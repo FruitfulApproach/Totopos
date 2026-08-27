@@ -1,0 +1,12 @@
+{
+	"description": "Abalien Diagram Chaser",
+	"dependencies": {
+		"pegged": "~>0.4.9"
+	},
+	"authors": [
+		"Daniel Donnelly"
+	],
+	"copyright": "Copyright © 2026, Daniel Donnelly",
+	"license": "proprietary",
+	"name": "abdc"
+}

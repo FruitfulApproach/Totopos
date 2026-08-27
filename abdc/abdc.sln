@@ -1,0 +1,23 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{52805C44-CFB0-45C2-B473-3C94815C6AA1}") = "abdc", ".dub\abdc.visualdproj", "{05D0D8D2-B4E2-48CA-A619-EF1CDDCAE53D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A36D0FFB-D2F0-49B9-8C74-945F42000C27} = {A36D0FFB-D2F0-49B9-8C74-945F42000C27}
+	EndProjectSection
+EndProject
+Project("{52805C44-CFB0-45C2-B473-3C94815C6AA1}") = "pegged", ".dub\pegged.visualdproj", "{A36D0FFB-D2F0-49B9-8C74-945F42000C27}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		debug|x64 = debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{05D0D8D2-B4E2-48CA-A619-EF1CDDCAE53D}.debug|x64.ActiveCfg = debug|x64
+		{05D0D8D2-B4E2-48CA-A619-EF1CDDCAE53D}.debug|x64.Build.0 = debug|x64
+		{A36D0FFB-D2F0-49B9-8C74-945F42000C27}.debug|x64.ActiveCfg = debug|x64
+		{A36D0FFB-D2F0-49B9-8C74-945F42000C27}.debug|x64.Build.0 = debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/abdc
+abdc.so
+abdc.dylib
+abdc.dll
+libabdc.a
+abdc.a
+abdc.lib
+abdc-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
