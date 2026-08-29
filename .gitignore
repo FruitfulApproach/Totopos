@@ -25,9 +25,8 @@ docs/
 /abdc/.vs
 /AbalienDiagramChaser
 /AbCatDC/AbCatDC/.vs
-/AbCatDC/AbCatDC/AbCatDC/AbCatDC.Kernel
 /AbCatDC/AbCatDC/AbCatDC/AbCatDC.RazorLib/obj
 /AbCatDC/AbCatDC/AbCatDC/AbCatDC/bin
-/AbCatDC/AbCatDC/AbCatDC/AbCatDC/obj/Debug
 /AbCatDC/AbCatDC/AbCatDC/AbCatDC/obj
-/AbCatDC/AbCatDC/AbCatDC/AbCatDC.RazorLib/bin/Debug
+/AbCatDC/AbCatDC/AbCatDC/AbCatDC.RazorLib/bin
+/AbCatDC/AbCatDC/AbCatDC/AbCatDC.Kernel/obj
