@@ -1,0 +1,174 @@
+@page "/quiver"
+@using AbCatDC.Kernel
+@using AbCatDC.RazorLib.Services
+
+<div class="ab-hero">
+    <h1><i class="fa-solid fa-arrows-turn-to-dots"></i> Quiver Import</h1>
+    <p>
+        Paste a diagram in <a href="https://q.uiver.app" target="_blank">quiver</a>'s export format
+        (raw JSON <code>[0, n, …cells]</code> or the base64 from a share link; the quiver source is
+        vendored under <code>third_party/quiver</code>). Vertices are replaced by de Bruijn indices —
+        ∀-bound unless their label is mentioned in the diagram title, in which case they stay free
+        (#k) — and edges are emitted in a canonical ordering found by invariant sorting plus
+        permutation search in the worst case.
+    </p>
+</div>
+
+<div class="ab-card">
+    <label class="ab-setting-label">Diagram title <span class="ab-muted">(vertex labels appearing here stay free)</span></label>
+    <input class="ab-text-input" value="@title" @oninput="e => title = e.Value?.ToString() ?? string.Empty"
+           placeholder="e.g. a triangle over the fixed object A" disabled="@(worker?.IsAlive == true)" />
+
+    <label class="ab-setting-label">Quiver JSON / base64</label>
+    <textarea class="ab-editor" rows="5" spellcheck="false" style="font-size:.95rem; font-family:Consolas, monospace"
+              value="@json" @oninput="e => json = e.Value?.ToString() ?? string.Empty"
+              placeholder='[0, 3, [0,0,"A"], [1,0,"B"], [1,1,"C"], [0,1,"f"], [1,2,"g"], [0,2,"h"]]'
+              disabled="@(worker?.IsAlive == true)"></textarea>
+
+    <div class="ab-quiver-btns">
+        <button type="button" class="ab-kind-btn" @onclick="LoadExample" disabled="@(worker?.IsAlive == true)">
+            <i class="fa-solid fa-play"></i> Load example (commuting triangle)
+        </button>
+        @if (worker?.IsAlive != true)
+        {
+            <button type="button" class="ab-btn-primary" @onclick="StartWork" disabled="@string.IsNullOrWhiteSpace(json)">
+                <i class="fa-solid fa-fingerprint"></i> Canonicalize
+            </button>
+        }
+        else
+        {
+            <button type="button" class="ab-btn-danger" @onclick="CancelWork">
+                <i class="fa-solid fa-ban"></i> Cancel
+            </button>
+        }
+    </div>
+
+    @if (worker?.IsAlive == true || running)
+    {
+        <div class="ab-progress-track" title="@progressCur / @progressTotal candidate orderings">
+            <div class="ab-progress-fill" style="width: @(ProgressPercent)%"></div>
+        </div>
+        <div class="ab-muted">Searching orderings… @progressCur / @progressTotal (@ProgressPercent%) — CanonicalFormThread</div>
+    }
+</div>
+
+@if (viewMode == "editor")
+{
+    <div class="ab-card">
+        <div class="ab-random-head">
+            <h5><i class="fa-solid fa-pen-ruler"></i> Quiver editor</h5>
+            <button type="button" class="ab-kind-btn" @onclick='() => viewMode = "preview"'>
+                <i class="fa-solid fa-eye"></i> Back to preview
+            </button>
+        </div>
+        <iframe class="ab-quiver-frame" src="@editorSrc" title="quiver editor"></iframe>
+        <p class="ab-muted" style="margin-top:.5rem">
+            The full vendored quiver editor (<code>third_party/quiver</code>), opened on the current diagram.
+            To bring changes back, use quiver's Export → <em>base64</em> and paste the result into the input above.
+        </p>
+    </div>
+}
+else
+{
+    <div class="ab-card">
+        <h5><i class="fa-solid fa-eye"></i> Preview <span class="ab-muted" style="font-weight:400">— hover for the ✎ edit button</span></h5>
+        <QuiverPreview Json="@json" Height="300" OnEdit="OpenEditor" />
+    </div>
+}
+
+@if (outcome is not null)
+{
+    @if (!outcome.Ok)
+    {
+        <div class="ab-error"><i class="fa-solid fa-triangle-exclamation"></i> @outcome.Error</div>
+    }
+    else
+    {
+        <div class="ab-output-grid">
+            <div class="ab-card ab-output">
+                <h5><i class="fa-solid fa-fingerprint"></i> Canonical form</h5>
+                <pre>@CanonicalText</pre>
+                <p class="ab-muted" style="margin-top:.5rem">
+                    @outcome.Diagram.Candidates ordering@(outcome.Diagram.Candidates == 1 ? "" : "s") examined.
+                    @if (outcome.Diagram.SkippedHigherCells > 0)
+                    {
+                        <span> @outcome.Diagram.SkippedHigherCells higher cell(s) (2-cells etc.) skipped.</span>
+                    }
+                </p>
+            </div>
+            <div class="ab-card ab-output">
+                <h5><i class="fa-solid fa-map-signs"></i> Vertex map</h5>
+                <pre>@VertexMapText</pre>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    string json = "";
+    string title = "";
+    string viewMode = "preview";
+    string editorSrc = "";
+    CanonicalFormThread? worker;
+    bool running;
+    int progressCur;
+    int progressTotal = 1;
+    QuiverImport.CanonicalOutcome? outcome;
+
+    int ProgressPercent => progressTotal <= 0 ? 0 : (int)(100L * progressCur / progressTotal);
+
+    string CanonicalText =>
+        outcome is { Ok: true }
+            ? string.Join("\n",
+                new[] { outcome.Diagram.ForallPrefix }
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .Concat(outcome.Diagram.Lines))
+            : "";
+
+    string VertexMapText =>
+        outcome is { Ok: true }
+            ? string.Join("\n",
+                outcome.Diagram.BoundMap.Select(m => $"{m.Item1} ← {m.Item2}  (∀-bound)")
+                    .Concat(outcome.Diagram.FreeMap.Select(m => $"{m.Item1} ← {m.Item2}  (free — in title)")))
+            : "";
+
+    void OpenEditor()
+    {
+        // snapshot the src so typing in the input doesn't reload the iframe
+        var t = (json ?? "").Trim();
+        var b64 = t.StartsWith("[") ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)) : t;
+        editorSrc = "_content/AbCatDC.RazorLib/quiver/index.html" + (b64.Length == 0 ? "" : "#q=" + b64);
+        viewMode = "editor";
+    }
+
+    void LoadExample()
+    {
+        json = "[0, 3, [0,0,\"A\"], [1,0,\"B\"], [1,1,\"C\"], [0,1,\"f\"], [1,2,\"g\"], [0,2,\"h\"]]";
+        title = "a commuting triangle over A";
+    }
+
+    void StartWork()
+    {
+        outcome = null;
+        progressCur = 0;
+        progressTotal = 1;
+        running = true;
+        worker = new CanonicalFormThread(
+            json, title,
+            onProgress: (cur, total) => _ = InvokeAsync(() =>
+            {
+                progressCur = cur;
+                progressTotal = Math.Max(1, total);
+                StateHasChanged();
+            }),
+            onCompleted: result => _ = InvokeAsync(() =>
+            {
+                outcome = result;
+                running = false;
+                StateHasChanged();
+            }));
+        worker.Start();
+    }
+
+    void CancelWork() => worker?.Cancel();
+}

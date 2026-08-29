@@ -1,0 +1,118 @@
+@page "/"
+@using AbCatDC.Kernel
+
+<div class="ab-hero">
+    <h1><i class="fa-solid fa-diagram-project"></i> Type Expression Tester</h1>
+    <p>
+        Build expressions with the symbol pad, or type LaTeX-style commands —
+        <code>\forall</code>, <code>\cup</code>, <code>\to</code> … A command is replaced the
+        moment its prefix is unique (<code>\for</code> → ∀), and <kbd>Ctrl</kbd>+<kbd>Space</kbd>
+        (or pausing while typing) opens suggestions.
+    </p>
+</div>
+
+<div class="ab-card">
+    <SymbolEditor Id="home-editor" Rows="4" ShowPad="true"
+                  Placeholder="e.g. ∀α. (x : α) → ⋃(y : α) β ∩ α   —   try typing \for or \bigc"
+                  Value="@input" ValueChanged="OnEditorChanged" />
+</div>
+
+@if (result is not null)
+{
+    @if (!result.Success)
+    {
+        <div class="ab-error"><i class="fa-solid fa-triangle-exclamation"></i> @result.Error</div>
+    }
+    else
+    {
+        <div class="ab-output-grid">
+            <div class="ab-card ab-output">
+                <h5><i class="fa-solid fa-align-left"></i> Format</h5>
+                <pre>@result.Formatted</pre>
+            </div>
+            @if (!string.IsNullOrEmpty(result.Elaborated))
+            {
+                <div class="ab-card ab-output">
+                    <h5><i class="fa-solid fa-arrows-split-up-and-left"></i> Elaboration</h5>
+                    <pre>@result.Elaborated</pre>
+                </div>
+            }
+            <div class="ab-card ab-output">
+                <h5><i class="fa-solid fa-fingerprint"></i> Canonical form</h5>
+                <pre>@result.Canonical</pre>
+            </div>
+            <div class="ab-card ab-output">
+                <h5><i class="fa-solid fa-map-signs"></i> Variable map</h5>
+                <pre>@result.VariableMap</pre>
+            </div>
+            @if (!string.IsNullOrEmpty(result.Inference))
+            {
+                <div class="ab-card ab-output">
+                    <h5><i class="fa-solid fa-microscope"></i> Inference</h5>
+                    <pre>@result.Inference</pre>
+                </div>
+            }
+        </div>
+    }
+}
+
+<div class="ab-card ab-random">
+    <div class="ab-random-head">
+        <h5><i class="fa-solid fa-dice"></i> Random string tester</h5>
+        <button type="button" class="ab-btn-primary" @onclick="GenerateSamples">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate random strings
+        </button>
+    </div>
+    @if (samples.Count > 0)
+    {
+        <p class="ab-muted">
+            @samples.Count(s => s.Ok) of @samples.Count parse — strings that fail are highlighted in red.
+            Click any string to load it into the editor.
+        </p>
+        <div class="ab-chip-grid">
+            @foreach (var s in samples)
+            {
+                <button type="button" class="ab-chip @(s.Ok ? "ok" : "bad")"
+                        title="@(s.Ok ? "Parses — click to load" : s.Error)"
+                        @onclick="() => UseSample(s.Text)">@s.Text</button>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="ab-muted">Generates strings over the language's alphabet — some grammar-driven, some random noise — and parses each one.</p>
+    }
+</div>
+
+@code {
+    string input = "";
+    RunResult? result;
+    List<(string Text, bool Ok, string Error)> samples = new();
+
+    void Parse() =>
+        result = string.IsNullOrWhiteSpace(input) ? null : Api.Run(input);
+
+    void OnEditorChanged(string v)
+    {
+        input = v;
+        Parse();
+    }
+
+    void GenerateSamples()
+    {
+        var seed = Random.Shared.Next();
+        samples = Generator.samples(seed, 24)
+            .Select(s =>
+            {
+                var r = Api.Run(s);
+                return (s, r.Success, r.Error);
+            })
+            .ToList();
+    }
+
+    void UseSample(string s)
+    {
+        input = s;
+        Parse();
+    }
+}

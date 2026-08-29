@@ -1,0 +1,838 @@
+@page "/rules"
+@using AbCatDC.Kernel
+@using System.Text.Json
+@inject IJSRuntime JS
+
+<div class="ab-hero">
+    <h1><i class="fa-solid fa-scale-balanced"></i> Inference Rule Editor</h1>
+    <p>
+        Design a formal system: name it, then add <em>Introduction</em>, <em>Elimination</em>,
+        <em>Construction</em>, and <em>Computational</em> rules. Every premise and conclusion is
+        parsed by the kernel — undeclared symbols get their ℤ-related default readings, shown with
+        the canonical form in the analysis panel.
+    </p>
+</div>
+
+<div class="ab-card">
+    <div class="ab-sys-row">
+        <div>
+            <label class="ab-setting-label" for="sysname">Formal system name</label>
+            <input id="sysname" class="ab-text-input" value="@systemName" @oninput="OnSystemName"
+                   placeholder="e.g. Diagram-chasing arithmetic" />
+        </div>
+        <div>
+            <label class="ab-setting-label" for="exsel">Example palettes</label>
+            <select id="exsel" class="ab-text-input" value="@exampleSel" @onchange="OnExampleSelected">
+                <option value="">Load an example palette…</option>
+                @foreach (var ex in ExampleSystems.All)
+                {
+                    <option value="@ex.Name">@ex.Name (@ex.Rules.Length rules)</option>
+                }
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="ab-rule-editor-grid">
+    <div class="ab-card">
+        <h5><i class="fa-solid fa-plus"></i> New rule</h5>
+
+        <div class="ab-kind-row">
+            @foreach (var k in Kinds)
+            {
+                var kk = k;
+                <button type="button" class="ab-kind-btn @(kk == kind ? "active" : "")"
+                        @onclick="() => kind = kk">@kk</button>
+            }
+        </div>
+
+        <SymbolEditor Id="rule-name-editor" Rows="1" ShowPad="false"
+                      Placeholder="Rule name — e.g. ×-intro, ℕ-elim, β-compute (try \times)"
+                      Value="@ruleName" ValueChanged="v => ruleName = v" />
+
+        <h6>Premises</h6>
+        @if (premises.Count > 0)
+        {
+            <div class="ab-tag-row">
+                @for (var i = 0; i < premises.Count; i++)
+                {
+                    var idx = i;
+                    <span class="ab-tag" title="@premises[idx].Raw" @onclick="() => ShowAnalysis(premises[idx])">
+                        @premises[idx].Result.Formatted
+                        <button type="button" class="ab-tag-x" title="Delete premise"
+                                @onclick='() => AskDelete("premise", idx, premises[idx].Result.Formatted)'
+                                @onclick:stopPropagation>×</button>
+                    </span>
+                }
+            </div>
+        }
+        <SymbolEditor Id="premise-editor" Rows="2" ShowPad="true" SubmitOnEnter="true"
+                      Placeholder="type a premise — Enter to add as a tag; e.g. [D1] commutes"
+                      Value="@premiseInput" ValueChanged="OnPremiseChanged" OnSubmit="AddPremise" />
+        <button type="button" class="ab-kind-btn ab-sketch-add" @onclick="() => OpenSketchModal(true)">
+            <i class="fa-solid fa-plus"></i> Sketch
+        </button>
+
+        <h6>Conclusions</h6>
+        @if (conclusions.Count > 0)
+        {
+            <div class="ab-tag-row">
+                @for (var i = 0; i < conclusions.Count; i++)
+                {
+                    var idx = i;
+                    <span class="ab-tag conclusion" title="@conclusions[idx].Raw" @onclick="() => ShowAnalysis(conclusions[idx])">
+                        @conclusions[idx].Result.Formatted
+                        <button type="button" class="ab-tag-x" title="Delete conclusion"
+                                @onclick='() => AskDelete("conclusion", idx, conclusions[idx].Result.Formatted)'
+                                @onclick:stopPropagation>×</button>
+                    </span>
+                }
+            </div>
+        }
+        <SymbolEditor Id="conclusion-editor" Rows="2" ShowPad="true" SubmitOnEnter="true"
+                      Placeholder="type a conclusion — Enter to add as a tag"
+                      Value="@conclusionInput" ValueChanged="OnConclusionChanged" OnSubmit="AddConclusion" />
+        <button type="button" class="ab-kind-btn ab-sketch-add" @onclick="() => OpenSketchModal(false)">
+            <i class="fa-solid fa-plus"></i> Sketch
+        </button>
+
+        <button type="button" class="ab-btn-primary mt-2" @onclick="AddRule"
+                disabled="@(conclusions.Count == 0)">
+            <i class="fa-solid fa-circle-plus"></i> Add rule to system
+        </button>
+        @if (conclusions.Count == 0)
+        {
+            <div class="ab-muted mt-1">A rule needs at least one conclusion.</div>
+        }
+    </div>
+
+    <div class="ab-card">
+        <h5><i class="fa-solid fa-microscope"></i> Analysis</h5>
+        @if (analysis is null)
+        {
+            <p class="ab-muted">Type into a premise/conclusion box — or click a tag — to see how it parses, what the ℤ-related defaults are, and its canonical form.</p>
+        }
+        else if (!analysis.Success)
+        {
+            <div class="ab-error">@analysis.Error</div>
+        }
+        else
+        {
+            <div class="ab-analysis-row"><span>Parsed</span><pre>@analysis.Formatted</pre></div>
+            @if (!string.IsNullOrEmpty(analysis.Elaborated))
+            {
+                <div class="ab-analysis-row"><span>Elaborated</span><pre>@analysis.Elaborated</pre></div>
+            }
+            <div class="ab-analysis-row"><span>Canonical</span><pre>@analysis.Canonical</pre></div>
+            @if (!string.IsNullOrEmpty(analysis.Inference))
+            {
+                <div class="ab-analysis-row"><span>Leaf typings</span><pre>@analysis.Inference</pre></div>
+            }
+        }
+    </div>
+</div>
+
+@if (sketches.Count > 0)
+{
+    <div class="ab-card">
+        <h5><i class="fa-solid fa-compass-drafting"></i> Sketches
+            <span class="ab-muted" style="font-weight:400">— reference in expressions as [name]; hover a preview to edit</span></h5>
+        <div class="ab-sketch-grid">
+            @foreach (var s in sketches)
+            {
+                var ss = s;
+                <div class="ab-sketch-item">
+                    <div class="ab-sketch-head">
+                        <code>[@ss.Name]</code>
+                        <button type="button" class="ab-tag-x" title="Delete sketch"
+                                @onclick='() => AskDelete("sketch", sketches.IndexOf(ss), ss.Name)'>×</button>
+                    </div>
+                    <QuiverPreview Json="@ss.Json" Height="170" OnEdit="() => OpenSketchOverlay(ss)" />
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="ab-card">
+    <h5 class="ab-pal-toggle" @onclick="() => paletteOpen = !paletteOpen">
+        <i class="fa-solid fa-palette"></i> Rule palette
+        <span class="ab-muted" style="font-weight:400"> — @RulePalette.Library.Count rules, searchable</span>
+        <i class="fa-solid @(paletteOpen ? "fa-chevron-up" : "fa-chevron-down") ab-pal-chev"></i>
+    </h5>
+    @if (paletteOpen)
+    {
+        <SymbolEditor Id="palette-search" Rows="1" ShowPad="false"
+                      Placeholder="@PalettePlaceholder"
+                      Value="@palSearch" ValueChanged="v => palSearch = v" />
+        @foreach (var k in Kinds)
+        {
+            var entries = FilterPalette(k);
+            if (entries.Count == 0) { continue; }
+            var kk = k;
+            var open = !string.IsNullOrWhiteSpace(palSearch) || openKinds.Contains(kk);
+            <h6 class="ab-rule-kind-head ab-pal-toggle" @onclick="() => ToggleKind(kk)">
+                @kk <span class="ab-muted">(@entries.Count)</span>
+                <i class="fa-solid @(open ? "fa-chevron-up" : "fa-chevron-down") ab-pal-chev"></i>
+            </h6>
+            if (!open) { continue; }
+            <div class="ab-pal-grid">
+                @foreach (var e in entries.Take(PaletteRenderCap))
+                {
+                    var ee = e;
+                    <div class="ab-pal-item">
+                        <div class="ab-pal-head">
+                            <strong>@ee.Name</strong>
+                            <span class="ab-pal-kind k-@ee.Kind.ToLowerInvariant()">@ee.Kind</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(ee.LongName))
+                        {
+                            <div class="ab-pal-long">@ee.LongName</div>
+                        }
+                        <div class="ab-rule-frac small">
+                            <div class="ab-rule-prem">
+                                @if (ee.Premises.Length == 0)
+                                {
+                                    <span class="ab-muted">(no premises)</span>
+                                }
+                                @foreach (var p in ee.Premises)
+                                {
+                                    <span>@p</span>
+                                }
+                            </div>
+                            <div class="ab-rule-line"></div>
+                            <div class="ab-rule-prem">
+                                @foreach (var c in ee.Conclusions)
+                                {
+                                    <span>@c</span>
+                                }
+                            </div>
+                        </div>
+                        <p class="ab-pal-desc">@ee.Description</p>
+                        <div class="ab-pal-btns">
+                            <button type="button" class="ab-kind-btn" title="Load into the builder to tweak"
+                                    @onclick="() => UsePalette(ee)">
+                                <i class="fa-solid fa-pen"></i> Load in builder
+                            </button>
+                            <button type="button" class="ab-btn-primary sm" title="Add to the system as-is"
+                                    @onclick="() => AddPalette(ee)">
+                                <i class="fa-solid fa-circle-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+            @if (entries.Count > PaletteRenderCap)
+            {
+                <p class="ab-muted">Showing @PaletteRenderCap of @entries.Count @kk rules — refine the search to see the rest.</p>
+            }
+        }
+    }
+</div>
+
+<div class="ab-card">
+    <h5><i class="fa-solid fa-book"></i> @(string.IsNullOrWhiteSpace(systemName) ? "Formal system" : systemName)</h5>
+    <div class="ab-reading-note">
+        <button type="button" class="ab-kind-btn" @onclick="() => readingOpen = !readingOpen">
+            <i class="fa-solid fa-book-open"></i> How to read these rules
+        </button>
+        @if (readingOpen)
+        {
+            <ul class="ab-reading-list">
+                <li>Premises sit <em>above</em> the inference line, conclusions <em>below</em>; the rule's name is on the right.</li>
+                <li><strong>Sequents and typing</strong>: write judgments as <code>Γ, x : σ ⊢ M : τ</code> — Γ, Δ, Θ, Ξ are context metavariables, <code>x : σ</code> adds a hypothesis (binding x to its right), and the goal may be a bare formula or a typing judgment <code>M : τ</code>. Type <code>\vdash</code> or <code>|-</code> for ⊢, <code>\Gamma</code> for Γ.</li>
+                <li><strong>Greek letters (σ, τ, ρ, …) are schematic metavariables</strong>: each rule is a template, valid under any uniform substitution of types for them — they are implicitly ∀-quantified at the <em>meta</em> level. In ∀α. τ the α is different: it is an object-level type variable bound by that quantifier.</li>
+                <li>Latin letters follow the ℤ-defaults: <code>a : ℕ</code> (an integer), <code>A ⊆ ℤ</code> (a set of integers), <code>AB</code> the elementwise product, <code>A^n</code> the diagonal power.</li>
+                <li>Click any expression — in a tag or inside a rule — to see its parse, canonical form, and leaf typings in the Analysis panel.</li>
+                <li>The <i class="fa-solid fa-circle-info"></i> button on each rule shows its remark: what the rule means and what each symbol is typed as.</li>
+            </ul>
+        }
+    </div>
+    @if (rules.Count == 0)
+    {
+        <p class="ab-muted">No rules yet — build one above.</p>
+    }
+    else
+    {
+        @foreach (var k in Kinds)
+        {
+            var kindRules = rules.Where(r => r.Kind == k).ToList();
+            if (kindRules.Count > 0)
+            {
+                <h6 class="ab-rule-kind-head">@k rules</h6>
+                <div class="ab-rule-list">
+                    @foreach (var r in kindRules)
+                    {
+                        var rr = r;
+                        <div class="ab-rule">
+                            <div class="ab-rule-row">
+                                <div class="ab-rule-frac">
+                                    <div class="ab-rule-prem">
+                                        @if (rr.Premises.Count == 0)
+                                        {
+                                            <span class="ab-muted">(no premises)</span>
+                                        }
+                                        @foreach (var p in rr.Premises)
+                                        {
+                                            <span @onclick="() => ShowAnalysis(p)">@p.Result.Formatted</span>
+                                        }
+                                    </div>
+                                    <div class="ab-rule-line"></div>
+                                    <div class="ab-rule-prem">
+                                        @foreach (var c in rr.Conclusions)
+                                        {
+                                            <span @onclick="() => ShowAnalysis(c)">@c.Result.Formatted</span>
+                                        }
+                                    </div>
+                                </div>
+                                <span class="ab-rule-name">(@(string.IsNullOrWhiteSpace(rr.Name) ? rr.Kind : rr.Name))</span>
+                                <button type="button" class="ab-rule-info" title="How to interpret this rule"
+                                        @onclick="() => ToggleRemark(rr)">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                                <button type="button" class="ab-tag-x big" title="Delete rule"
+                                        @onclick='() => AskDelete("rule", rules.IndexOf(rr), rr.Name)'>×</button>
+                            </div>
+                            @if (openRemarks.Contains(rr))
+                            {
+                                <div class="ab-rule-remark">
+                                    @if (!string.IsNullOrEmpty(rr.LongName))
+                                    {
+                                        <div class="ab-pal-long">@rr.LongName</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(rr.Description))
+                                    {
+                                        <p>@rr.Description</p>
+                                    }
+                                    <pre>@RuleRemark(rr)</pre>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+
+@if (sketchModalOpen)
+{
+    <div class="ab-modal-overlay" @onclick="CloseSketchModal">
+        <div class="ab-modal ab-sketch-modal" @onclick:stopPropagation>
+            <h5><i class="fa-solid fa-compass-drafting" style="color: var(--ab-accent)"></i> New sketch</h5>
+            <label class="ab-setting-label">Sketch name</label>
+            <input class="ab-text-input" value="@sketchNameInput"
+                   @oninput="e => sketchNameInput = e.Value?.ToString() ?? string.Empty" />
+            <label class="ab-setting-label">Diagram (quiver JSON / base64 — or draw it in the editor)</label>
+            <textarea class="ab-editor" rows="3" spellcheck="false" style="font-size:.9rem; font-family:Consolas, monospace"
+                      value="@sketchJsonInput" @oninput="e => sketchJsonInput = e.Value?.ToString() ?? string.Empty"></textarea>
+            <QuiverPreview Json="@sketchJsonInput" Height="170" OnEdit="OpenSketchOverlayFromModal" />
+            <div class="ab-modal-btns">
+                <button type="button" class="ab-kind-btn" @onclick="CloseSketchModal">Cancel</button>
+                <button type="button" class="ab-kind-btn" @onclick="OpenSketchOverlayFromModal">
+                    <i class="fa-solid fa-pen-ruler"></i> Draw in quiver
+                </button>
+                <button type="button" class="ab-btn-primary sm" @onclick="SaveSketch"
+                        disabled="@(!SketchNameValid)">
+                    <i class="fa-solid fa-circle-plus"></i> Add sketch
+                </button>
+            </div>
+            @if (!SketchNameValid)
+            {
+                <div class="ab-muted" style="margin-top:.4rem">Name must be letters/digits, start with a letter, and be unused.</div>
+            }
+        </div>
+    </div>
+}
+
+@if (sketchOverlayOpen)
+{
+    <div class="ab-sketch-overlay">
+        <iframe id="sketch-frame" class="ab-sketch-frame" src="@sketchOverlaySrc" title="quiver editor"></iframe>
+        <div class="ab-sketch-overlay-bar">
+            <span>Draw the diagram, press quiver's <strong>Save</strong> (Ctrl+S), then the check to bring it back.</span>
+        </div>
+        <button type="button" class="ab-sketch-done" title="Done — import the diagram and close" @onclick="CloseSketchOverlay">
+            <svg viewBox="0 0 24 24" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 12.5 L9.5 18 L20 6.5" fill="none" stroke="currentColor" stroke-width="3"
+                      stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </button>
+    </div>
+}
+
+@if (pendingExample is not null)
+{
+    <div class="ab-modal-overlay" @onclick="() => pendingExample = null">
+        <div class="ab-modal" @onclick:stopPropagation>
+            <h5><i class="fa-solid fa-boxes-packing" style="color: var(--ab-accent)"></i> Load example palette</h5>
+            <p><strong>@pendingExample.Name</strong> — @pendingExample.Rules.Length rules</p>
+            <p class="ab-muted">@pendingExample.Description</p>
+            <div class="ab-modal-btns">
+                <button type="button" class="ab-kind-btn" @onclick="() => pendingExample = null">Cancel</button>
+                <button type="button" class="ab-kind-btn" @onclick="() => LoadExample(replace: false)">Append to system</button>
+                <button type="button" class="ab-btn-primary sm" @onclick="() => LoadExample(replace: true)">Replace system</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (pendingDelete is not null)
+{
+    <div class="ab-modal-overlay" @onclick="() => pendingDelete = null">
+        <div class="ab-modal" @onclick:stopPropagation>
+            <h5><i class="fa-solid fa-triangle-exclamation"></i> Confirm delete</h5>
+            <p>Delete @pendingDelete.Value.Kind @(string.IsNullOrWhiteSpace(pendingDelete.Value.Label) ? "" : $"“{pendingDelete.Value.Label}”")?</p>
+            <div class="ab-modal-btns">
+                <button type="button" class="ab-kind-btn" @onclick="() => pendingDelete = null">Cancel</button>
+                <button type="button" class="ab-btn-danger" @onclick="ConfirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    static readonly string[] Kinds = { "Introduction", "Elimination", "Construction", "Computational", "Structural" };
+
+    class TagItem
+    {
+        public string Raw = "";
+        public RunResult Result = default!;
+    }
+
+    class Rule
+    {
+        public string Name = "";
+        public string Kind = "Introduction";
+        public string LongName = "";
+        public string Description = "";
+        public List<TagItem> Premises = new();
+        public List<TagItem> Conclusions = new();
+    }
+
+    class RuleDto
+    {
+        public string Name { get; set; } = "";
+        public string Kind { get; set; } = "Introduction";
+        public string LongName { get; set; } = "";
+        public string Description { get; set; } = "";
+        public List<string> Premises { get; set; } = new();
+        public List<string> Conclusions { get; set; } = new();
+    }
+
+    class Sketch
+    {
+        public string Name = "";
+        public string Json = "";
+    }
+
+    class SketchDto
+    {
+        public string Name { get; set; } = "";
+        public string Json { get; set; } = "";
+    }
+
+    class SystemDto
+    {
+        public string Name { get; set; } = "";
+        public List<RuleDto> Rules { get; set; } = new();
+        public List<SketchDto> Sketches { get; set; } = new();
+    }
+
+    string systemName = "";
+    string kind = "Introduction";
+    string ruleName = "";
+    string premiseInput = "";
+    string conclusionInput = "";
+    List<TagItem> premises = new();
+    List<TagItem> conclusions = new();
+    List<Rule> rules = new();
+    RunResult? analysis;
+    (string Kind, int Index, string Label)? pendingDelete;
+    bool paletteOpen = true;
+    bool readingOpen;
+    string builderLongName = "";
+    string builderDescription = "";
+    readonly HashSet<Rule> openRemarks = new();
+    readonly Dictionary<Rule, string> remarkCache = new();
+
+    void ToggleRemark(Rule r)
+    {
+        if (!openRemarks.Remove(r)) openRemarks.Add(r);
+    }
+
+    // one deduplicated typing line per distinct symbol across the whole rule —
+    // this is where "what is σ typed as?" gets its answer
+    string RuleRemark(Rule r)
+    {
+        if (remarkCache.TryGetValue(r, out var cached)) return cached;
+        var seen = new HashSet<string>();
+        var lines = new List<string>();
+        foreach (var t in r.Premises.Concat(r.Conclusions))
+        {
+            foreach (var line in (t.Result.Inference ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var subject = line.Split(' ')[0];
+                if (seen.Add(subject)) lines.Add(line);
+            }
+        }
+        var remark = lines.Count == 0 ? "No leaves to type." : string.Join("\n", lines);
+        remarkCache[r] = remark;
+        return remark;
+    }
+    string palSearch = "";
+    readonly HashSet<string> openKinds = new();
+    const int PaletteRenderCap = 96;
+
+    ExampleSystems.ExampleSystem? pendingExample;
+    string exampleSel = "";
+
+    void OnExampleSelected(ChangeEventArgs e)
+    {
+        var name = e.Value?.ToString();
+        exampleSel = "";
+        pendingExample = ExampleSystems.All.FirstOrDefault(x => x.Name == name);
+    }
+
+    async Task LoadExample(bool replace)
+    {
+        if (pendingExample is null) return;
+        var ex = pendingExample;
+        pendingExample = null;
+        if (replace)
+        {
+            rules.Clear();
+            systemName = ex.Name;
+        }
+        foreach (var en in ex.Rules)
+        {
+            rules.Add(new Rule
+            {
+                Name = en.Name,
+                Kind = en.Kind,
+                LongName = en.LongName,
+                Description = en.Description,
+                Premises = MakeTags(en.Premises),
+                Conclusions = MakeTags(en.Conclusions),
+            });
+        }
+        await Save();
+    }
+
+    void ToggleKind(string k)
+    {
+        if (!openKinds.Remove(k)) openKinds.Add(k);
+    }
+
+    static string PalettePlaceholder =>
+        $"Search {RulePalette.Library.Count} rules — try 'dist', 'proj', 'cast-\\N^2', 'β', 'add', 'mono'…";
+
+    static readonly Dictionary<RulePalette.Entry, string> hayCache = new();
+    static readonly Dictionary<RulePalette.Entry, string> canonCache = new();
+
+    static string Haystack(RulePalette.Entry p)
+    {
+        if (!hayCache.TryGetValue(p, out var h))
+        {
+            h = string.Join(" ",
+                p.Name, SymbolCommands.ExpandAll(p.Name), p.LongName, p.Description,
+                string.Join(" ", p.Premises), string.Join(" ", p.Conclusions));
+            hayCache[p] = h;
+        }
+        return h;
+    }
+
+    // canonical forms of the rule's expressions — for α-equivalence-insensitive search
+    static string CanonHaystack(RulePalette.Entry p)
+    {
+        if (!canonCache.TryGetValue(p, out var h))
+        {
+            h = string.Join("\n",
+                p.Premises.Concat(p.Conclusions)
+                    .Select(s => Api.Run(s) is { Success: true } r ? r.Canonical : ""));
+            canonCache[p] = h;
+        }
+        return h;
+    }
+
+    List<RulePalette.Entry> FilterPalette(string kindName)
+    {
+        // normalize the query (\Bbb{N} / \nat / \N → ℕ, superscripts → ^n) and
+        // require every token (split on spaces and hyphens) to match somewhere;
+        // additionally, if the query parses as an expression, match rules whose
+        // premises/conclusions are α-equivalent (same canonical form) — so
+        // "X × (Y ∪ Z)" finds "A × (B ∪ C)" regardless of variable names
+        var q = SymbolCommands.ExpandAll(palSearch.Trim());
+        var tokens = q.Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries);
+        string? qCanon = null;
+        if (q.Length > 0 && Api.Run(q) is { Success: true } qr)
+            qCanon = qr.Canonical;
+        return RulePalette.Library
+            .Where(p => p.Kind == kindName)
+            .Where(p => tokens.Length == 0
+                || tokens.All(t => Haystack(p).Contains(t, StringComparison.OrdinalIgnoreCase))
+                || (qCanon != null && CanonHaystack(p).Contains(qCanon, StringComparison.Ordinal)))
+            .ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("abEditor.loadItem", "abcatdc-rules");
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var dto = JsonSerializer.Deserialize<SystemDto>(json);
+                    if (dto != null)
+                    {
+                        systemName = dto.Name;
+                        rules = dto.Rules
+                            .Select(r => new Rule
+                            {
+                                Name = r.Name,
+                                Kind = Kinds.Contains(r.Kind) ? r.Kind : "Introduction",
+                                LongName = r.LongName,
+                                Description = r.Description,
+                                Premises = r.Premises.Select(MakeTag).Where(t => t != null).Select(t => t!).ToList(),
+                                Conclusions = r.Conclusions.Select(MakeTag).Where(t => t != null).Select(t => t!).ToList(),
+                            })
+                            .ToList();
+                        sketches = dto.Sketches.Select(s => new Sketch { Name = s.Name, Json = s.Json }).ToList();
+                        StateHasChanged();
+                    }
+                }
+            }
+            catch
+            {
+                // corrupted store — start fresh
+            }
+        }
+    }
+
+    static TagItem? MakeTag(string raw)
+    {
+        var r = Api.Run(raw);
+        return r.Success ? new TagItem { Raw = raw, Result = r } : null;
+    }
+
+    async Task Save()
+    {
+        var dto = new SystemDto
+        {
+            Name = systemName,
+            Rules = rules.Select(r => new RuleDto
+            {
+                Name = r.Name,
+                Kind = r.Kind,
+                LongName = r.LongName,
+                Description = r.Description,
+                Premises = r.Premises.Select(t => t.Raw).ToList(),
+                Conclusions = r.Conclusions.Select(t => t.Raw).ToList(),
+            }).ToList(),
+            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json }).ToList(),
+        };
+        try { await JS.InvokeVoidAsync("abEditor.saveItem", "abcatdc-rules", JsonSerializer.Serialize(dto)); }
+        catch { }
+    }
+
+    async Task OnSystemName(ChangeEventArgs e)
+    {
+        systemName = e.Value?.ToString() ?? "";
+        await Save();
+    }
+
+    void OnPremiseChanged(string v)
+    {
+        premiseInput = v;
+        analysis = string.IsNullOrWhiteSpace(v) ? null : Api.Run(v);
+    }
+
+    void OnConclusionChanged(string v)
+    {
+        conclusionInput = v;
+        analysis = string.IsNullOrWhiteSpace(v) ? null : Api.Run(v);
+    }
+
+    void AddPremise(string t) => AddTag(t, isPremise: true);
+
+    void AddConclusion(string t) => AddTag(t, isPremise: false);
+
+    void AddTag(string t, bool isPremise)
+    {
+        var text = t.Trim();
+        if (text.Length == 0) return;
+        var r = Api.Run(text);
+        analysis = r;
+        if (!r.Success) return;
+        var tag = new TagItem { Raw = text, Result = r };
+        if (isPremise) { premises.Add(tag); premiseInput = ""; }
+        else { conclusions.Add(tag); conclusionInput = ""; }
+    }
+
+    void ShowAnalysis(TagItem t) => analysis = t.Result;
+
+    void AskDelete(string what, int index, string label) =>
+        pendingDelete = (what, index, label);
+
+    async Task ConfirmDelete()
+    {
+        if (pendingDelete is null) return;
+        var (what, idx, _) = pendingDelete.Value;
+        pendingDelete = null;
+        switch (what)
+        {
+            case "premise" when idx >= 0 && idx < premises.Count:
+                premises.RemoveAt(idx);
+                break;
+            case "conclusion" when idx >= 0 && idx < conclusions.Count:
+                conclusions.RemoveAt(idx);
+                break;
+            case "rule" when idx >= 0 && idx < rules.Count:
+                rules.RemoveAt(idx);
+                await Save();
+                break;
+            case "sketch" when idx >= 0 && idx < sketches.Count:
+                sketches.RemoveAt(idx);
+                await Save();
+                break;
+        }
+    }
+
+    // ---- sketches -----------------------------------------------------------
+
+    List<Sketch> sketches = new();
+    bool sketchModalOpen;
+    string sketchNameInput = "";
+    string sketchJsonInput = "";
+    bool sketchTargetIsPremise;
+    bool sketchOverlayOpen;
+    string sketchOverlaySrc = "";
+    Sketch? overlaySketch;   // set when editing an existing sketch from the gallery
+
+    bool SketchNameValid =>
+        sketchNameInput.Length > 0
+        && char.IsLetter(sketchNameInput[0])
+        && sketchNameInput.All(char.IsLetterOrDigit)
+        && !sketches.Any(s => s.Name == sketchNameInput);
+
+    void OpenSketchModal(bool isPremise)
+    {
+        sketchTargetIsPremise = isPremise;
+        var i = sketches.Count + 1;
+        while (sketches.Any(s => s.Name == $"D{i}")) i++;
+        sketchNameInput = $"D{i}";
+        sketchJsonInput = "";
+        sketchModalOpen = true;
+    }
+
+    void CloseSketchModal() => sketchModalOpen = false;
+
+    async Task SaveSketch()
+    {
+        if (!SketchNameValid) return;
+        sketches.Add(new Sketch { Name = sketchNameInput, Json = sketchJsonInput });
+        sketchModalOpen = false;
+        var reference = $"[{sketchNameInput}] ";
+        if (sketchTargetIsPremise)
+            OnPremiseChanged(premiseInput + (premiseInput.Length > 0 ? " " : "") + reference);
+        else
+            OnConclusionChanged(conclusionInput + (conclusionInput.Length > 0 ? " " : "") + reference);
+        await Save();
+    }
+
+    static string ToQuiverFragment(string json)
+    {
+        var t = (json ?? "").Trim();
+        if (t.Length == 0) return "";
+        var b64 = t.StartsWith("[") ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)) : t;
+        return "#q=" + b64;
+    }
+
+    void OpenSketchOverlayFromModal()
+    {
+        overlaySketch = null;   // result goes back into the modal's JSON box
+        sketchOverlaySrc = "_content/AbCatDC.RazorLib/quiver/index.html" + ToQuiverFragment(sketchJsonInput);
+        sketchOverlayOpen = true;
+    }
+
+    void OpenSketchOverlay(Sketch s)
+    {
+        overlaySketch = s;
+        sketchOverlaySrc = "_content/AbCatDC.RazorLib/quiver/index.html" + ToQuiverFragment(s.Json);
+        sketchOverlayOpen = true;
+    }
+
+    async Task CloseSketchOverlay()
+    {
+        // quiver writes #q=... into its URL on Save; same-origin lets us read it
+        var b64 = "";
+        try { b64 = await JS.InvokeAsync<string>("abEditor.readQuiverFrame", "sketch-frame"); }
+        catch { }
+        sketchOverlayOpen = false;
+        if (!string.IsNullOrEmpty(b64))
+        {
+            if (overlaySketch is not null)
+            {
+                overlaySketch.Json = b64;
+                await Save();
+            }
+            else
+            {
+                sketchJsonInput = b64;
+            }
+        }
+        overlaySketch = null;
+    }
+
+    static List<TagItem> MakeTags(string[] raws) =>
+        raws.Select(MakeTag).Where(t => t != null).Select(t => t!).ToList();
+
+    void UsePalette(RulePalette.Entry e)
+    {
+        kind = e.Kind;
+        ruleName = e.Name;
+        builderLongName = e.LongName;
+        builderDescription = e.Description;
+        premises = MakeTags(e.Premises);
+        conclusions = MakeTags(e.Conclusions);
+        premiseInput = "";
+        conclusionInput = "";
+        analysis = conclusions.FirstOrDefault()?.Result ?? premises.FirstOrDefault()?.Result;
+    }
+
+    async Task AddPalette(RulePalette.Entry e)
+    {
+        rules.Add(new Rule
+        {
+            Name = e.Name,
+            Kind = e.Kind,
+            LongName = e.LongName,
+            Description = e.Description,
+            Premises = MakeTags(e.Premises),
+            Conclusions = MakeTags(e.Conclusions),
+        });
+        await Save();
+    }
+
+    async Task AddRule()
+    {
+        if (conclusions.Count == 0) return;
+        rules.Add(new Rule
+        {
+            Name = ruleName.Trim(),
+            Kind = kind,
+            LongName = builderLongName,
+            Description = builderDescription,
+            Premises = premises,
+            Conclusions = conclusions,
+        });
+        premises = new();
+        conclusions = new();
+        ruleName = "";
+        builderLongName = "";
+        builderDescription = "";
+        await Save();
+    }
+}

@@ -1,0 +1,63 @@
+﻿@page "/settings"
+@using AbCatDC.RazorLib.Services
+@inject AppSettingsService AppSettings
+
+<div class="ab-hero">
+    <h1><i class="fa-solid fa-gear"></i> Settings</h1>
+    <p>Editor behavior and appearance. Changes are saved immediately.</p>
+</div>
+
+<div class="ab-card" style="max-width: 620px">
+    <h5><i class="fa-solid fa-keyboard"></i> Editor</h5>
+
+    <label class="ab-setting-label" for="delay-range">
+        Completion popup delay
+        <span class="ab-setting-value">@AppSettings.CompletionDelayMs ms</span>
+    </label>
+    <input id="delay-range" type="range" class="form-range" min="100" max="2000" step="50"
+           value="@AppSettings.CompletionDelayMs" @oninput="OnDelayChanged" />
+    <p class="ab-muted">
+        How long to wait after you stop typing before symbol suggestions pop up.
+        <kbd>Ctrl</kbd>+<kbd>Space</kbd> always opens them instantly.
+    </p>
+
+    <hr class="ab-divider" />
+
+    <h5><i class="fa-solid fa-palette"></i> Appearance</h5>
+
+    <div class="ab-theme-row">
+        <span><i class="fa-solid fa-sun"></i> Light</span>
+        <label class="ab-switch">
+            <input type="checkbox" checked="@AppSettings.DarkMode" @onchange="OnThemeChanged" />
+            <span class="ab-switch-track"></span>
+        </label>
+        <span><i class="fa-solid fa-moon"></i> Dark</span>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AppSettings.EnsureLoadedAsync();
+            StateHasChanged();
+        }
+    }
+
+    async Task OnDelayChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v))
+        {
+            AppSettings.CompletionDelayMs = Math.Clamp(v, 100, 5000);
+            await AppSettings.SaveAsync();
+        }
+    }
+
+    async Task OnThemeChanged(ChangeEventArgs e)
+    {
+        AppSettings.DarkMode = e.Value is bool b && b;
+        await AppSettings.SaveAsync();
+    }
+}
+

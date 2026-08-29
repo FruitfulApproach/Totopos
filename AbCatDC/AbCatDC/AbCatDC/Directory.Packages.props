@@ -1,0 +1,21 @@
+<Project>
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <MauiVersion>10.0.100</MauiVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageVersion Include="FSharp.Maui.WinUICompat" Version="1.1.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.10" />
+        <PackageVersion Include="Fabulous" Version="10.0.0" />
+        <PackageVersion Include="Fabulous.MauiControls" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+        <PackageVersion Include="FSharp.Core" Version="10.0.104" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
+        <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+        <PackageVersion Include="CommunityToolkit.Maui" Version="14.2.2" />
+        <PackageVersion Include="CommunityToolkit.Maui.Markup" Version="7.0.1" />
+        <PackageVersion Include="VijayAnand.Toolkit.Markup" Version="5.0.0" />
+        <PackageVersion Include="Microsoft.Maui.Controls.Foldable" Version="$(MauiVersion)" />
+        <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    </ItemGroup>
+</Project>

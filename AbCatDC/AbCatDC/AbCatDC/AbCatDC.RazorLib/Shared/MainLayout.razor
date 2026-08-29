@@ -1,0 +1,33 @@
+@inherits LayoutComponentBase
+@using AbCatDC.RazorLib.Services
+@inject AppSettingsService Settings
+@implements IDisposable
+
+<div class="page">
+	<div class="sidebar">
+		<NavMenu />
+	</div>
+
+	<main>
+		<div class="top-row px-4 ab-top-row">
+			<a href="settings" class="ab-gear-btn" title="Settings">
+				<i class="fa-solid fa-gear"></i>
+			</a>
+		</div>
+
+		<article class="content px-4">
+			@Body
+		</article>
+	</main>
+</div>
+
+@code {
+	protected override void OnInitialized()
+	{
+		Settings.Changed += OnSettingsChanged;
+	}
+
+	private void OnSettingsChanged() => InvokeAsync(StateHasChanged);
+
+	public void Dispose() => Settings.Changed -= OnSettingsChanged;
+}
