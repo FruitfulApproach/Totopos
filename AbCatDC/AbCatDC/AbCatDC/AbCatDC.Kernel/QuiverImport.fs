@@ -103,6 +103,65 @@ let TryParse (input: string) : ParseOutcome =
     | Ok g -> { Ok = true; Graph = g; Error = "" }
     | Error e -> { Ok = false; Graph = emptyGraph; Error = e }
 
+// ---- diagram → textual judgment group -------------------------------------
+
+let private subMap =
+    dict [ '0','₀'; '1','₁'; '2','₂'; '3','₃'; '4','₄'; '5','₅'; '6','₆'; '7','₇'; '8','₈'; '9','₉'
+           'a','ₐ'; 'e','ₑ'; 'h','ₕ'; 'i','ᵢ'; 'j','ⱼ'; 'k','ₖ'; 'l','ₗ'; 'm','ₘ'; 'n','ₙ'; 'o','ₒ'
+           'p','ₚ'; 'r','ᵣ'; 's','ₛ'; 't','ₜ'; 'u','ᵤ'; 'v','ᵥ'; 'x','ₓ'
+           'A','ₐ'; 'E','ₑ'; 'H','ₕ'; 'I','ᵢ'; 'J','ⱼ'; 'K','ₖ'; 'L','ₗ'; 'M','ₘ'; 'N','ₙ'; 'O','ₒ'
+           'P','ₚ'; 'R','ᵣ'; 'S','ₛ'; 'T','ₜ'; 'U','ᵤ'; 'V','ᵥ'; 'X','ₓ' ]
+
+/// Normalize a quiver cell label towards a kernel identifier: LaTeX-style
+/// subscripts (_X, _{ab}) become unicode subscripts; whitespace is trimmed.
+let private normalizeLabel (label: string) =
+    let l = label.Trim()
+    let l = Text.RegularExpressions.Regex.Replace(l, @"_\{([^}]*)\}|_(.)", fun m ->
+        let payload = if m.Groups.[1].Success then m.Groups.[1].Value else m.Groups.[2].Value
+        let sb = Text.StringBuilder()
+        let mutable ok = true
+        for ch in payload do
+            match subMap.TryGetValue ch with
+            | true, s -> sb.Append s |> ignore
+            | _ -> ok <- false
+        if ok then sb.ToString() else m.Value)
+    l
+
+/// True when the normalized label lexes as one plain identifier or literal.
+let private isUsableName (l: string) =
+    match Parser.parse l with
+    | Ok (Ty.Var _) | Ok (Ty.Atom _) | Ok (Ty.Lit _) -> true
+    | _ -> false
+
+/// The textual judgment group equivalent to "[sketch] in <category>":
+/// one object judgment per DISTINCT label (two vertices labeled X are separate
+/// diagram nodes, but their label — and hence their value as an object — is
+/// the same, so they yield a single X : C), then one morphism judgment per
+/// edge, endpoints referred to by label. Unusable/empty labels get generated
+/// names (v1…, e1…).
+type ExpandOutcome = { Ok: bool; Text: string; Error: string }
+
+let TryExpand (input: string) (category: string) : ExpandOutcome =
+    match parse input with
+    | Error e -> { Ok = false; Text = ""; Error = e }
+    | Ok g ->
+        let objName i =
+            let l = normalizeLabel g.VertexLabels.[i]
+            if l <> "" && isUsableName l then l else $"v{i + 1}"
+        let objects =
+            [ for i in 0 .. g.VertexCount - 1 -> objName i ]
+            |> List.distinct
+            |> List.map (fun o -> $"{o} : {category}")
+        let morphisms =
+            [ for k in 0 .. g.Edges.Length - 1 ->
+                let (s, t) = g.Edges.[k]
+                let l = normalizeLabel g.EdgeLabels.[k]
+                let name = if l <> "" && isUsableName l then l else $"e{k + 1}"
+                $"{name} : {objName s} → {objName t}" ]
+            // same label + same endpoints = the same morphism drawn twice
+            |> List.distinct
+        { Ok = true; Text = String.concat ", " (objects @ morphisms); Error = "" }
+
 let rec private permutations (xs: 'a list) : 'a list list =
     match xs with
     | [] | [ _ ] -> [ xs ]

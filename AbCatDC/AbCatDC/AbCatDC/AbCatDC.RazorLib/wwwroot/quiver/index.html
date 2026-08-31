@@ -2,6 +2,16 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <script>
+        // AbCatDC: capture startup errors so the host app can diagnose issues
+        window.__abErrors = [];
+        window.addEventListener('error', function (e) {
+            window.__abErrors.push((e.message || '?') + ' @ ' + (e.filename || '') + ':' + e.lineno);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+            window.__abErrors.push('rejection: ' + (e.reason && (e.reason.message || e.reason)));
+        });
+    </script>
     <title>quiver: a modern commutative diagram editor</title>
     <link rel="icon" href="icon.png">
     <!-- Prevent zooming on mobile -->
@@ -44,13 +54,9 @@
     <script type="module" src="ui.js"></script>
     <!-- Web app manifest -->
     <link rel="manifest" href="manifest.json">
-    <!-- Service worker -->
-    <script type="module">
-        import { Workbox } from "./Workbox/workbox-window.prod.js";
-        if ("serviceWorker" in navigator) {
-            new Workbox("service-worker.js").register();
-        }
-    </script>
+    <!-- AbCatDC: service-worker block removed — Workbox is not vendored, and in
+         the app's webview the request for the missing file never completes,
+         which hangs the module graph and prevents DOMContentLoaded. -->
 </head>
 <body>
     <a id="logo-link" href="https://github.com/varkor/quiver" target="_blank">

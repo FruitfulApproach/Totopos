@@ -2869,18 +2869,21 @@ class UI {
 
     /// Scales the diagram so that it fills the available window size.
     scale_to_fit() {
-        // Get the available dimensions to work with within the window.
-        const window_width = Math.max(0, document.body.clientWidth - 2 * CONSTANTS.EMBED_PADDING);
-        const window_height = Math.max(0, document.body.clientHeight - 2 * CONSTANTS.EMBED_PADDING);
-
-        // Compute the size of the diagram.
+        // AbCatDC patch: `pad` fragment parameter overrides the embed padding
+        // (small inline previews need nearly the whole box), and upscaling is
+        // capped at 2x so tiny diagrams don't balloon.
+        const pad_param = parseFloat(url_parameters().get("pad"));
+        const padding = Number.isNaN(pad_param) ? CONSTANTS.EMBED_PADDING : pad_param;
+        const window_width = Math.max(0, document.body.clientWidth - 2 * padding);
+        const window_height = Math.max(0, document.body.clientHeight - 2 * padding);
         const diagram_size = this.diagram_size();
         const scale = window_width > 0 && window_height > 0 ?
-            Math.log2(Math.min(
+            Math.min(1, Math.log2(Math.min(
                 window_width / diagram_size.width,
                 window_height / diagram_size.height
-            )) : 0;
+            ))) : 0;
         this.pan_view(Offset.zero(), scale);
+        this.centre_view();
     }
 
     /// Returns whether there are any selected vertices.

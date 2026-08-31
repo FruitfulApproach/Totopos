@@ -25,6 +25,9 @@ type Ty =
     | Sketch of Name
     /// τ commutes — the assertion that the referenced diagram commutes
     | Commutes of Ty
+    /// [D] in C — the sketch's objects and morphisms all live in category C;
+    /// equivalent to the textual group of judgments X : C, …, f : X → Y, …
+    | InCategory of Ty * Ty
     /// Γ, x : σ, τ ⊢ ρ — a sequent: the goal ρ is derivable from the context
     | Entails of context: CtxItem list * goal: Ty
     /// M : σ — a typing judgment: the term M inhabits the type σ
@@ -97,20 +100,34 @@ module Ty =
     /// Identifiers that denote whole-context metavariables in sequents.
     let contextVars = Set.ofList [ "Γ"; "Δ"; "Θ"; "Ξ" ]
 
-    /// Capture-naive substitution of a type for a type variable: τ[α := σ]
-    let rec substTyVar (alpha: Name) (sigma: Ty) (ty: Ty) : Ty =
-        let s = substTyVar alpha sigma
+    /// Simultaneous substitution of types for free type variables: τ[m].
+    /// Capture-naive on the replacement side, but shadow-correct on the
+    /// pattern side: every binder (∀/∃/μ, dependent and familial binders, and
+    /// sequent hypotheses) removes its bound name from the substitution for
+    /// the scope it governs.
+    let rec substTyVars (m: Map<Name, Ty>) (ty: Ty) : Ty =
+        if Map.isEmpty m then ty else
+        let s = substTyVars m
+        let under (x: Name) = substTyVars (Map.remove x m)
         match ty with
         | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ty
-        | Ty.Var a -> if a = alpha then sigma else ty
+        | Ty.Var a -> (match Map.tryFind a m with Some rep -> rep | None -> ty)
         | Ty.Power (b, n) -> Ty.Power (s b, n)
         | Ty.Commutes b -> Ty.Commutes (s b)
+        | Ty.InCategory (d, c) -> Ty.InCategory (s d, s c)
         | Ty.Entails (ctx, goal) ->
-            let item = function
-                | CtxVar n -> CtxVar n
-                | Hyp (x, t) -> Hyp (x, s t)
-                | Anon t -> Anon (s t)
-            Ty.Entails (List.map item ctx, s goal)
+            // hypotheses bind their name for everything to the right
+            let mutable cur = m
+            let items =
+                [ for it in ctx ->
+                    match it with
+                    | CtxVar n -> CtxVar n
+                    | Hyp (x, t) ->
+                        let t' = substTyVars cur t
+                        cur <- Map.remove x cur
+                        Hyp (x, t')
+                    | Anon t -> Anon (substTyVars cur t) ]
+            Ty.Entails (items, substTyVars cur goal)
         | Ty.HasType (subj, t) -> Ty.HasType (s subj, s t)
         | Ty.Eq (a, b) -> Ty.Eq (s a, s b)
         | Ty.Function (d, c) -> Ty.Function (s d, s c)
@@ -119,14 +136,18 @@ module Ty =
         | Ty.Intersection (a, b) -> Ty.Intersection (s a, s b)
         | Ty.Union (a, b) -> Ty.Union (s a, s b)
         | Ty.Record ms -> Ty.Record (ms |> List.map (fun (n, t) -> n, s t))
-        | Ty.Polymorphic (a, body) -> if a = alpha then ty else Ty.Polymorphic (a, s body)
-        | Ty.Existential (a, body) -> if a = alpha then ty else Ty.Existential (a, s body)
-        | Ty.Recursive (a, body) -> if a = alpha then ty else Ty.Recursive (a, s body)
-        | Ty.DependentFunction (x, d, c) -> Ty.DependentFunction (x, s d, s c)
-        | Ty.DependentPair (x, a, b) -> Ty.DependentPair (x, s a, s b)
-        | Ty.DependentIntersection (x, a, b) -> Ty.DependentIntersection (x, s a, s b)
-        | Ty.FamilialIntersection (x, a, b) -> Ty.FamilialIntersection (x, s a, s b)
-        | Ty.FamilialUnion (x, a, b) -> Ty.FamilialUnion (x, s a, s b)
+        | Ty.Polymorphic (a, body) -> Ty.Polymorphic (a, under a body)
+        | Ty.Existential (a, body) -> Ty.Existential (a, under a body)
+        | Ty.Recursive (a, body) -> Ty.Recursive (a, under a body)
+        | Ty.DependentFunction (x, d, c) -> Ty.DependentFunction (x, s d, under x c)
+        | Ty.DependentPair (x, a, b) -> Ty.DependentPair (x, s a, under x b)
+        | Ty.DependentIntersection (x, a, b) -> Ty.DependentIntersection (x, s a, under x b)
+        | Ty.FamilialIntersection (x, a, b) -> Ty.FamilialIntersection (x, s a, under x b)
+        | Ty.FamilialUnion (x, a, b) -> Ty.FamilialUnion (x, s a, under x b)
+
+    /// Single-variable substitution τ[α := σ], via substTyVars.
+    let substTyVar (alpha: Name) (sigma: Ty) (ty: Ty) : Ty =
+        substTyVars (Map.ofList [ alpha, sigma ]) ty
 
     let private superscript (n: bigint) =
         string n
@@ -141,6 +162,7 @@ module Ty =
         match ty with
         | Ty.Atom _ | Ty.Var _ | Ty.Lit _ | Ty.Sketch _ -> ty
         | Ty.Commutes b -> Ty.Commutes (expandPowers b)
+        | Ty.InCategory (d, c) -> Ty.InCategory (expandPowers d, expandPowers c)
         | Ty.Entails (ctx, goal) ->
             let item = function
                 | CtxVar n -> CtxVar n
@@ -190,6 +212,7 @@ module Ty =
         | Ty.Power (b, n) -> $"{atom b}{superscript n}"
         | Ty.Sketch n -> $"[{n}]"
         | Ty.Commutes b -> $"{atom b} commutes"
+        | Ty.InCategory (d, c) -> $"{atom d} in {atom c}"
         | Ty.Entails (ctx, goal) ->
             let item = function
                 | CtxVar n -> n

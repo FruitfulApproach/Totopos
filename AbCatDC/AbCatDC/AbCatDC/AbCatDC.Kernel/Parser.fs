@@ -13,6 +13,7 @@ type Token =
     | TLParen | TRParen | TLAngle | TRAngle
     | TLBracket | TRBracket
     | TCommutes
+    | TIn
     | TTurnstile
     | TEquals
     | TDot | TColon | TComma
@@ -40,6 +41,7 @@ let private describe tok =
     | TLBracket -> "'['"
     | TRBracket -> "']'"
     | TCommutes -> "'commutes'"
+    | TIn -> "'in'"
     | TTurnstile -> "'⊢'"
     | TEquals -> "'='"
     | TDot -> "'.'"
@@ -116,7 +118,11 @@ let private lex (s: string) : Token list =
                   && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'' || isSubscript s.[i] || isHyphenJoin i) do
                 i <- i + 1
             let word = s.Substring(start, i - start)
-            toks.Add (if word = "commutes" then TCommutes else TIdent word)
+            toks.Add (
+                match word with
+                | "commutes" -> TCommutes
+                | "in" -> TIn
+                | _ -> TIdent word)
         else
             raise (ParseError $"Unexpected character '{c}' at position {i}.")
     toks.Add TEnd
@@ -185,13 +191,20 @@ and private parseBody st =
 
 and private parseType (st: State) : Ty =
     let mutable t = parseTypeCore st
-    // postfix 'commutes' assertion; an arrow may still follow it
-    while peek st = TCommutes do
-        advance st
-        t <- Ty.Commutes t
-        if peek st = TArrow then
+    // postfix assertions: 'commutes' and 'in <category>'
+    let mutable looping = true
+    while looping do
+        match peek st with
+        | TCommutes ->
             advance st
-            t <- Ty.Function (t, parseType st)
+            t <- Ty.Commutes t
+            if peek st = TArrow then
+                advance st
+                t <- Ty.Function (t, parseType st)
+        | TIn ->
+            advance st
+            t <- Ty.InCategory (t, parseAtom st)
+        | _ -> looping <- false
     // '=' binds loosest of all: a = b → c reads a = (b → c)
     if peek st = TEquals then
         advance st

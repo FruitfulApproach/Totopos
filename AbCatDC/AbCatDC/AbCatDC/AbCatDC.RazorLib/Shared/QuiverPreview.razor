@@ -45,8 +45,9 @@
         {
             var t = (Json ?? "").Trim();
             var b64 = t.StartsWith("[") ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)) : t;
-            // relative URL so it works whatever host address the webview uses
-            embedSrc = "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed";
+            // relative URL so it works whatever host address the webview uses;
+            // pad shrinks quiver's embed margins so the diagram fills the box
+            embedSrc = "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed&pad=10";
         }
     }
 }

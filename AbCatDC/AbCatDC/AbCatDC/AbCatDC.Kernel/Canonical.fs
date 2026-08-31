@@ -33,6 +33,7 @@ let private alphaRename (ty: Ty) : Ty * (Name * Name) list =
         | Ty.Var a -> (match Map.tryFind a env with Some b -> Ty.Var b | None -> ty)
         | Ty.Power (b, n) -> Ty.Power (go env depth b, n)
         | Ty.Commutes b -> Ty.Commutes (go env depth b)
+        | Ty.InCategory (d, c) -> Ty.InCategory (go env depth d, go env depth c)
         | Ty.HasType (subj, t) -> Ty.HasType (go env depth subj, go env depth t)
         | Ty.Eq (a, b) -> Ty.Eq (go env depth a, go env depth b)
         | Ty.Entails (ctx, goal) ->
@@ -85,6 +86,7 @@ let rec private mapVars (f: Name -> Name) ty =
     | Ty.Var a -> Ty.Var (f a)
     | Ty.Power (b, n) -> Ty.Power (mapVars f b, n)
     | Ty.Commutes b -> Ty.Commutes (mapVars f b)
+    | Ty.InCategory (d, c) -> Ty.InCategory (mapVars f d, mapVars f c)
     | Ty.HasType (subj, t) -> Ty.HasType (mapVars f subj, mapVars f t)
     | Ty.Eq (a, b) -> Ty.Eq (mapVars f a, mapVars f b)
     | Ty.Entails (ctx, goal) ->
@@ -121,6 +123,7 @@ let private freeVarsInOrder (ty: Ty) : Name list =
         | Ty.Var a when not (isBoundName a) -> if not (acc.Contains a) then acc.Add a
         | Ty.Var _ | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ()
         | Ty.Power (b, _) | Ty.Commutes b -> go b
+        | Ty.InCategory (a, b) -> go a; go b
         | Ty.HasType (subj, t) -> go subj; go t
         | Ty.Eq (a, b) -> go a; go b
         | Ty.Entails (ctx, goal) ->
@@ -173,6 +176,7 @@ let rec private variants (ty: Ty) : Ty list =
     | Ty.Atom _ | Ty.Var _ | Ty.Lit _ | Ty.Sketch _ -> [ ty ]
     | Ty.Power (b, n) -> via (fun l -> Ty.Power (l.[0], n)) [ b ]
     | Ty.Commutes b -> via (fun l -> Ty.Commutes l.[0]) [ b ]
+    | Ty.InCategory (d, c) -> via (fun l -> Ty.InCategory (l.[0], l.[1])) [ d; c ]
     | Ty.HasType (subj, t) -> via (fun l -> Ty.HasType (l.[0], l.[1])) [ subj; t ]
     | Ty.Eq (a, b) ->
         // = is symmetric: offer both orientations and let the least form win
@@ -237,6 +241,11 @@ and private commVariants mk dec ty =
 ///  3. free variables become #0, #1, ... by first occurrence
 /// The least formatted candidate wins, and the canonical-name -> original-name
 /// mappings are returned alongside the type.
+/// Free variables (never binder-bound names) in first-occurrence order.
+let freeVariables (ty: Ty) : Name[] =
+    let renamed, _ = alphaRename ty
+    freeVarsInOrder renamed |> Array.ofList
+
 let canonicalize (ty: Ty) : Canonicalized =
     let renamed, boundLog = alphaRename ty
     let bestTy, freeMap =
@@ -244,3 +253,17 @@ let canonicalize (ty: Ty) : Canonicalized =
         |> List.map renumberFrees
         |> List.minBy (fun (t, _) -> Ty.format t)
     { Ty = bestTy; BoundVars = boundLog; FreeVars = freeMap }
+
+let private canonicalText (t: Ty) : string =
+    Ty.format (canonicalize (Ty.expandPowers t)).Ty
+
+/// Name-preserving semantic equality. Canonical strings alone identify
+/// expressions only up to renaming of FREE variables (A → B ≡ C → D), which
+/// is too loose for proof checking. The pairing trick fixes it: a ≡ b iff
+/// canonical ⟨a, b⟩ = canonical ⟨a, a⟩ — the shared free-variable renumbering
+/// across the pair forces the names to correspond, while α-equivalence,
+/// ∩/∪ sorting, and Eq orientation are still absorbed.
+let sameTy (a: Ty) (b: Ty) : bool =
+    // cheap pre-filter: different canonical shapes can never be equal
+    if canonicalText a <> canonicalText b then false
+    else canonicalText (Ty.Product (a, b)) = canonicalText (Ty.Product (a, a))

@@ -85,6 +85,12 @@ let infer (ty: Ty) : Judgment list =
             go env b
             add (Ty.format (Ty.Commutes b)) "Prop"
                 "commutativity assertion: every pair of parallel composites of arrows in the diagram is equal"
+        | Ty.InCategory (d, c) ->
+            go env c
+            go env d
+            add (Ty.format (Ty.InCategory (d, c)))
+                "Ctx"
+                "diagram-in-category: shorthand for the group of judgments declaring each object (X : C) and each morphism (f : X → Y) of the sketch — expandable to text with ⇄"
         | Ty.Eq (a, b) ->
             go env a
             go env b

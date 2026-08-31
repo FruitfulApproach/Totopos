@@ -1,4 +1,4 @@
-/// An enumeration type.
+﻿/// An enumeration type.
 export class Enum {
     constructor(name, ...variants) {
         for (const variant of variants) {

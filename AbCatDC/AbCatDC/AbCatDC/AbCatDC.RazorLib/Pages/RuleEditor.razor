@@ -35,7 +35,16 @@
 
 <div class="ab-rule-editor-grid">
     <div class="ab-card">
-        <h5><i class="fa-solid fa-plus"></i> New rule</h5>
+        <h5><i class="fa-solid @(editingRule is null ? "fa-plus" : "fa-pen")"></i> @(editingRule is null ? "New rule" : "Edit rule")</h5>
+        @if (editingRule is not null)
+        {
+            <div class="ab-editing-banner">
+                <i class="fa-solid fa-pen-to-square"></i>
+                Editing <strong>@(string.IsNullOrWhiteSpace(editingRule.Name) ? editingRule.Kind : editingRule.Name)</strong>
+                — Save replaces it in place.
+                <button type="button" class="ab-kind-btn" @onclick="CancelEdit">Cancel</button>
+            </div>
+        }
 
         <div class="ab-kind-row">
             @foreach (var k in Kinds)
@@ -50,6 +59,11 @@
                       Placeholder="Rule name — e.g. ×-intro, ℕ-elim, β-compute (try \times)"
                       Value="@ruleName" ValueChanged="v => ruleName = v" />
 
+        <h6>Shared context <span class="ab-ctx-hint">— prefixed onto every premise &amp; conclusion you add</span></h6>
+        <SymbolEditor Id="context-editor" Rows="1" ShowPad="false"
+                      Placeholder="e.g. C : Type, X : C   (leave empty for none)"
+                      Value="@sharedContext" ValueChanged="v => sharedContext = v" />
+
         <h6>Premises</h6>
         @if (premises.Count > 0)
         {
@@ -58,7 +72,14 @@
                 {
                     var idx = i;
                     <span class="ab-tag" title="@premises[idx].Raw" @onclick="() => ShowAnalysis(premises[idx])">
-                        @premises[idx].Result.Formatted
+                        <InlineExpr Text="@premises[idx].Result.Formatted" Sketches="SketchMap" Height="70" />
+                        @if (CanToggle(premises[idx]))
+                        {
+                            <button type="button" class="ab-tag-x pencil" title="Expand/contract diagram ⇄ judgment group"
+                                    @onclick="() => ToggleExpand(premises[idx])" @onclick:stopPropagation><i class="fa-solid fa-right-left"></i></button>
+                        }
+                        <button type="button" class="ab-tag-x pencil" title="Edit this premise"
+                                @onclick="() => EditTag(idx, true)" @onclick:stopPropagation><i class="fa-solid fa-pencil"></i></button>
                         <button type="button" class="ab-tag-x" title="Delete premise"
                                 @onclick='() => AskDelete("premise", idx, premises[idx].Result.Formatted)'
                                 @onclick:stopPropagation>×</button>
@@ -81,7 +102,14 @@
                 {
                     var idx = i;
                     <span class="ab-tag conclusion" title="@conclusions[idx].Raw" @onclick="() => ShowAnalysis(conclusions[idx])">
-                        @conclusions[idx].Result.Formatted
+                        <InlineExpr Text="@conclusions[idx].Result.Formatted" Sketches="SketchMap" Height="70" />
+                        @if (CanToggle(conclusions[idx]))
+                        {
+                            <button type="button" class="ab-tag-x pencil" title="Expand/contract diagram ⇄ judgment group"
+                                    @onclick="() => ToggleExpand(conclusions[idx])" @onclick:stopPropagation><i class="fa-solid fa-right-left"></i></button>
+                        }
+                        <button type="button" class="ab-tag-x pencil" title="Edit this conclusion"
+                                @onclick="() => EditTag(idx, false)" @onclick:stopPropagation><i class="fa-solid fa-pencil"></i></button>
                         <button type="button" class="ab-tag-x" title="Delete conclusion"
                                 @onclick='() => AskDelete("conclusion", idx, conclusions[idx].Result.Formatted)'
                                 @onclick:stopPropagation>×</button>
@@ -98,7 +126,8 @@
 
         <button type="button" class="ab-btn-primary mt-2" @onclick="AddRule"
                 disabled="@(conclusions.Count == 0 && string.IsNullOrWhiteSpace(conclusionInput))">
-            <i class="fa-solid fa-circle-plus"></i> Add rule to system
+            <i class="fa-solid @(editingRule is null ? "fa-circle-plus" : "fa-floppy-disk")"></i>
+            @(editingRule is null ? "Add rule to system" : "Save changes")
         </button>
         @if (conclusions.Count == 0 && string.IsNullOrWhiteSpace(conclusionInput))
         {
@@ -135,8 +164,13 @@
 @if (sketches.Count > 0)
 {
     <div class="ab-card">
-        <h5><i class="fa-solid fa-compass-drafting"></i> Sketches
-            <span class="ab-muted" style="font-weight:400">— reference in expressions as [name]; hover a preview to edit</span></h5>
+        <h5 class="ab-pal-toggle" @onclick="() => sketchGalleryOpen = !sketchGalleryOpen">
+            <i class="fa-solid fa-compass-drafting"></i> Manage sketches
+            <span class="ab-muted" style="font-weight:400">— @sketches.Count sketch@(sketches.Count == 1 ? "" : "es"); rules show them inline. Open to edit or delete.</span>
+            <i class="fa-solid @(sketchGalleryOpen ? "fa-chevron-up" : "fa-chevron-down") ab-pal-chev"></i>
+        </h5>
+        @if (sketchGalleryOpen)
+        {
         <div class="ab-sketch-grid">
             @foreach (var s in sketches)
             {
@@ -151,6 +185,7 @@
                 </div>
             }
         </div>
+        }
     </div>
 }
 
@@ -231,7 +266,23 @@
 </div>
 
 <div class="ab-card">
-    <h5><i class="fa-solid fa-book"></i> @(string.IsNullOrWhiteSpace(systemName) ? "Formal system" : systemName)</h5>
+    <div class="ab-sys-head">
+        <h5><i class="fa-solid fa-book"></i> @(string.IsNullOrWhiteSpace(systemName) ? "Formal system" : systemName)
+            <span class="ab-muted" style="font-weight:400">— @rules.Count rule@(rules.Count == 1 ? "" : "s"), @sketches.Count sketch@(sketches.Count == 1 ? "" : "es")</span>
+        </h5>
+        <div class="ab-sys-actions">
+            <button type="button" class="ab-kind-btn" title="Copy the whole system as JSON" @onclick="ExportSystem">
+                <i class="fa-solid @(exportCopied ? "fa-check" : "fa-copy")"></i> @(exportCopied ? "Copied!" : "Export JSON")
+            </button>
+            @if (rules.Count > 0 || sketches.Count > 0)
+            {
+                <button type="button" class="ab-kind-btn danger" title="Delete every rule and sketch"
+                        @onclick='() => AskDelete("system", 0, systemName)'>
+                    <i class="fa-solid fa-trash-can"></i> Clear
+                </button>
+            }
+        </div>
+    </div>
     <div class="ab-reading-note">
         <button type="button" class="ab-kind-btn" @onclick="() => readingOpen = !readingOpen">
             <i class="fa-solid fa-book-open"></i> How to read these rules
@@ -259,12 +310,12 @@
             var kindRules = rules.Where(r => r.Kind == k).ToList();
             if (kindRules.Count > 0)
             {
-                <h6 class="ab-rule-kind-head">@k rules</h6>
+                <h6 class="ab-rule-kind-head">@k rules <span class="ab-muted">(@kindRules.Count)</span></h6>
                 <div class="ab-rule-list">
                     @foreach (var r in kindRules)
                     {
                         var rr = r;
-                        <div class="ab-rule">
+                        <div class="ab-rule k-@rr.Kind.ToLowerInvariant() @(rr == editingRule ? "editing" : "")">
                             <div class="ab-rule-row">
                                 <div class="ab-rule-frac">
                                     <div class="ab-rule-prem">
@@ -274,18 +325,22 @@
                                         }
                                         @foreach (var p in rr.Premises)
                                         {
-                                            <span @onclick="() => ShowAnalysis(p)">@p.Result.Formatted</span>
+                                            <span @onclick="() => ShowAnalysis(p)"><InlineExpr Text="@p.Result.Formatted" Sketches="SketchMap" Height="84" /></span>
                                         }
                                     </div>
                                     <div class="ab-rule-line"></div>
                                     <div class="ab-rule-prem">
                                         @foreach (var c in rr.Conclusions)
                                         {
-                                            <span @onclick="() => ShowAnalysis(c)">@c.Result.Formatted</span>
+                                            <span @onclick="() => ShowAnalysis(c)"><InlineExpr Text="@c.Result.Formatted" Sketches="SketchMap" Height="84" /></span>
                                         }
                                     </div>
                                 </div>
                                 <span class="ab-rule-name">(@(string.IsNullOrWhiteSpace(rr.Name) ? rr.Kind : rr.Name))</span>
+                                <button type="button" class="ab-rule-info" title="Edit this rule in the builder"
+                                        @onclick="() => EditRule(rr)">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </button>
                                 <button type="button" class="ab-rule-info" title="How to interpret this rule"
                                         @onclick="() => ToggleRemark(rr)">
                                     <i class="fa-solid fa-circle-info"></i>
@@ -398,6 +453,8 @@
     {
         public string Raw = "";
         public RunResult Result = default!;
+        /// <summary>the other face of a "[D] in C" expression (expanded ⇄ contracted)</summary>
+        public string? Alt;
     }
 
     class Rule
@@ -453,6 +510,117 @@
     bool readingOpen;
     string builderLongName = "";
     string builderDescription = "";
+    Rule? editingRule;
+    bool exportCopied;
+
+    static readonly System.Text.RegularExpressions.Regex InCatRx =
+        new(@"\[([^\[\]\s]+)\]\s+in\s+([A-Za-z][A-Za-z0-9_]*)");
+
+    bool CanToggle(TagItem t) =>
+        t.Alt is not null
+        || InCatRx.Matches(t.Raw).Cast<System.Text.RegularExpressions.Match>()
+            .Any(m => sketches.Any(s => s.Name == m.Groups[1].Value));
+
+    // swap a tag between "[D] in C" and its equivalent textual judgment group
+    async Task ToggleExpand(TagItem t)
+    {
+        if (t.Alt is string other)
+        {
+            var run = Api.Run(other);
+            if (!run.Success) { analysis = run; return; }
+            (t.Raw, t.Alt) = (other, t.Raw);
+            t.Result = run;
+        }
+        else
+        {
+            var expanded = InCatRx.Replace(t.Raw, m =>
+            {
+                var sk = sketches.FirstOrDefault(s => s.Name == m.Groups[1].Value);
+                if (sk is null) return m.Value;
+                var ex = QuiverImport.TryExpand(sk.Json, m.Groups[2].Value);
+                return ex.Ok ? ex.Text : m.Value;
+            });
+            if (expanded == t.Raw) return;
+            var run = Api.Run(expanded);
+            if (!run.Success) { analysis = run; return; }
+            t.Alt = t.Raw;
+            t.Raw = expanded;
+            t.Result = run;
+        }
+        analysis = t.Result;
+        await Save();
+    }
+
+    // pull one tag's source text back into its editor for tweaking
+    void EditTag(int idx, bool isPremise)
+    {
+        var list = isPremise ? premises : conclusions;
+        if (idx < 0 || idx >= list.Count) return;
+        var tag = list[idx];
+        list.RemoveAt(idx);
+        // preserve anything already being typed by committing it first
+        var pending = isPremise ? premiseInput : conclusionInput;
+        if (!string.IsNullOrWhiteSpace(pending)) AddTag(pending, isPremise);
+        if (isPremise) premiseInput = tag.Raw; else conclusionInput = tag.Raw;
+        analysis = tag.Result;
+    }
+
+    async Task EditRule(Rule r)
+    {
+        editingRule = r;
+        kind = r.Kind;
+        ruleName = r.Name;
+        builderLongName = r.LongName;
+        builderDescription = r.Description;
+        premises = r.Premises.Select(t => new TagItem { Raw = t.Raw, Result = t.Result }).ToList();
+        conclusions = r.Conclusions.Select(t => new TagItem { Raw = t.Raw, Result = t.Result }).ToList();
+        premiseInput = "";
+        conclusionInput = "";
+        analysis = r.Conclusions.FirstOrDefault()?.Result ?? r.Premises.FirstOrDefault()?.Result;
+        try { await JS.InvokeVoidAsync("eval", "document.querySelector('.ab-rule-editor-grid')?.scrollIntoView({behavior:'smooth'})"); } catch { }
+    }
+
+    void CancelEdit()
+    {
+        editingRule = null;
+        premises = new();
+        conclusions = new();
+        ruleName = "";
+        builderLongName = "";
+        builderDescription = "";
+        premiseInput = "";
+        conclusionInput = "";
+    }
+
+    async Task ExportSystem()
+    {
+        var dto = new SystemDto
+        {
+            Name = systemName,
+            Rules = rules.Select(r => new RuleDto
+            {
+                Name = r.Name, Kind = r.Kind, LongName = r.LongName, Description = r.Description,
+                Premises = r.Premises.Select(t => t.Raw).ToList(),
+                Conclusions = r.Conclusions.Select(t => t.Raw).ToList(),
+            }).ToList(),
+            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json }).ToList(),
+        };
+        var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions { WriteIndented = true });
+        try
+        {
+            await JS.InvokeVoidAsync("eval", $"navigator.clipboard.writeText({JsonSerializer.Serialize(json)})");
+            exportCopied = true;
+            _ = ResetCopiedLater();
+        }
+        catch { }
+    }
+
+    async Task ResetCopiedLater()
+    {
+        await Task.Delay(1600);
+        exportCopied = false;
+        await InvokeAsync(StateHasChanged);
+    }
     readonly HashSet<Rule> openRemarks = new();
     readonly Dictionary<Rule, string> remarkCache = new();
 
@@ -651,18 +819,38 @@
     static List<string> Lines(string v) =>
         (v ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
 
-    // live preview: each line is its own expression — show the first error,
-    // otherwise the analysis of the last line (the one being typed)
-    static RunResult? Preview(string v)
+    string sharedContext = "";
+
+    // Prefix the shared context onto an expression, producing a full sequent.
+    // Idempotent when the expression's context already starts with it (so
+    // editing an already-combined tag doesn't double-prefix).
+    string ApplyContext(string t)
+    {
+        var s = sharedContext.Trim().TrimEnd(',').Trim();
+        if (s.Length == 0) return t;
+        var text = t.Trim();
+        var idx = text.IndexOf('⊢');
+        if (idx < 0) idx = text.IndexOf("|-", StringComparison.Ordinal);
+        if (idx < 0) return $"{s} ⊢ {text}";
+        var ctx = text[..idx].Trim().TrimEnd(',').Trim();
+        var rest = text[idx..];
+        if (ctx.Length == 0) return $"{s} {rest}";
+        if (ctx.StartsWith(s, StringComparison.Ordinal)) return text;
+        return $"{s}, {ctx} {rest}";
+    }
+
+    // live preview: each line is its own expression (with the shared context
+    // applied) — show the first error, otherwise the last line's analysis
+    RunResult? Preview(string v)
     {
         var lines = Lines(v);
         if (lines.Count == 0) return null;
         foreach (var line in lines)
         {
-            var r = Api.Run(line);
+            var r = Api.Run(ApplyContext(line));
             if (!r.Success) return r;
         }
-        return Api.Run(lines[^1]);
+        return Api.Run(ApplyContext(lines[^1]));
     }
 
     void OnPremiseChanged(string v)
@@ -688,8 +876,9 @@
         var lines = Lines(t);
         if (lines.Count == 0) return;
         var failed = new List<string>();
-        foreach (var line in lines)
+        foreach (var rawLine in lines)
         {
+            var line = ApplyContext(rawLine);
             var r = Api.Run(line);
             if (r.Success)
             {
@@ -699,7 +888,7 @@
             }
             else
             {
-                failed.Add(line);
+                failed.Add(rawLine);
             }
         }
         if (failed.Count > 0) analysis = Api.Run(failed[0]);
@@ -733,12 +922,20 @@
                 sketches.RemoveAt(idx);
                 await Save();
                 break;
+            case "system":
+                rules.Clear();
+                sketches.Clear();
+                editingRule = null;
+                await Save();
+                break;
         }
     }
 
     // ---- sketches -----------------------------------------------------------
 
     List<Sketch> sketches = new();
+    bool sketchGalleryOpen;
+    IReadOnlyDictionary<string, string> SketchMap => sketches.ToDictionary(s => s.Name, s => s.Json);
     bool sketchModalOpen;
     string sketchNameInput = "";
     string sketchJsonInput = "";
@@ -860,7 +1057,7 @@
         if (!string.IsNullOrWhiteSpace(premiseInput)) AddTag(premiseInput, isPremise: true);
         if (!string.IsNullOrWhiteSpace(conclusionInput)) AddTag(conclusionInput, isPremise: false);
         if (conclusions.Count == 0) return;
-        rules.Add(new Rule
+        var built = new Rule
         {
             Name = ruleName.Trim(),
             Kind = kind,
@@ -868,7 +1065,18 @@
             Description = builderDescription,
             Premises = premises,
             Conclusions = conclusions,
-        });
+        };
+        if (editingRule is not null)
+        {
+            var idx = rules.IndexOf(editingRule);
+            if (idx >= 0) rules[idx] = built; else rules.Add(built);
+            remarkCache.Remove(editingRule);
+            editingRule = null;
+        }
+        else
+        {
+            rules.Add(built);
+        }
         premises = new();
         conclusions = new();
         ruleName = "";

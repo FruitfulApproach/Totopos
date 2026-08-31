@@ -1,0 +1,62 @@
+@using System.Text
+@using System.Text.RegularExpressions
+
+@foreach (var s in segs)
+{
+    if (s.IsSketch)
+    {
+        var src = s.Value;
+        <span class="ab-inline-sketch-wrap" title="double-click to enlarge"
+              @ondblclick="() => zoomSrc = src" @ondblclick:stopPropagation>
+            <iframe class="ab-inline-sketch" style="height: @(Height)px" src="@(src + "&pad=4")"
+                    title="sketch preview" loading="lazy"></iframe>
+        </span>
+    }
+    else
+    {
+        @s.Value
+    }
+}
+
+@if (zoomSrc is not null)
+{
+    <div class="ab-zoom-overlay" @onclick="() => zoomSrc = null" @ondblclick="() => zoomSrc = null">
+        <iframe class="ab-zoom-frame" src="@zoomSrc" title="diagram — enlarged"></iframe>
+        <button type="button" class="ab-zoom-close" title="Close" @onclick="() => zoomSrc = null">×</button>
+    </div>
+}
+
+@code {
+    // Renders a formatted expression with every [sketch] reference replaced by
+    // a miniature quiver embed of that sketch, inline with the text.
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    /// <summary>sketch name → quiver JSON/base64; unknown names stay as text</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Sketches { get; set; }
+    [Parameter] public int Height { get; set; } = 84;
+
+    private static readonly Regex SketchRef = new(@"\[([^\[\]\s]+)\]", RegexOptions.Compiled);
+
+    private record Seg(bool IsSketch, string Value);
+    private List<Seg> segs = new();
+    private string? zoomSrc;
+
+    protected override void OnParametersSet()
+    {
+        segs = new List<Seg>();
+        var t = Text ?? "";
+        var pos = 0;
+        foreach (Match m in SketchRef.Matches(t))
+        {
+            var name = m.Groups[1].Value;
+            if (Sketches != null && Sketches.TryGetValue(name, out var json) && !string.IsNullOrWhiteSpace(json))
+            {
+                if (m.Index > pos) segs.Add(new(false, t[pos..m.Index]));
+                var trimmed = json.Trim();
+                var b64 = trimmed.StartsWith("[") ? Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmed)) : trimmed;
+                segs.Add(new(true, "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed"));
+                pos = m.Index + m.Length;
+            }
+        }
+        if (pos < t.Length) segs.Add(new(false, t[pos..]));
+    }
+}
