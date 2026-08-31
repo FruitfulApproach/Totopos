@@ -46,25 +46,13 @@ public static class RulePaletteGenerator
             var union = Chain("∪", vs);
 
             Add(Intro, $"×-intro{n}", vs, new[] { prod },
-                $"{n}-ary pairing: proofs of all {n} components combine into the {n}-tuple of type {prod}.");
+                $"{n}-ary pairing: proofs of all {n} components combine into the {n}-tuple of type {prod}. Components are recovered schematically, by iterating the binary π₁/π₂ through the left-nested chain — there is deliberately no per-index projection family.");
             Add(Intro, $"∩-intro{n}", vs, new[] { inter },
-                $"{n}-ary intersection introduction: one and the same term must inhabit each of the {n} types.");
+                $"{n}-ary intersection introduction: one and the same term must inhabit each of the {n} types. Recover components by iterating the binary ∩-eliminations.");
             Add(Elim, $"+-case{n}", new[] { sum }.Concat(vs.Select(v => $"{v} → ρ")).ToArray(), new[] { "ρ" },
-                $"{n}-way case analysis: to use the sum, handle each of its {n} injections and land in a common ρ.");
+                $"{n}-way case analysis: to use the sum, handle each of its {n} injections and land in a common ρ. Injections are the iterated binary ι₁/ι₂.");
             Add(Elim, $"∪-case{n}", new[] { union }.Concat(vs.Select(v => $"{v} → ρ")).ToArray(), new[] { "ρ" },
                 $"{n}-way union elimination: a member of the union is a member of one branch — handle all {n}.");
-
-            for (var i = 1; i <= n; i++)
-            {
-                Add(Elim, $"×-proj-{i}of{n}", new[] { prod }, new[] { $"σ{i}" },
-                    $"Projection π{i}: extract component {i} from the {n}-ary product {prod}.");
-                Add(Intro, $"+-inj-{i}of{n}", new[] { $"σ{i}" }, new[] { sum },
-                    $"Injection ι{i}: a proof of σ{i} proves the {n}-ary sum {sum}.");
-                Add(Elim, $"∩-proj-{i}of{n}", new[] { inter }, new[] { $"σ{i}" },
-                    $"Intersection elimination at position {i}: an inhabitant of {inter} inhabits σ{i}.");
-                Add(Intro, $"∪-inj-{i}of{n}", new[] { $"σ{i}" }, new[] { union },
-                    $"Union introduction at position {i}: a member of σ{i} is a member of {union}.");
-            }
         }
 
         // ---- distribution / factoring laws ---------------------------------

@@ -34,6 +34,7 @@ let private alphaRename (ty: Ty) : Ty * (Name * Name) list =
         | Ty.Power (b, n) -> Ty.Power (go env depth b, n)
         | Ty.Commutes b -> Ty.Commutes (go env depth b)
         | Ty.HasType (subj, t) -> Ty.HasType (go env depth subj, go env depth t)
+        | Ty.Eq (a, b) -> Ty.Eq (go env depth a, go env depth b)
         | Ty.Entails (ctx, goal) ->
             // hypotheses bind their names in later entries and the goal
             let mutable env2 = env
@@ -85,6 +86,7 @@ let rec private mapVars (f: Name -> Name) ty =
     | Ty.Power (b, n) -> Ty.Power (mapVars f b, n)
     | Ty.Commutes b -> Ty.Commutes (mapVars f b)
     | Ty.HasType (subj, t) -> Ty.HasType (mapVars f subj, mapVars f t)
+    | Ty.Eq (a, b) -> Ty.Eq (mapVars f a, mapVars f b)
     | Ty.Entails (ctx, goal) ->
         let item = function
             | CtxVar n -> CtxVar n
@@ -120,6 +122,7 @@ let private freeVarsInOrder (ty: Ty) : Name list =
         | Ty.Var _ | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ()
         | Ty.Power (b, _) | Ty.Commutes b -> go b
         | Ty.HasType (subj, t) -> go subj; go t
+        | Ty.Eq (a, b) -> go a; go b
         | Ty.Entails (ctx, goal) ->
             ctx |> List.iter (function CtxVar _ -> () | Hyp (_, t) | Anon t -> go t)
             go goal
@@ -171,6 +174,13 @@ let rec private variants (ty: Ty) : Ty list =
     | Ty.Power (b, n) -> via (fun l -> Ty.Power (l.[0], n)) [ b ]
     | Ty.Commutes b -> via (fun l -> Ty.Commutes l.[0]) [ b ]
     | Ty.HasType (subj, t) -> via (fun l -> Ty.HasType (l.[0], l.[1])) [ subj; t ]
+    | Ty.Eq (a, b) ->
+        // = is symmetric: offer both orientations and let the least form win
+        [ for av in variants a do
+            for bv in variants b do
+                yield Ty.Eq (av, bv)
+                yield Ty.Eq (bv, av) ]
+        |> List.truncate maxVariants
     | Ty.Entails (ctx, goal) ->
         // hypothesis order can carry dependencies, so the context is not permuted
         let choices =

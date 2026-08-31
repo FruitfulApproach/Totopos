@@ -29,6 +29,8 @@ type Ty =
     | Entails of context: CtxItem list * goal: Ty
     /// M : σ — a typing judgment: the term M inhabits the type σ
     | HasType of subject: Ty * Ty
+    /// M = N — an equation; symmetric, so canonicalization may orient it
+    | Eq of Ty * Ty
     /// σ → τ
     | Function of domain: Ty * codomain: Ty
     /// σ × τ
@@ -110,6 +112,7 @@ module Ty =
                 | Anon t -> Anon (s t)
             Ty.Entails (List.map item ctx, s goal)
         | Ty.HasType (subj, t) -> Ty.HasType (s subj, s t)
+        | Ty.Eq (a, b) -> Ty.Eq (s a, s b)
         | Ty.Function (d, c) -> Ty.Function (s d, s c)
         | Ty.Product (a, b) -> Ty.Product (s a, s b)
         | Ty.Sum (a, b) -> Ty.Sum (s a, s b)
@@ -145,6 +148,7 @@ module Ty =
                 | Anon t -> Anon (expandPowers t)
             Ty.Entails (List.map item ctx, expandPowers goal)
         | Ty.HasType (subj, t) -> Ty.HasType (expandPowers subj, expandPowers t)
+        | Ty.Eq (a, b) -> Ty.Eq (expandPowers a, expandPowers b)
         | Ty.Power (b, n) ->
             let b' = expandPowers b
             if n = bigint 1 then b'
@@ -194,6 +198,7 @@ module Ty =
             let left = ctx |> List.map item |> String.concat ", "
             (if left = "" then "⊢ " else left + " ⊢ ") + format goal
         | Ty.HasType (subj, t) -> $"{format subj} : {format t}"
+        | Ty.Eq (a, b) -> $"{format a} = {format b}"
         | Ty.Function (d, c) -> $"{atom d} → {atom c}"
         | Ty.Product (a, b) -> $"{atom a} × {atom b}"
         | Ty.Sum (a, b) -> $"{atom a} + {atom b}"

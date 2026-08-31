@@ -90,19 +90,19 @@
             </div>
         }
         <SymbolEditor Id="conclusion-editor" Rows="2" ShowPad="true" SubmitOnEnter="true"
-                      Placeholder="type a conclusion — Enter to add as a tag"
+                      Placeholder="type a conclusion — Enter adds it; several lines become separate conclusions"
                       Value="@conclusionInput" ValueChanged="OnConclusionChanged" OnSubmit="AddConclusion" />
         <button type="button" class="ab-kind-btn ab-sketch-add" @onclick="() => OpenSketchModal(false)">
             <i class="fa-solid fa-plus"></i> Sketch
         </button>
 
         <button type="button" class="ab-btn-primary mt-2" @onclick="AddRule"
-                disabled="@(conclusions.Count == 0)">
+                disabled="@(conclusions.Count == 0 && string.IsNullOrWhiteSpace(conclusionInput))">
             <i class="fa-solid fa-circle-plus"></i> Add rule to system
         </button>
-        @if (conclusions.Count == 0)
+        @if (conclusions.Count == 0 && string.IsNullOrWhiteSpace(conclusionInput))
         {
-            <div class="ab-muted mt-1">A rule needs at least one conclusion.</div>
+            <div class="ab-muted mt-1">A rule needs at least one conclusion — type one above (Enter adds it as a tag, or just click Add).</div>
         }
     </div>
 
@@ -339,7 +339,7 @@
             </div>
             @if (!SketchNameValid)
             {
-                <div class="ab-muted" style="margin-top:.4rem">Name must be letters/digits, start with a letter, and be unused.</div>
+                <div class="ab-muted" style="margin-top:.4rem">Name must be letters/digits/underscore/hyphen, start with a letter, not end with a hyphen, and be unused.</div>
             }
         </div>
     </div>
@@ -516,6 +516,11 @@
                 Conclusions = MakeTags(en.Conclusions),
             });
         }
+        foreach (var (name, json) in ex.Sketches ?? Array.Empty<(string, string)>())
+        {
+            if (!sketches.Any(s => s.Name == name))
+                sketches.Add(new Sketch { Name = name, Json = json });
+        }
         await Save();
     }
 
@@ -643,32 +648,63 @@
         await Save();
     }
 
+    static List<string> Lines(string v) =>
+        (v ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+
+    // live preview: each line is its own expression — show the first error,
+    // otherwise the analysis of the last line (the one being typed)
+    static RunResult? Preview(string v)
+    {
+        var lines = Lines(v);
+        if (lines.Count == 0) return null;
+        foreach (var line in lines)
+        {
+            var r = Api.Run(line);
+            if (!r.Success) return r;
+        }
+        return Api.Run(lines[^1]);
+    }
+
     void OnPremiseChanged(string v)
     {
         premiseInput = v;
-        analysis = string.IsNullOrWhiteSpace(v) ? null : Api.Run(v);
+        analysis = Preview(v);
     }
 
     void OnConclusionChanged(string v)
     {
         conclusionInput = v;
-        analysis = string.IsNullOrWhiteSpace(v) ? null : Api.Run(v);
+        analysis = Preview(v);
     }
 
     void AddPremise(string t) => AddTag(t, isPremise: true);
 
     void AddConclusion(string t) => AddTag(t, isPremise: false);
 
+    // every non-blank line becomes its own tag; lines that fail to parse stay
+    // behind in the editor with the first error shown in the analysis panel
     void AddTag(string t, bool isPremise)
     {
-        var text = t.Trim();
-        if (text.Length == 0) return;
-        var r = Api.Run(text);
-        analysis = r;
-        if (!r.Success) return;
-        var tag = new TagItem { Raw = text, Result = r };
-        if (isPremise) { premises.Add(tag); premiseInput = ""; }
-        else { conclusions.Add(tag); conclusionInput = ""; }
+        var lines = Lines(t);
+        if (lines.Count == 0) return;
+        var failed = new List<string>();
+        foreach (var line in lines)
+        {
+            var r = Api.Run(line);
+            if (r.Success)
+            {
+                var tag = new TagItem { Raw = line, Result = r };
+                if (isPremise) premises.Add(tag); else conclusions.Add(tag);
+                analysis = r;
+            }
+            else
+            {
+                failed.Add(line);
+            }
+        }
+        if (failed.Count > 0) analysis = Api.Run(failed[0]);
+        var remaining = string.Join("\n", failed);
+        if (isPremise) premiseInput = remaining; else conclusionInput = remaining;
     }
 
     void ShowAnalysis(TagItem t) => analysis = t.Result;
@@ -714,7 +750,8 @@
     bool SketchNameValid =>
         sketchNameInput.Length > 0
         && char.IsLetter(sketchNameInput[0])
-        && sketchNameInput.All(char.IsLetterOrDigit)
+        && sketchNameInput.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' || "₀₁₂₃₄₅₆₇₈₉₊₋₌".Contains(c))
+        && sketchNameInput[^1] != '-'
         && !sketches.Any(s => s.Name == sketchNameInput);
 
     void OpenSketchModal(bool isPremise)
@@ -818,6 +855,10 @@
 
     async Task AddRule()
     {
+        // commit any text still sitting in the editors — clicking Add should
+        // not require pressing Enter first
+        if (!string.IsNullOrWhiteSpace(premiseInput)) AddTag(premiseInput, isPremise: true);
+        if (!string.IsNullOrWhiteSpace(conclusionInput)) AddTag(conclusionInput, isPremise: false);
         if (conclusions.Count == 0) return;
         rules.Add(new Rule
         {

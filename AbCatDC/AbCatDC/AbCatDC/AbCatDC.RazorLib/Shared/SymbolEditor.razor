@@ -52,7 +52,7 @@
 
     static readonly string[] PadSymbols =
     {
-        "⊢", "Γ", "Δ", "→", "×", "+", "∩", "∪", "⟨", "⟩", "∀", "∃", "μ", "⋂", "⋃",
+        "⊢", "=", "Γ", "Δ", "→", "×", "+", "∩", "∪", "⟨", "⟩", "∀", "∃", "μ", "⋂", "⋃",
         "(", ")", ".", ":", ",", "^", "α", "β", "γ", "ρ", "σ", "τ", "ℕ", "ℤ"
     };
 
@@ -108,6 +108,19 @@
     async Task AfterTextChanged(string t, int cursor, int gen)
     {
         debounceCts?.Cancel();
+        // \_X / \_{12} → unicode subscripts, in place
+        if (SymbolCommands.FindSubscript(t, cursor) is { } sub)
+        {
+            if (gen != inputGen) return;
+            var stSub = await JS.InvokeAsync<EditorState>("abEditor.replaceRange", Id, sub.Start, cursor, sub.Replacement);
+            if (gen == inputGen)
+            {
+                text = stSub.Text;
+                await Push();
+            }
+            await ClosePopup();
+            return;
+        }
         var (start, prefix) = SymbolCommands.FindContext(t, cursor);
         if (start >= 0 && prefix.Length > 0)
         {

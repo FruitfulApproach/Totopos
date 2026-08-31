@@ -85,6 +85,11 @@ let infer (ty: Ty) : Judgment list =
             go env b
             add (Ty.format (Ty.Commutes b)) "Prop"
                 "commutativity assertion: every pair of parallel composites of arrows in the diagram is equal"
+        | Ty.Eq (a, b) ->
+            go env a
+            go env b
+            add (Ty.format (Ty.Eq (a, b))) "Prop"
+                "equation: both sides denote the same element/morphism (symmetric — canonicalization may orient it)"
         | Ty.HasType (subj, t) ->
             go env t
             (match subj with

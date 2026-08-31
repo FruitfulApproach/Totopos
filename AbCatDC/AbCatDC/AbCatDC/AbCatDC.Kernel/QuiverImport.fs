@@ -173,7 +173,7 @@ let run (json: string) (title: string) (report: Action<int, int>) (ct: Cancellat
                         nextBound <- nextBound + 1
                         let st = tok s
                         let tt = tok t
-                        $"{{{e}}}:{{{st}}}\\to{{{tt}}}" |]
+                        $"{{{e}}}:{{{st}}}→{{{tt}}}" |]
                 // isolated vertices still need binders / free names
                 for v in 0 .. n - 1 do
                     if not (tokens.ContainsKey v) then tok v |> ignore

@@ -7,7 +7,9 @@ namespace AbCatDC.RazorLib.Shared;
 /// </summary>
 public static class ExampleSystems
 {
-    public record ExampleSystem(string Name, string Description, RulePalette.Entry[] Rules);
+    public record ExampleSystem(
+        string Name, string Description, RulePalette.Entry[] Rules,
+        (string Name, string Json)[]? Sketches = null);
 
     static RulePalette.Entry R(string kind, string name, string[] prem, string[] concl, string desc) =>
         new(kind, name, prem, concl, desc);
@@ -135,6 +137,29 @@ public static class ExampleSystems
                 R("Elimination", "∩-mono", new[] { "A → B" }, new[] { "(A ∩ X) → (B ∩ X)" },
                     "Monotonicity of intersection in a subtyping reading."),
                 R("Elimination", "→-elim", new[] { "σ → τ", "σ" }, new[] { "τ" }, "Application."),
+            }),
+
+        new("Poset as a category",
+            "The functor from posets to thin categories: elements are objects, x ≤ y is the unique arrow x → y. Reflexivity gives identities, transitivity gives composition, and thinness makes every diagram commute. (Antisymmetry corresponds to skeletality — mutually connected objects coincide — which lives outside the syntax as a side condition.)",
+            new[]
+            {
+                R("Structural", "objects", None, new[] { "P : Type, x : P ⊢ x : P" },
+                    "Each element of the poset is an object of the category."),
+                R("Construction", "refl-id", None, new[] { "P : Type, x : P ⊢ idₓ : x → x" },
+                    "Reflexivity x ≤ x becomes the identity arrow: hom(x, x) is inhabited."),
+                R("Elimination", "trans-compose",
+                    new[] { "Γ ⊢ f : x → y", "Γ ⊢ g : y → z" }, new[] { "Γ ⊢ gf : x → z" },
+                    "Transitivity (x ≤ y and y ≤ z imply x ≤ z) becomes composition; gf stands for g ∘ f."),
+                R("Computational", "thinness",
+                    new[] { "Γ ⊢ f : x → y", "Γ ⊢ g : x → y" }, new[] { "Γ ⊢ [Par] commutes" },
+                    "At most one arrow between any two objects: any parallel pair is equal, so every diagram in a poset-category commutes."),
+                R("Structural", "point-commutes", None, new[] { "C : Type, X : C ⊢ [Pt] commutes" },
+                    "A single-object diagram — no arrows, not even the identity drawn — commutes vacuously: there is no pair of parallel composites to compare."),
+            },
+            new[]
+            {
+                ("Pt", "[0, 1, [0,0,\"X\"]]"),
+                ("Par", "[0, 2, [0,0,\"X\"], [1,0,\"Y\"], [0,1,\"f\"], [0,1,\"g\",2,{\"curve\":2}]]"),
             }),
 
         new("Linear logic (fragment)",

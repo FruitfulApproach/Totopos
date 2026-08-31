@@ -14,6 +14,7 @@ type Token =
     | TLBracket | TRBracket
     | TCommutes
     | TTurnstile
+    | TEquals
     | TDot | TColon | TComma
     | TEnd
 
@@ -40,6 +41,7 @@ let private describe tok =
     | TRBracket -> "']'"
     | TCommutes -> "'commutes'"
     | TTurnstile -> "'⊢'"
+    | TEquals -> "'='"
     | TDot -> "'.'"
     | TColon -> "':'"
     | TComma -> "','"
@@ -72,6 +74,7 @@ let private lex (s: string) : Token list =
         elif c = ']' then toks.Add TRBracket; i <- i + 1
         elif c = '⊢' then toks.Add TTurnstile; i <- i + 1
         elif c = '|' && i + 1 < s.Length && s.[i + 1] = '-' then toks.Add TTurnstile; i <- i + 2
+        elif c = '=' then toks.Add TEquals; i <- i + 1
         elif c = '.' then toks.Add TDot; i <- i + 1
         elif c = ':' then toks.Add TColon; i <- i + 1
         elif c = ',' then toks.Add TComma; i <- i + 1
@@ -88,12 +91,29 @@ let private lex (s: string) : Token list =
         elif Char.IsDigit c then
             let start = i
             while i < s.Length && Char.IsDigit s.[i] do i <- i + 1
-            toks.Add (TInt (bigint.Parse(s.Substring(start, i - start))))
+            // digits followed by a subscript continue as an identifier, so the
+            // identity morphism 1ₓ is one name rather than a numeral
+            let isSubTail (ch: char) = "₀₁₂₃₄₅₆₇₈₉₊₋₌ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ".IndexOf ch >= 0
+            if i < s.Length && isSubTail s.[i] then
+                while i < s.Length && s.[i] <> 'μ'
+                      && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'' || isSubTail s.[i]) do
+                    i <- i + 1
+                toks.Add (TIdent (s.Substring(start, i - start)))
+            else
+                toks.Add (TInt (bigint.Parse(s.Substring(start, i - start))))
         elif Char.IsLetter c || c = '_' then
-            // μ is a letter but always lexes as the binder, so identifiers exclude it
+            // μ is a letter but always lexes as the binder, so identifiers exclude it.
+            // Subscript letters are Unicode letters already; subscript digits and
+            // signs (₀-₉, ₊₋₌) are admitted explicitly so idₓ and x₁ stay one token.
+            let isSubscript (ch: char) = "₀₁₂₃₄₅₆₇₈₉₊₋₌".IndexOf ch >= 0
+            // a '-' continues the identifier (right-identity) unless it starts
+            // an arrow '->' — lookahead keeps X->Y lexing as an arrow
+            let isHyphenJoin j =
+                s.[j] = '-' && j + 1 < s.Length && s.[j + 1] <> '>'
+                && (Char.IsLetterOrDigit s.[j + 1] || isSubscript s.[j + 1] || s.[j + 1] = '_')
             let start = i
             while i < s.Length && s.[i] <> 'μ'
-                  && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'') do
+                  && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'' || isSubscript s.[i] || isHyphenJoin i) do
                 i <- i + 1
             let word = s.Substring(start, i - start)
             toks.Add (if word = "commutes" then TCommutes else TIdent word)
@@ -136,7 +156,34 @@ let private startsDependent st =
 //   product := atom ('×' atom)*
 //   atom    := identifier | '(' type ')' | '⟨' x ':' type (',' x ':' type)* '⟩' | type
 
-let rec private parseType (st: State) : Ty =
+let rec private parseTypedBinder st (plain: Name * Ty -> Ty) (dep: Name * Ty * Ty -> Ty) : Ty =
+    // quantifier body forms:  x . body  |  x : annot . body  |  x : annot
+    let a = ident st
+    match peek st with
+    | TDot ->
+        advance st
+        plain (a, parseBody st)
+    | TColon ->
+        advance st
+        let ann = parseType st
+        if peek st = TDot then
+            advance st
+            dep (a, ann, parseBody st)
+        else
+            // bare "∃x : T" — existence of a typed witness
+            plain (a, Ty.HasType (Ty.Var a, ann))
+    | t -> raise (ParseError $"Expected '.' or ':' after the bound variable but found {describe t}.")
+
+/// A binder body: a type, optionally refined to a typing judgment M : σ.
+/// (Equations are already part of parseType.)
+and private parseBody st =
+    let t = parseType st
+    if peek st = TColon then
+        advance st
+        Ty.HasType (t, parseType st)
+    else t
+
+and private parseType (st: State) : Ty =
     let mutable t = parseTypeCore st
     // postfix 'commutes' assertion; an arrow may still follow it
     while peek st = TCommutes do
@@ -145,12 +192,16 @@ let rec private parseType (st: State) : Ty =
         if peek st = TArrow then
             advance st
             t <- Ty.Function (t, parseType st)
+    // '=' binds loosest of all: a = b → c reads a = (b → c)
+    if peek st = TEquals then
+        advance st
+        t <- Ty.Eq (t, parseType st)
     t
 
 and private parseTypeCore (st: State) : Ty =
     match peek st with
-    | TForall -> advance st; let a = ident st in expect st TDot; Ty.Polymorphic (a, parseType st)
-    | TExists -> advance st; let a = ident st in expect st TDot; Ty.Existential (a, parseType st)
+    | TForall -> advance st; parseTypedBinder st Ty.Polymorphic Ty.DependentFunction
+    | TExists -> advance st; parseTypedBinder st Ty.Existential Ty.DependentPair
     | TMu -> advance st; let a = ident st in expect st TDot; Ty.Recursive (a, parseType st)
     | TBigCap -> advance st; parseFamilial st Ty.FamilialIntersection
     | TBigCup -> advance st; parseFamilial st Ty.FamilialUnion
@@ -236,7 +287,8 @@ and private parseAtom st =
         Ty.Record (List.ofSeq members)
     | t -> raise (ParseError $"Unexpected {describe t}.")
 
-/// goal := type (':' type)?   — a bare formula or a typing judgment M : σ
+/// goal := type (':' type)?
+/// — a bare formula (equations included via parseType) or a typing judgment
 let private parseGoal st =
     let t = parseType st
     if peek st = TColon then
