@@ -92,6 +92,49 @@ window.abEditor = {
         } catch { return ''; }
     },
 
+    // Full-screen diagram zoom, mounted on <body> so no transformed ancestor
+    // can trap the fixed positioning or stacking context. When editRef/editArg
+    // are given, a hover edit button invokes .NET ZoomEdit(editArg) to open the
+    // real quiver editor for that sketch.
+    showZoom: function (src, editRef, editArg) {
+        if (document.getElementById('ab-zoom-ov')) return;
+        const ov = document.createElement('div');
+        ov.id = 'ab-zoom-ov';
+        ov.className = 'ab-zoom-overlay';
+        const fr = document.createElement('iframe');
+        fr.className = 'ab-zoom-frame';
+        fr.title = 'diagram — enlarged';
+        fr.addEventListener('load', function () { ov.classList.add('ab-loaded'); });
+        fr.src = src;
+        const btn = document.createElement('button');
+        btn.className = 'ab-zoom-close';
+        btn.title = 'Close';
+        btn.textContent = '×';
+        const close = function () {
+            ov.remove();
+            document.removeEventListener('keydown', onKey);
+        };
+        const onKey = function (e) { if (e.key === 'Escape') close(); };
+        ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+        ov.addEventListener('dblclick', function (e) { if (e.target === ov) close(); });
+        btn.addEventListener('click', close);
+        document.addEventListener('keydown', onKey);
+        ov.appendChild(fr);
+        ov.appendChild(btn);
+        if (editRef) {
+            const ed = document.createElement('button');
+            ed.className = 'ab-zoom-edit';
+            ed.title = 'Edit this diagram';
+            ed.innerHTML = '<i class="fa-solid fa-pencil"></i>';
+            ed.addEventListener('click', function () {
+                close();
+                editRef.invokeMethodAsync('ZoomEdit', editArg);
+            });
+            ov.appendChild(ed);
+        }
+        document.body.appendChild(ov);
+    },
+
     loadItem: function (key) {
         try { return localStorage.getItem(key); } catch { return null; }
     },

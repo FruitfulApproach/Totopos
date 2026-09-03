@@ -95,7 +95,7 @@ let private lex (s: string) : Token list =
             while i < s.Length && Char.IsDigit s.[i] do i <- i + 1
             // digits followed by a subscript continue as an identifier, so the
             // identity morphism 1ₓ is one name rather than a numeral
-            let isSubTail (ch: char) = "₀₁₂₃₄₅₆₇₈₉₊₋₌ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ".IndexOf ch >= 0
+            let isSubTail = Ty.isSubscriptChar
             if i < s.Length && isSubTail s.[i] then
                 while i < s.Length && s.[i] <> 'μ'
                       && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'' || isSubTail s.[i]) do
@@ -107,7 +107,7 @@ let private lex (s: string) : Token list =
             // μ is a letter but always lexes as the binder, so identifiers exclude it.
             // Subscript letters are Unicode letters already; subscript digits and
             // signs (₀-₉, ₊₋₌) are admitted explicitly so idₓ and x₁ stay one token.
-            let isSubscript (ch: char) = "₀₁₂₃₄₅₆₇₈₉₊₋₌".IndexOf ch >= 0
+            let isSubscript = Ty.isSubscriptChar
             // a '-' continues the identifier (right-identity) unless it starts
             // an arrow '->' — lookahead keeps X->Y lexing as an arrow
             let isHyphenJoin j =
@@ -271,7 +271,27 @@ and private parsePower st =
 
 and private parseAtom st =
     match peek st with
-    | TIdent n -> advance st; (if Set.contains n Ty.constantAtoms then Ty.Atom n else Ty.Var n)
+    | TIdent n ->
+        advance st
+        if Ty.isTagAtom n then
+            // tag application: built-in markers ("Ker f", "Coker (gf)") and
+            // user-defined rigid tags — any identifier containing '_', e.g.
+            // "Mono_C (A → B)" or "Mono_C A B" — are function-like constants
+            // taking each following atom as an argument (left-nested)
+            let mutable acc = Ty.Atom n
+            let mutable more = true
+            while more do
+                match peek st with
+                | TIdent _ | TInt _ | TLParen | TLBracket -> acc <- Ty.Product (acc, parseAtom st)
+                | _ -> more <- false
+            acc
+        elif Set.contains n Ty.constantAtoms then Ty.Atom n
+        elif n.Length > 0 && System.Char.IsDigit n.[0] then
+            // digit-led identifiers are identity notation (1ₐ, 1ₛ): rigid
+            // constants, never metavariables — an equation like p₁i₁ = 1ₐ
+            // must not let 1ₐ unify with an arbitrary term
+            Ty.Atom n
+        else Ty.Var n
     | TInt n -> advance st; Ty.Lit n
     | TLBracket ->
         advance st

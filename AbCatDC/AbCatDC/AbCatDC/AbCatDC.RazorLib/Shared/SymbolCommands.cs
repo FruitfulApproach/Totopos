@@ -94,16 +94,27 @@ public static class SymbolCommands
                 var sb = new System.Text.StringBuilder();
                 foreach (var ch in chars)
                 {
-                    if (!TrySub(ch, out var s)) return null;
+                    if (!TrySub(ch, out var s)) { sb = null; break; }
                     sb.Append(s);
                 }
-                return (i - 2, sb.ToString());
+                if (sb != null) return (i - 2, sb.ToString());
+                // some character has no subscript form — fall back to a
+                // literal _payload (a rigid tag suffix) when it stays a name
+                if (chars.All(char.IsLetterOrDigit))
+                    return (i - 2, "_" + new string(chars.ToArray()));
+                return null;
             }
         }
         // single form \_c
-        if (cursor >= 3 && text[cursor - 3] == '\\' && text[cursor - 2] == '_' && text[cursor - 1] != '{'
-            && TrySub(text[cursor - 1], out var single))
-            return (cursor - 3, single.ToString());
+        if (cursor >= 3 && text[cursor - 3] == '\\' && text[cursor - 2] == '_' && text[cursor - 1] != '{')
+        {
+            var c = text[cursor - 1];
+            if (TrySub(c, out var single)) return (cursor - 3, single.ToString());
+            // no Unicode subscript exists (b c d f g q w y z, and capitals map
+            // to lowercase) — fall back to a literal _c: the parser reads
+            // underscore names as rigid user-defined tags (Mono_C)
+            if (char.IsLetterOrDigit(c)) return (cursor - 3, "_" + c);
+        }
         return null;
     }
 
@@ -127,7 +138,8 @@ public static class SymbolCommands
                 var sb = new System.Text.StringBuilder();
                 foreach (var ch in payload)
                 {
-                    if (!TrySub(ch, out var s)) return m.Value;
+                    if (!TrySub(ch, out var s))
+                        return payload.All(char.IsLetterOrDigit) ? "_" + payload : m.Value;
                     sb.Append(s);
                 }
                 return sb.ToString();

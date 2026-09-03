@@ -1,0 +1,690 @@
+@page "/prover"
+@using AbCatDC.Kernel
+@using System.Text.Json
+@inject IJSRuntime JS
+
+<div class="ab-hero">
+    <h1><i class="fa-solid fa-route"></i> Diagram Chaser</h1>
+    <p>
+        Prove statements using <em>only</em> the rules of your formal system. Add givens, let the
+        engine match rule premises against proven steps automatically, and when the goal is reached,
+        save the result as a named <strong>theorem</strong> — it joins the rule system.
+    </p>
+</div>
+
+<div class="ab-card">
+    <div class="ab-sys-head">
+        <h5><i class="fa-solid fa-folder-open"></i> Proof</h5>
+        <div class="ab-sys-actions">
+            <select class="ab-text-input" style="width:auto; margin:0" value="@(blob.Active)" @onchange="OnProofSelected">
+                @foreach (var p in blob.Proofs)
+                {
+                    <option value="@p.Name">@p.Name</option>
+                }
+            </select>
+            <button type="button" class="ab-kind-btn" @onclick="NewProof"><i class="fa-solid fa-plus"></i> New</button>
+            <button type="button" class="ab-kind-btn" @onclick="() => renaming = !renaming"><i class="fa-solid fa-i-cursor"></i> Rename</button>
+            <button type="button" class="ab-kind-btn danger" @onclick='() => pendingConfirm = "delete-proof"'><i class="fa-solid fa-trash-can"></i> Delete</button>
+        </div>
+    </div>
+    @if (renaming)
+    {
+        <input class="ab-text-input" style="max-width:20rem" value="@renameText"
+               @oninput="e => renameText = e.Value?.ToString() ?? string.Empty" />
+        <button type="button" class="ab-kind-btn" @onclick="ApplyRename">OK</button>
+    }
+    @if (!string.IsNullOrWhiteSpace(Active.SystemName) && Active.SystemName != sys.Name)
+    {
+        <div class="ab-muted" style="margin-top:.4rem"><i class="fa-solid fa-triangle-exclamation"></i>
+            This proof was made in system “@Active.SystemName”; the current system is “@sys.Name”.</div>
+    }
+</div>
+
+<div class="ab-card @(ProvenStep >= 0 ? "ab-goal-proven" : "")">
+    <h5><i class="fa-solid fa-flag-checkered"></i> Goal
+        @if (ProvenStep >= 0)
+        {
+            <span class="ab-proven-chip"><i class="fa-solid fa-check"></i> PROVEN — step @(ProvenStep + 1)</span>
+        }
+    </h5>
+    <SymbolEditor Id="goal-editor" Rows="2" ShowPad="true"
+                  Placeholder="the statement to prove — e.g. Γ ⊢ hgf : A → D  (optional: you can chase forward without one)"
+                  Value="@goalText" ValueChanged="OnGoalChanged" />
+    @if (goalRun is not null && !goalRun.Success)
+    {
+        <div class="ab-error">@goalRun.Error</div>
+    }
+</div>
+
+<div class="ab-card">
+    <h5><i class="fa-solid fa-list-ol"></i> Steps
+        <span class="ab-muted" style="font-weight:400">— givens and derived statements, in order</span></h5>
+    @if (proofLoading)
+    {
+        <p class="ab-muted"><i class="fa-solid fa-spinner fa-spin"></i> Loading proof…</p>
+    }
+    else if (steps.Count == 0)
+    {
+        <p class="ab-muted">No steps yet. Add givens below, or apply a premise-free rule.</p>
+    }
+    else
+    {
+        <ol class="ab-step-list">
+            @for (var i = 0; i < steps.Count; i++)
+            {
+                var st = steps[i];
+                <li class="ab-step @(st.Invalid ? "invalid" : "") @(i == ProvenStep ? "goal-step" : "")">
+                    <span class="ab-step-expr">
+                        @if (st.Invalid)
+                        {
+                            <span title="@(st.Result?.Error ?? "no longer parses")">@st.Raw <i class="fa-solid fa-triangle-exclamation"></i></span>
+                        }
+                        else
+                        {
+                            <InlineExpr Text="@st.Result!.Formatted" Sketches="SketchMap" Height="60" />
+                        }
+                    </span>
+                    <span class="ab-step-just">@st.Just</span>
+                </li>
+            }
+        </ol>
+    }
+    <div class="ab-sys-actions" style="margin-top:.6rem">
+        <button type="button" class="ab-kind-btn" disabled="@(steps.Count == 0)" @onclick="UndoLast">
+            <i class="fa-solid fa-rotate-left"></i> Undo last
+        </button>
+        <button type="button" class="ab-kind-btn danger" disabled="@(steps.Count == 0)"
+                @onclick='() => pendingConfirm = "reset"'>
+            <i class="fa-solid fa-eraser"></i> Reset steps
+        </button>
+    </div>
+
+    <h6>Add given</h6>
+    <SymbolEditor Id="given-editor" Rows="2" ShowPad="true" SubmitOnEnter="true"
+                  Placeholder="assumption(s) — Enter adds each line as a given, e.g. Γ ⊢ f : A → B"
+                  Value="@givenInput" ValueChanged="v => givenInput = v" OnSubmit="AddGivens" />
+    @if (givenError is not null)
+    {
+        <div class="ab-error">@givenError</div>
+    }
+</div>
+
+<div class="ab-card">
+    <h5><i class="fa-solid fa-wand-magic-sparkles"></i> Apply a rule</h5>
+    @if (sys.Rules.Count == 0)
+    {
+        <p class="ab-muted">The current system has no rules — define some on the <a href="rules">Rules page</a> first.</p>
+    }
+    else
+    {
+        <select class="ab-text-input" style="max-width: 28rem" value="@selRuleIdx" @onchange="OnRuleSelected">
+            <option value="-1">— choose a rule —</option>
+            @foreach (var k in SystemStore.Kinds)
+            {
+                var group = sys.Rules.Select((r, i) => (r, i)).Where(t => t.r.Kind == k).ToList();
+                if (group.Count == 0) { continue; }
+                <optgroup label="@k">
+                    @foreach (var (r, i) in group)
+                    {
+                        <option value="@i">@(string.IsNullOrWhiteSpace(r.Name) ? $"({k} rule {i + 1})" : r.Name)</option>
+                    }
+                </optgroup>
+            }
+        </select>
+
+        @if (SelRule is not null)
+        {
+            <div class="ab-rule k-@SelRule.Kind.ToLowerInvariant()" style="margin-top:.6rem">
+                <div class="ab-rule-row">
+                    <div class="ab-rule-frac">
+                        <div class="ab-rule-prem">
+                            @if (SelRule.Premises.Count == 0)
+                            {
+                                <span class="ab-muted">(no premises)</span>
+                            }
+                            @foreach (var p in SelRule.Premises)
+                            {
+                                <span>@p</span>
+                            }
+                        </div>
+                        <div class="ab-rule-mid">
+                            <div class="ab-rule-line"></div>
+                            <span class="ab-rule-name">(@SelRule.Name)</span>
+                        </div>
+                        <div class="ab-rule-prem">
+                            @foreach (var c in SelRule.Conclusions)
+                            {
+                                <span>@c</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (ruleError is not null)
+            {
+                <div class="ab-error">This rule no longer parses: @ruleError</div>
+            }
+            else if (engineRunning)
+            {
+                <div class="ab-engine-box">
+                    <i class="fa-solid fa-spinner fa-spin"></i> matching the rule's premises against the steps…
+                </div>
+            }
+            else if (engine is { Ok: true })
+            {
+                <div class="ab-engine-box ok">
+                    <div><i class="fa-solid fa-circle-check"></i> Match found.
+                        @if (engine.Bindings.Length > 0)
+                        {
+                            <span class="ab-engine-sub">
+                                @(string.Join(",  ", engine.Bindings.Select(b => $"{b.Item1} ≔ {b.Item2}")))
+                            </span>
+                        }
+                        @if (engine.UsedSteps.Length > 0)
+                        {
+                            <span class="ab-muted"> from step@(engine.UsedSteps.Length > 1 ? "s" : "") @(string.Join(", ", engineUsedDisplay.Select(i => i + 1)))</span>
+                        }
+                    </div>
+                    <ul class="ab-engine-concl">
+                        @foreach (var c in engine.NewConclusions)
+                        {
+                            <li>@c</li>
+                        }
+                    </ul>
+                    <button type="button" class="ab-btn-primary sm" @onclick="ApplyEngine">
+                        <i class="fa-solid fa-circle-plus"></i> Apply
+                    </button>
+                    @if (applyMessage is not null)
+                    {
+                        <span class="ab-muted" style="margin-left:.6rem">@applyMessage</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="ab-engine-box bad">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    @(engine?.Error ?? "no consistent match of the premises against the proven steps")
+                    <div class="ab-muted" style="margin-top:.3rem">
+                        Contexts match literally (Γ only matches Γ; no weakening), and hypothesis names match up to renaming.
+                    </div>
+                </div>
+
+                <button type="button" class="ab-kind-btn" style="margin-top:.5rem"
+                        @onclick="() => manualOpen = !manualOpen">
+                    <i class="fa-solid fa-sliders"></i> Manual substitution
+                </button>
+                @if (manualOpen && metaNames.Length > 0)
+                {
+                    <div class="ab-manual-grid">
+                        @for (var i = 0; i < metaNames.Length; i++)
+                        {
+                            var idx = i;
+                            <div class="ab-manual-row" @key="@($"{selRuleIdx}:{metaNames[idx]}")">
+                                <span class="ab-manual-var">@metaNames[idx] ≔</span>
+                                <SymbolEditor Id="@($"mv-{idx}")" Rows="1" ShowPad="false"
+                                              Value="@manualVals[idx]"
+                                              ValueChanged="v => { manualVals[idx] = v; manualOutcome = null; }" />
+                            </div>
+                        }
+                    </div>
+                    <button type="button" class="ab-kind-btn" @onclick="VerifyManual">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> Verify
+                    </button>
+                    @if (manualOutcome is { Ok: true })
+                    {
+                        <span class="ab-manual-ok"><i class="fa-solid fa-circle-check"></i> premises verified</span>
+                        <button type="button" class="ab-btn-primary sm" @onclick="ApplyManual">
+                            <i class="fa-solid fa-circle-plus"></i> Apply
+                        </button>
+                    }
+                    else if (manualOutcome is not null)
+                    {
+                        <div class="ab-error" style="margin-top:.4rem">@manualOutcome.Error</div>
+                    }
+                }
+                else if (manualOpen)
+                {
+                    <p class="ab-muted">This rule has no metavariables to instantiate.</p>
+                }
+            }
+        }
+    }
+</div>
+
+@if (ProvenStep >= 0 && !string.IsNullOrWhiteSpace(goalText))
+{
+    <div class="ab-card ab-thm-card">
+        <h5><i class="fa-solid fa-award"></i> Save as theorem</h5>
+        <div class="ab-sys-actions" style="flex-wrap:wrap">
+            <input class="ab-text-input" style="max-width:18rem; margin:0" placeholder="theorem name"
+                   value="@thmName" @oninput="e => thmName = e.Value?.ToString() ?? string.Empty" />
+            <select class="ab-text-input" style="width:auto; margin:0" value="@thmKind"
+                    @onchange='e => thmKind = e.Value?.ToString() ?? "Theorem"'>
+                @foreach (var k in SystemStore.Kinds)
+                {
+                    <option value="@k">@k</option>
+                }
+            </select>
+            <button type="button" class="ab-btn-primary" disabled="@(string.IsNullOrWhiteSpace(thmName))"
+                    @onclick="SaveTheorem">
+                <i class="fa-solid fa-floppy-disk"></i> Save theorem
+            </button>
+        </div>
+        @if (thmSaved is not null)
+        {
+            <div class="ab-muted" style="margin-top:.4rem"><i class="fa-solid fa-check"></i> @thmSaved</div>
+        }
+    </div>
+}
+
+@if (pendingConfirm is not null)
+{
+    <div class="ab-modal-overlay" @onclick="() => pendingConfirm = null">
+        <div class="ab-modal" @onclick:stopPropagation>
+            <h5><i class="fa-solid fa-triangle-exclamation"></i> Confirm</h5>
+            <p>@(pendingConfirm == "reset" ? "Clear all steps of this proof?" : $"Delete proof “{blob.Active}”?")</p>
+            <div class="ab-modal-btns">
+                <button type="button" class="ab-kind-btn" @onclick="() => pendingConfirm = null">Cancel</button>
+                <button type="button" class="ab-btn-danger" @onclick="ConfirmPending">Confirm</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ---- persistence shapes -------------------------------------------------
+    class StepDto
+    {
+        public string Raw { get; set; } = "";
+        public string Just { get; set; } = "";
+        public string RuleName { get; set; } = "";
+        public List<List<string>> Bindings { get; set; } = new();
+        public List<int> UsedSteps { get; set; } = new();
+    }
+    class ProofDto
+    {
+        public string Name { get; set; } = "";
+        public string SystemName { get; set; } = "";
+        public string GoalRaw { get; set; } = "";
+        public List<StepDto> Steps { get; set; } = new();
+    }
+    class ProofsBlob
+    {
+        public string Active { get; set; } = "";
+        public List<ProofDto> Proofs { get; set; } = new();
+    }
+
+    class Step
+    {
+        public string Raw = "";
+        public string Just = "";
+        public string RuleName = "";
+        public List<List<string>> Bindings = new();
+        public List<int> UsedSteps = new();
+        public RunResult? Result;
+        public bool Invalid => Result is null || !Result.Success;
+    }
+
+    // ---- state --------------------------------------------------------------
+    SystemDto sys = new();
+    ProofsBlob blob = new();
+    List<Step> steps = new();
+    string goalText = "";
+    RunResult? goalRun;
+    string givenInput = "";
+    string? givenError;
+    int selRuleIdx = -1;
+    string? ruleError;
+    ApplyOutcome? engine;
+    int[] engineUsedDisplay = Array.Empty<int>();
+    string? applyMessage;
+    bool manualOpen;
+    string[] metaNames = Array.Empty<string>();
+    string[] manualVals = Array.Empty<string>();
+    ApplyOutcome? manualOutcome;
+    int[] manualUsedDisplay = Array.Empty<int>();
+    string thmName = "";
+    string thmKind = "Theorem";
+    string? thmSaved;
+    bool renaming;
+    string renameText = "";
+    string? pendingConfirm;
+    bool loaded;
+    bool proofLoading = true;
+    bool engineRunning;
+    int engineVersion;   // guards against out-of-order engine results
+    int goalVersion;     // guards against out-of-order goal parses
+
+    ProofDto Active => blob.Proofs.FirstOrDefault(p => p.Name == blob.Active) ?? new ProofDto();
+    RuleDto? SelRule => selRuleIdx >= 0 && selRuleIdx < sys.Rules.Count ? sys.Rules[selRuleIdx] : null;
+    // cached: a stable reference lets Blazor skip re-rendering every InlineExpr
+    IReadOnlyDictionary<string, string> sketchMapCache = new Dictionary<string, string>();
+    IReadOnlyDictionary<string, string> SketchMap => sketchMapCache;
+    void RefreshSketchMap() => sketchMapCache = sys.Sketches.ToDictionary(s => s.Name, s => s.Json);
+
+    // memoized: Api.SameExpr per step is CPU work, not per-render work
+    int provenStep = -1;
+    int ProvenStep => provenStep;
+
+    static int ComputeProven(RunResult? goal, string goalRaw, List<Step> snap)
+    {
+        if (goal is null || !goal.Success) return -1;
+        for (var i = 0; i < snap.Count; i++)
+            if (!snap[i].Invalid && Api.SameExpr(snap[i].Raw, goalRaw)) return i;
+        return -1;
+    }
+
+    async Task RecomputeProven()
+    {
+        var gt = goalText;
+        var g = goalRun;
+        var snap = steps.ToList();
+        provenStep = await Task.Run(() => ComputeProven(g, gt, snap));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || loaded) return;
+        loaded = true;
+        sys = await SystemStore.LoadAsync(JS);
+        Api.SetConstants(sys.Constants.ToArray());
+        RefreshSketchMap();
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("abEditor.loadItem", "abcatdc-proofs");
+            if (!string.IsNullOrEmpty(json))
+                blob = JsonSerializer.Deserialize<ProofsBlob>(json) ?? new ProofsBlob();
+        }
+        catch { }
+        if (blob.Proofs.Count == 0)
+            blob.Proofs.Add(new ProofDto { Name = "Proof 1", SystemName = sys.Name });
+        if (blob.Proofs.All(p => p.Name != blob.Active))
+            blob.Active = blob.Proofs[0].Name;
+        await LoadActive();
+        StateHasChanged();
+    }
+
+    async Task LoadActive()
+    {
+        var p = Active;
+        goalText = p.GoalRaw;
+        selRuleIdx = -1;
+        engine = null;
+        manualOpen = false;
+        applyMessage = null;
+        thmSaved = null;
+        proofLoading = true;
+        var gt = goalText;
+        var dtos = p.Steps.ToList();
+        // parsing goal + every step is CPU work — keep it off the UI thread.
+        // invalid steps are kept (marked), never dropped: indices must stay stable
+        var (gr, sts, pv) = await Task.Run(() =>
+        {
+            var g = string.IsNullOrWhiteSpace(gt) ? null : Api.Run(gt);
+            var list = dtos.Select(s => new Step
+            {
+                Raw = s.Raw, Just = s.Just, RuleName = s.RuleName,
+                Bindings = s.Bindings, UsedSteps = s.UsedSteps,
+                Result = Api.Run(s.Raw),
+            }).ToList();
+            return (g, list, ComputeProven(g, gt, list));
+        });
+        goalRun = gr;
+        steps = sts;
+        provenStep = pv;
+        proofLoading = false;
+        StateHasChanged();
+    }
+
+    async Task SaveProofs()
+    {
+        var p = Active;
+        p.GoalRaw = goalText;
+        p.SystemName = string.IsNullOrWhiteSpace(p.SystemName) ? sys.Name : p.SystemName;
+        p.Steps = steps.Select(s => new StepDto
+        {
+            Raw = s.Raw, Just = s.Just, RuleName = s.RuleName,
+            Bindings = s.Bindings, UsedSteps = s.UsedSteps,
+        }).ToList();
+        try { await JS.InvokeVoidAsync("abEditor.saveItem", "abcatdc-proofs", JsonSerializer.Serialize(blob)); }
+        catch { }
+    }
+
+    // ---- proof management ---------------------------------------------------
+    async Task OnProofSelected(ChangeEventArgs e)
+    {
+        await SaveProofs();
+        blob.Active = e.Value?.ToString() ?? blob.Active;
+        await LoadActive();
+    }
+
+    async Task NewProof()
+    {
+        await SaveProofs();
+        var n = blob.Proofs.Count + 1;
+        while (blob.Proofs.Any(p => p.Name == $"Proof {n}")) n++;
+        blob.Proofs.Add(new ProofDto { Name = $"Proof {n}", SystemName = sys.Name });
+        blob.Active = $"Proof {n}";
+        await LoadActive();
+        await SaveProofs();
+    }
+
+    async Task ApplyRename()
+    {
+        var name = renameText.Trim();
+        if (name.Length > 0 && blob.Proofs.All(p => p.Name != name))
+        {
+            Active.Name = name;
+            blob.Active = name;
+        }
+        renaming = false;
+        await SaveProofs();
+    }
+
+    async Task ConfirmPending()
+    {
+        var what = pendingConfirm;
+        pendingConfirm = null;
+        if (what == "reset")
+        {
+            steps.Clear();
+            engine = null;
+            provenStep = -1;
+            await SaveProofs();
+        }
+        else if (what == "delete-proof")
+        {
+            blob.Proofs.RemoveAll(p => p.Name == blob.Active);
+            if (blob.Proofs.Count == 0)
+                blob.Proofs.Add(new ProofDto { Name = "Proof 1", SystemName = sys.Name });
+            blob.Active = blob.Proofs[0].Name;
+            await LoadActive();
+            await SaveProofs();
+        }
+    }
+
+    // ---- goal / givens / steps ---------------------------------------------
+    async Task OnGoalChanged(string v)
+    {
+        goalText = v;
+        var ver = ++goalVersion;
+        var snap = steps.ToList();
+        // parse per keystroke happens off-thread; the version guard drops stale results
+        var (gr, pv) = await Task.Run(() =>
+        {
+            var g = string.IsNullOrWhiteSpace(v) ? null : Api.Run(v);
+            return (g, ComputeProven(g, v, snap));
+        });
+        if (ver != goalVersion) return;
+        goalRun = gr;
+        provenStep = pv;
+        await SaveProofs();
+    }
+
+    async Task AddGivens(string text)
+    {
+        givenError = null;
+        var lines = (text ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        var results = await Task.Run(() => lines.Select(l => (line: l, r: Api.Run(l))).ToList());
+        var failed = new List<string>();
+        foreach (var (line, r) in results)
+        {
+            if (r.Success) steps.Add(new Step { Raw = line, Just = "given", Result = r });
+            else { failed.Add(line); givenError = r.Error; }
+        }
+        givenInput = string.Join("\n", failed);
+        await AfterStepsChanged();
+    }
+
+    async Task UndoLast()
+    {
+        if (steps.Count > 0) steps.RemoveAt(steps.Count - 1);
+        await AfterStepsChanged();
+    }
+
+    async Task AfterStepsChanged()
+    {
+        applyMessage = null;
+        await RunEngine();
+        await RecomputeProven();
+        await SaveProofs();
+    }
+
+    // ---- rule application ---------------------------------------------------
+    async Task OnRuleSelected(ChangeEventArgs e)
+    {
+        selRuleIdx = int.TryParse(e.Value?.ToString(), out var i) ? i : -1;
+        manualOpen = false;
+        manualOutcome = null;
+        applyMessage = null;
+        ruleError = null;
+        engine = null;
+        if (SelRule is null) return;
+        var exprs = SelRule.Premises.Concat(SelRule.Conclusions).ToArray();
+        var (err, metas) = await Task.Run(() =>
+        {
+            foreach (var expr in exprs)
+            {
+                var r = Api.Run(expr);
+                if (!r.Success) return ($"'{expr}': {r.Error}", Array.Empty<string>());
+            }
+            return ((string?)null, Api.MetaVars(exprs));
+        });
+        ruleError = err;
+        if (err is not null) return;
+        metaNames = metas;
+        manualVals = metaNames.ToArray();  // identity prefill
+        await RunEngine();
+    }
+
+    (string[] raws, int[] display) ValidSteps()
+    {
+        var raws = new List<string>();
+        var display = new List<int>();
+        for (var i = 0; i < steps.Count; i++)
+            if (!steps[i].Invalid) { raws.Add(steps[i].Raw); display.Add(i); }
+        return (raws.ToArray(), display.ToArray());
+    }
+
+    async Task RunEngine()
+    {
+        engine = null;
+        engineRunning = false;
+        if (SelRule is null || ruleError is not null) return;
+        var (raws, display) = ValidSteps();
+        var prem = SelRule.Premises.ToArray();
+        var concl = SelRule.Conclusions.ToArray();
+        // Construction rules introduce fresh witnesses — the engine enforces
+        // the eigenvariable condition on their conclusion-only names
+        var introduces = SelRule.Kind == "Construction";
+        var ver = ++engineVersion;
+        engineRunning = true;
+        // premise matching backtracks over every step assignment — off the UI thread
+        var outc = await Task.Run(() => Api.TryApplyRule(prem, concl, raws, introduces));
+        if (ver != engineVersion) return;   // a newer selection superseded this run
+        engineRunning = false;
+        engine = outc;
+        engineUsedDisplay = outc.Ok ? outc.UsedSteps.Select(i => display[i]).ToArray() : Array.Empty<int>();
+    }
+
+    async Task ApplyEngine() => await ApplyOutcomeSteps(engine, engineUsedDisplay);
+
+    async Task VerifyManual()
+    {
+        manualOutcome = null;
+        if (SelRule is null) return;
+        var (raws, display) = ValidSteps();
+        var bindings = metaNames.Zip(manualVals, (n, v) => Tuple.Create(n, v ?? "")).ToArray();
+        var prem = SelRule.Premises.ToArray();
+        var concl = SelRule.Conclusions.ToArray();
+        var introduces = SelRule.Kind == "Construction";
+        var outc = await Task.Run(() => Api.TryApplyRuleManual(prem, concl, raws, bindings, introduces));
+        manualOutcome = outc;
+        manualUsedDisplay = outc.Ok ? outc.UsedSteps.Select(i => display[i]).ToArray() : Array.Empty<int>();
+    }
+
+    async Task ApplyManual() => await ApplyOutcomeSteps(manualOutcome, manualUsedDisplay);
+
+    async Task ApplyOutcomeSteps(ApplyOutcome? outc, int[] usedDisplay)
+    {
+        if (outc is not { Ok: true } || SelRule is null) return;
+        var just = SelRule.Name +
+            (usedDisplay.Length > 0 ? $" [{string.Join(", ", usedDisplay.Select(i => i + 1))}]" : "");
+        var snap = steps.ToList();
+        // dup-checks (SameExpr) and re-parsing each conclusion are CPU work
+        var fresh = await Task.Run(() =>
+        {
+            var list = new List<(string c, RunResult r)>();
+            foreach (var c in outc.NewConclusions)
+            {
+                if (snap.Any(s => !s.Invalid && Api.SameExpr(s.Raw, c))) continue;
+                if (list.Any(x => Api.SameExpr(x.c, c))) continue;
+                list.Add((c, Api.Run(c)));
+            }
+            return list;
+        });
+        var added = 0;
+        foreach (var (c, r) in fresh)
+        {
+            steps.Add(new Step
+            {
+                Raw = c, Just = just, RuleName = SelRule.Name,
+                Bindings = outc.Bindings.Select(b => new List<string> { b.Item1, b.Item2 }).ToList(),
+                UsedSteps = usedDisplay.ToList(),
+                Result = r,
+            });
+            added++;
+        }
+        applyMessage = added == 0 ? "all conclusions already present" : $"added {added} step{(added > 1 ? "s" : "")}";
+        await RunEngine();
+        await RecomputeProven();
+        await SaveProofs();
+    }
+
+    // ---- theorem ------------------------------------------------------------
+    async Task SaveTheorem()
+    {
+        var fresh = await SystemStore.LoadAsync(JS);
+        var name = thmName.Trim();
+        while (fresh.Rules.Any(r => r.Name == name)) name += "′";
+        var usedRules = steps.Where(s => s.Just != "given" && s.RuleName != "").Select(s => s.RuleName).Distinct().ToList();
+        fresh.Rules.Add(new RuleDto
+        {
+            Name = name,
+            Kind = SystemStore.Kinds.Contains(thmKind) ? thmKind : "Theorem",
+            LongName = "Theorem",
+            Description = $"Proved in {steps.Count} step{(steps.Count == 1 ? "" : "s")}"
+                + (usedRules.Count > 0 ? $" using: {string.Join(", ", usedRules)}" : "") + ".",
+            Premises = steps.Where(s => s.Just == "given").Select(s => s.Raw).ToList(),
+            Conclusions = new List<string> { goalText },
+        });
+        await SystemStore.SaveAsync(JS, fresh);
+        sys = fresh;
+        Api.SetConstants(sys.Constants.ToArray());
+        RefreshSketchMap();
+        thmSaved = $"“{name}” saved to the system — available on the Rules page and in the rule picker above.";
+        thmName = "";
+    }
+}

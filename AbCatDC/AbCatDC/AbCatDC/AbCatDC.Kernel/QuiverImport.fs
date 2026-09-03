@@ -103,6 +103,36 @@ let TryParse (input: string) : ParseOutcome =
     | Ok g -> { Ok = true; Graph = g; Error = "" }
     | Error e -> { Ok = false; Graph = emptyGraph; Error = e }
 
+/// Compact a diagram's grid layout: distinct x/y coordinates are rank-
+/// compressed to 0, 1, 2, … so dragging cells far apart in the editor never
+/// bloats the bounding box (embeds auto-fit, so sprawl = unreadable zoom-out).
+/// Labels, edges, curves, and styles are preserved; base64 input is accepted
+/// and plain JSON returned. On any error the input is returned unchanged.
+let NormalizePositions (input: string) : string =
+    try
+        let text =
+            let t = (input : string).Trim()
+            if t.StartsWith "[" then t
+            else Text.Encoding.UTF8.GetString(Convert.FromBase64String t)
+        let node = Nodes.JsonNode.Parse text
+        let arr = node.AsArray()
+        let n = arr.[1].GetValue<int>()
+        if n <= 0 then text else
+        let coords (d: int) =
+            [ for i in 2 .. 1 + n -> int (arr.[i].AsArray().[d].GetValue<double>()) ]
+        let rank (xs: int list) =
+            xs |> List.distinct |> List.sort |> List.mapi (fun i v -> v, i) |> Map.ofList
+        let rx = rank (coords 0)
+        let ry = rank (coords 1)
+        for i in 2 .. 1 + n do
+            let cell = arr.[i].AsArray()
+            let x = int (cell.[0].GetValue<double>())
+            let y = int (cell.[1].GetValue<double>())
+            cell.[0] <- Nodes.JsonValue.Create(rx.[x])
+            cell.[1] <- Nodes.JsonValue.Create(ry.[y])
+        node.ToJsonString()
+    with _ -> input
+
 // ---- diagram → textual judgment group -------------------------------------
 
 let private subMap =

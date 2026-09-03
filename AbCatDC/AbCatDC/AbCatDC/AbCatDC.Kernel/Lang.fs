@@ -94,8 +94,85 @@ type Term =
 module Ty =
 
     /// Well-known constant atoms — identifiers the parser treats as constants
-    /// rather than variables (so canonicalization never renames them).
-    let constantAtoms = Set.ofList [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "ℂ" ]
+    /// rather than variables (so canonicalization never renames them, and rule
+    /// matching treats them as rigid instead of as metavariables). Besides the
+    /// number sets, the categorical class markers Mono/Epi and the dependent
+    /// markers Ker/Coker (as in "k : Ker f") are constants: a premise like
+    /// "m : Mono" must only match a literal Mono judgment, never unify Mono
+    /// with an arbitrary type.
+    let constantAtoms =
+        Set.ofList [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "ℂ"
+                     "Mono"; "Epi"; "Ker"; "Coker"; "Functor"; "Additive" ]
+
+    /// Function-like marker constants: "Ker f" parses as the marker applied to
+    /// the next atom ("k : Ker f" — k is a kernel of f), encoded as a Product
+    /// with the marker atom on the left, and formatted back without the ×.
+    let markerAtoms = Set.ofList [ "Ker"; "Coker" ]
+
+    /// Subscript characters (digits ₀-₉, signs ₊₋₌, and subscript letters
+    /// including the Greek ᵦᵧᵨᵩᵪ) — they continue the unit they follow.
+    let isSubscriptChar (ch: char) =
+        let cp = int ch
+        (cp >= 0x2080 && cp <= 0x209C) || (cp >= 0x1D62 && cp <= 0x1D6A)
+
+    /// Segment a juxtaposition name into its composition units: a base letter
+    /// or digit plus its subscript tail. i₁p₁ → [i₁; p₁], mu → [m; u],
+    /// F0 → [F; 0], 1ₛ → [1ₛ]. A name containing any other character
+    /// (hyphen, prime, underscore) does not segment — it is one opaque unit.
+    let nameUnits (n: string) : string list =
+        let units = ResizeArray()
+        let mutable ok = true
+        let mutable i = 0
+        while ok && i < n.Length do
+            let c = n.[i]
+            if System.Char.IsLetterOrDigit c && not (isSubscriptChar c) then
+                let start = i
+                i <- i + 1
+                while i < n.Length && isSubscriptChar n.[i] do i <- i + 1
+                units.Add (n.Substring(start, i - start))
+            else ok <- false
+        if ok && units.Count > 0 then List.ofSeq units else [ n ]
+
+    /// The longest juxtaposition chain read as a composition. Real chains are
+    /// short (gf, hgf, FgFf, i₁p₁); anything longer is a WORD — "monomorphism"
+    /// is a name, not m∘o∘n∘o∘…∘m. Without this cap, substituting m would also
+    /// rewrite the m's inside such a word.
+    let maxCompositionUnits = 4
+
+    /// Does this name read as a juxtaposition composite (g∘f) rather than as
+    /// an atomic word? Digit-led names (identity notation) never do.
+    let isCompositeName (n: Name) =
+        if n.Length = 0 || System.Char.IsDigit n.[0] then false
+        else
+            let units = nameUnits n
+            units.Length >= 2 && units.Length <= maxCompositionUnits
+
+    /// The plain name of a type that IS just a name, if any.
+    let simpleName (t: Ty) : Name option =
+        match t with
+        | Ty.Var n | Ty.Atom n -> Some n
+        | Ty.Lit l -> Some (string l)
+        | _ -> None
+
+    /// Rigid names declared by the ACTIVE formal system (e.g. Ring, Mod) —
+    /// loaded by the UI before parsing that system's rules. Mutable module
+    /// state because the parser is static; there is one active system at a
+    /// time and the UI sets this before any parsing batch.
+    let mutable userConstants : Set<Name> = Set.empty
+
+    /// Is this atom a function-like rigid tag — a built-in marker (Ker/Coker),
+    /// an identifier containing '_' (Mono_C), or a name the active system
+    /// declared as a constant (Ring, Mod — so "Mod R" applies Mod to R)?
+    let isTagAtom (n: Name) =
+        Set.contains n markerAtoms || n.Contains "_" || Set.contains n userConstants
+
+    /// The tag at the head of a left-nested application spine, if any:
+    /// Product(Product(Mono_C, A), B) → Some "Mono_C".
+    let rec tagAppHead (t: Ty) : Name option =
+        match t with
+        | Ty.Atom n when isTagAtom n -> Some n
+        | Ty.Product (l, _) -> tagAppHead l
+        | _ -> None
 
     /// Identifiers that denote whole-context metavariables in sequents.
     let contextVars = Set.ofList [ "Γ"; "Δ"; "Θ"; "Ξ" ]
@@ -111,7 +188,27 @@ module Ty =
         let under (x: Name) = substTyVars (Map.remove x m)
         match ty with
         | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ty
-        | Ty.Var a -> (match Map.tryFind a m with Some rep -> rep | None -> ty)
+        | Ty.Var a ->
+            match Map.tryFind a m with
+            | Some rep -> rep
+            | None ->
+                // juxtaposition-aware: a composite name like gf (= g ∘ f) whose
+                // every character is a substituted variable is rebuilt from the
+                // substituted names (gf[f:=u, g:=v] = vu). Only simple-name
+                // replacements compose; otherwise the composite is left as-is.
+                let units = nameUnits a
+                if isCompositeName a && units |> List.exists (fun c -> Map.containsKey c m) then
+                    // a partially-bound composite still rebuilds: ku[k:=r] = ru
+                    // (u untouched, e.g. because a surrounding binder shadows it)
+                    let parts =
+                        units |> List.map (fun c ->
+                            match Map.tryFind c m with
+                            | Some rep -> simpleName rep
+                            | None -> Some c)
+                    if parts |> List.forall Option.isSome then
+                        Ty.Var (parts |> List.map Option.get |> String.concat "")
+                    else ty
+                else ty
         | Ty.Power (b, n) -> Ty.Power (s b, n)
         | Ty.Commutes b -> Ty.Commutes (s b)
         | Ty.InCategory (d, c) -> Ty.InCategory (s d, s c)
@@ -147,7 +244,7 @@ module Ty =
 
     /// Single-variable substitution τ[α := σ], via substTyVars.
     let substTyVar (alpha: Name) (sigma: Ty) (ty: Ty) : Ty =
-        substTyVars (Map.ofList [ alpha, sigma ]) ty
+        substTyVars (Map.add alpha sigma Map.empty) ty
 
     let private superscript (n: bigint) =
         string n
@@ -223,6 +320,10 @@ module Ty =
         | Ty.HasType (subj, t) -> $"{format subj} : {format t}"
         | Ty.Eq (a, b) -> $"{format a} = {format b}"
         | Ty.Function (d, c) -> $"{atom d} → {atom c}"
+        | Ty.Product (a, b) when (tagAppHead a).IsSome ->
+            // tag application prints without the ×: Ker f, Mono_C (A → B),
+            // and chains flatten left-to-right: Mono_C A B
+            $"{format a} {atom b}"
         | Ty.Product (a, b) -> $"{atom a} × {atom b}"
         | Ty.Sum (a, b) -> $"{atom a} + {atom b}"
         | Ty.Intersection (a, b) -> $"{atom a} ∩ {atom b}"

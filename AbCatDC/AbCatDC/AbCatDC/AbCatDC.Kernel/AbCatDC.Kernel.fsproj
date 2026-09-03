@@ -11,6 +11,7 @@
         <Compile Include="Lang.fs" />
         <Compile Include="Parser.fs" />
         <Compile Include="Canonical.fs" />
+        <Compile Include="Match.fs" />
         <Compile Include="Generator.fs" />
         <Compile Include="Infer.fs" />
         <Compile Include="QuiverImport.fs" />

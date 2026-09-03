@@ -13,7 +13,13 @@ let private atomDescriptions =
            "ℤ", "the integers"
            "ℚ", "the rationals"
            "ℝ", "the reals"
-           "ℂ", "the complex numbers" ]
+           "ℂ", "the complex numbers"
+           "Mono", "the class of monomorphisms — m : Mono is the judgment 'm is monic'"
+           "Epi", "the class of epimorphisms — e : Epi is the judgment 'e is epic'"
+           "Ker", "kernel marker — k : Ker f is the judgment 'k is a kernel of f'"
+           "Coker", "cokernel marker — c : Coker f is the judgment 'c is a cokernel of f'"
+           "Functor", "the class of functors — F : Functor is the judgment 'F is functorial'"
+           "Additive", "the class of additive functors — F : Additive says F acts on hom-groups as a homomorphism" ]
 
 /// Infer typings for the leaves of a type expression.
 ///
@@ -43,6 +49,10 @@ let infer (ty: Ty) : Judgment list =
     let rec defaultVar (v: string) =
         if v.Length > 0 && v |> Seq.forall isGreekChar then
             add v "Type" "schematic metavariable — ranges over arbitrary types; instantiate uniformly (implicitly ∀-quantified at the meta level)"
+        elif v.Length >= 2 && v |> Seq.forall System.Char.IsLetter && not (Ty.isCompositeName v) then
+            // a multi-letter WORD (monomorphism, BigCat) — never a composition
+            add v (if System.Char.IsUpper v.[0] then "Type" else "Term")
+                "undeclared NAME — read as a single identifier, and schematic: as a rule it matches ANY expression. To make it a fixed constant, add it to the system's 'Rigid constants' box (Rules page)."
         elif v.Length >= 2 && v |> Seq.forall System.Char.IsLetter then
             // juxtaposition: AB is the elementwise product {ab : a ∈ A, b ∈ B}
             let parts = [ for ch in v -> string ch ]
@@ -58,10 +68,10 @@ let infer (ty: Ty) : Judgment list =
             if isSet then
                 let product = pieces |> List.map fst |> String.concat ""
                 let clauses = pieces |> List.choose snd |> String.concat ", "
-                add v "⊆ ℤ" $"undeclared — juxtaposition, the elementwise product {{{product} : {clauses}}}"
+                add v "⊆ ℤ" $"undeclared — juxtaposition, the elementwise product {{{product} : {clauses}}} (if this is one name, declare it in 'Rigid constants')"
             else
                 let prod = String.concat "·" parts
-                add v "ℕ" $"undeclared — juxtaposition, the integer product {prod} in ℤ"
+                add v "ℕ" $"undeclared — juxtaposition, the integer product {prod} in ℤ (if this is one name, declare it in 'Rigid constants')"
             parts |> List.iter defaultVar
         elif v.Length > 0 && System.Char.IsUpper v.[0] then
             add v "⊆ ℤ" "undeclared — defaulted to a set of integers"
@@ -72,13 +82,38 @@ let infer (ty: Ty) : Judgment list =
         match t with
         | Ty.Lit n ->
             add (string n) "ℕ" $"constant — computes inside ℤ, equivalent to the value {n}"
+        | Ty.Atom a when a.Length > 0 && System.Char.IsDigit a.[0] ->
+            add a "Mor" "identity notation — 1ₓ names the identity morphism on the object X (rigid, never a metavariable)"
+        | Ty.Atom a when a.Contains "_" ->
+            add a "Type" "user-defined rigid tag — a constant, never a metavariable; following atoms are its arguments (Mono_C (A → B))"
+        | Ty.Atom a when Set.contains a Ty.userConstants ->
+            add a "Type" "declared rigid constant of this system — never a metavariable; function-like (Mod R applies it to R)"
         | Ty.Atom a ->
             let note = if atomDescriptions.ContainsKey a then atomDescriptions.[a] else "type constant"
             add a "Type" note
         | Ty.Var v ->
             match Map.tryFind v env with
             | Some declared -> add v declared "bound variable"
-            | None -> defaultVar v
+            | None ->
+                // a composite whose every unit is a declared arrow is a
+                // COMPOSITION, not an integer product: mg is m∘g, and its type
+                // is read off the ends of the chain (rightmost applied first)
+                let units = if Ty.isCompositeName v then Ty.nameUnits v else []
+                let arrows =
+                    units |> List.map (fun u ->
+                        match Map.tryFind u env with
+                        | Some t when (t: string).Contains "→" ->
+                            match t.Split([| " → " |], System.StringSplitOptions.None) with
+                            | [| d; c |] -> Some (u, d, c)
+                            | _ -> None
+                        | _ -> None)
+                if not units.IsEmpty && arrows |> List.forall Option.isSome then
+                    let parts = arrows |> List.map Option.get
+                    let (_, _, cod) = List.head parts        // leftmost applies last
+                    let (_, dom, _) = List.last parts        // rightmost applies first
+                    let chain = parts |> List.map (fun (u, _, _) -> u) |> String.concat "∘"
+                    add v $"{dom} → {cod}" $"composition — juxtaposition is composition, so {v} is {chain} (rightmost applied first)"
+                else defaultVar v
         | Ty.Sketch n ->
             add $"[{n}]" "Diagram" "a named quiver sketch — its identity is the diagram's canonical form"
         | Ty.Commutes b ->

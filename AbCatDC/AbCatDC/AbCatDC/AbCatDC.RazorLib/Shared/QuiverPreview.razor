@@ -11,9 +11,13 @@
     }
     else
     {
-        @* quiver's native read-only embed mode: real KaTeX labels, arrow styles, higher cells *@
-        <iframe class="ab-qprev-frame" src="@embedSrc" style="height: @(Height)px"
-                title="quiver diagram preview" loading="lazy"></iframe>
+        @* quiver's native read-only embed mode: real KaTeX labels, arrow styles, higher cells.
+           native onload (not a Blazor event) flips the loading spinner off without a re-render *@
+        <span class="ab-frame-wrap" style="height: @(Height)px">
+            <iframe class="ab-qprev-frame" src="@embedSrc" style="height: @(Height)px"
+                    title="quiver diagram preview" loading="lazy"
+                    onload="this.parentElement.classList.add('ab-loaded')"></iframe>
+        </span>
     }
 
     <button type="button" class="ab-qprev-edit" title="Edit in the quiver editor"

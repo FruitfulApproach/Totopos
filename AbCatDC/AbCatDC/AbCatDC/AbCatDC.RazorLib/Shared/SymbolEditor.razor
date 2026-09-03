@@ -3,17 +3,22 @@
 @inject AppSettingsService Settings
 @implements IAsyncDisposable
 
-<div class="ab-se">
-    @if (ShowPad)
-    {
-        <div class="ab-symbol-pad">
+@{
+    RenderFragment pad =
+        @<div class="ab-symbol-pad">
             @foreach (var s in PadSymbols)
             {
                 var sym = s;
                 <button type="button" class="ab-symbol-btn" title="Insert @sym" tabindex="-1"
                         @onclick="() => InsertSymbol(sym)">@sym</button>
             }
-        </div>
+        </div>;
+}
+
+<div class="ab-se">
+    @if (ShowPad && !PadBelow)
+    {
+        @pad
     }
     <div class="ab-editor-wrap">
         <textarea id="@Id" class="ab-editor @(Rows <= 1 ? "single" : "")" rows="@Rows" spellcheck="false"
@@ -37,6 +42,10 @@
             </div>
         }
     </div>
+    @if (ShowPad && PadBelow)
+    {
+        @pad
+    }
 </div>
 
 @code {
@@ -47,6 +56,8 @@
     [Parameter] public EventCallback<string> OnSubmit { get; set; }
     [Parameter] public int Rows { get; set; } = 4;
     [Parameter] public bool ShowPad { get; set; } = true;
+    /// <summary>render the symbol pad below the text area instead of above it</summary>
+    [Parameter] public bool PadBelow { get; set; }
     [Parameter] public bool SubmitOnEnter { get; set; }
     [Parameter] public string Placeholder { get; set; } = "";
 

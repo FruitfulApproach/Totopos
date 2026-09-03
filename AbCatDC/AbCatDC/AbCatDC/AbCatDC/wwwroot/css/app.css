@@ -758,6 +758,7 @@ div.page main .top-row.ab-top-row {
     flex-wrap: wrap;
     gap: 1.4rem;
     justify-content: center;
+    align-items: center; /* short text shares the vertical center of tall diagram entries */
     font-family: 'Cambria Math', 'Segoe UI Symbol', monospace;
     font-size: 1.1rem;
     padding: .1rem .3rem;
@@ -775,6 +776,53 @@ div.page main .top-row.ab-top-row {
     border-top: 2px solid var(--ab-text);
     align-self: stretch;
     margin: .3rem 0;
+}
+
+/* middle row of a fraction: the bar with the rule's name printed on it */
+.ab-rule-mid {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    align-self: stretch;
+    margin: .25rem 0;
+}
+
+    .ab-rule-mid .ab-rule-line {
+        flex: 1;
+        align-self: auto;
+        margin: 0;
+        min-width: 3rem;
+    }
+
+.ab-rule-actions {
+    display: inline-flex;
+    gap: .05rem;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.ab-rule:hover .ab-rule-actions {
+    opacity: 1;
+}
+
+.ab-rule {
+    position: relative;
+    padding-right: 2rem;
+}
+
+.ab-rule-corner {
+    position: absolute;
+    top: .3rem;
+    right: .35rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .05rem;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.ab-rule:hover .ab-rule-corner {
+    opacity: 1;
 }
 
 .ab-rule-name {
@@ -991,6 +1039,58 @@ div.page main .top-row.ab-top-row {
     display: inline-block;
     vertical-align: middle;
     cursor: zoom-in;
+    position: relative;
+}
+
+/* ---------- diagram loading spinners ----------
+   each quiver iframe sits in a wrapper that gets .ab-loaded from the iframe's
+   native onload; until then the frame is invisible and a spinner sits on top */
+
+.ab-frame-wrap {
+    display: block;
+    position: relative;
+}
+
+.ab-inline-sketch-wrap:not(.ab-loaded) > .ab-inline-sketch,
+.ab-frame-wrap:not(.ab-loaded) > .ab-qprev-frame,
+.ab-zoom-overlay:not(.ab-loaded) > .ab-zoom-frame {
+    opacity: 0;
+}
+
+.ab-inline-sketch,
+.ab-qprev-frame,
+.ab-zoom-frame {
+    transition: opacity .25s ease;
+}
+
+.ab-inline-sketch-wrap:not(.ab-loaded)::after,
+.ab-frame-wrap:not(.ab-loaded)::after,
+.ab-zoom-overlay:not(.ab-loaded)::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 22px;
+    height: 22px;
+    margin: -11px 0 0 -11px;
+    border: 3px solid var(--ab-border);
+    border-top-color: var(--ab-accent);
+    border-radius: 50%;
+    animation: ab-spin .8s linear infinite;
+    pointer-events: none;
+}
+
+.ab-zoom-overlay:not(.ab-loaded)::after {
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    border-width: 4px;
+    border-color: rgba(255, 255, 255, .35);
+    border-top-color: #fff;
+}
+
+@keyframes ab-spin {
+    to { transform: rotate(360deg); }
 }
 
 .ab-zoom-overlay {
@@ -1027,6 +1127,88 @@ div.page main .top-row.ab-top-row {
     cursor: pointer;
     box-shadow: 0 2px 10px rgba(0, 0, 0, .4);
 }
+
+/* hover-revealed edit button on the zoom overlay — opens the quiver editor */
+.ab-zoom-edit {
+    position: absolute;
+    top: 1.1rem;
+    right: 4.4rem;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 50%;
+    border: none;
+    background: var(--ab-accent);
+    color: #fff;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .4);
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.ab-zoom-overlay:hover .ab-zoom-edit {
+    opacity: 1;
+}
+
+/* ---------- tab drag-to-reorder ---------- */
+
+.ab-tab[draggable="true"] {
+    cursor: grab;
+}
+
+.ab-tab.dragging {
+    opacity: .4;
+    cursor: grabbing;
+}
+
+.ab-tab.dropzone {
+    outline: 2px dashed var(--ab-accent);
+    outline-offset: 2px;
+}
+
+.ab-order-warn {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+    margin: .4rem 0 .1rem;
+    padding: .35rem .6rem;
+    border-radius: 8px;
+    font-size: .85rem;
+    background: var(--ab-accent-soft);
+    color: var(--ab-accent);
+    border: 1px solid color-mix(in srgb, var(--ab-accent) 30%, transparent);
+}
+
+    .ab-order-warn.bad {
+        background: var(--ab-bad-soft);
+        color: var(--ab-bad);
+        border-color: color-mix(in srgb, var(--ab-bad) 35%, transparent);
+    }
+
+    .ab-order-warn .ab-kind-btn {
+        margin-left: auto;
+    }
+
+/* an expression that no longer parses (e.g. after a rigid-constants change) */
+.ab-bad-expr {
+    color: var(--ab-bad);
+    text-decoration: underline wavy var(--ab-bad);
+    text-underline-offset: 3px;
+}
+
+/* a [sketch] reference rendered as text — click pops the diagram open */
+.ab-sketch-ref {
+    color: var(--ab-accent);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+
+    .ab-sketch-ref:hover {
+        color: var(--ab-accent-2);
+    }
 
 .ab-inline-sketch {
     display: inline-block;
@@ -1072,6 +1254,161 @@ div.page main .top-row.ab-top-row {
 }
 
 /* ---------- rule editing / system polish ---------- */
+
+/* ---------- compact rule builder ---------- */
+
+.ab-builder-head {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    flex-wrap: wrap;
+    margin-bottom: .6rem;
+}
+
+    .ab-builder-head h5 {
+        margin: 0;
+    }
+
+.ab-kind-select {
+    width: auto;
+    margin: 0;
+    padding: .35rem .6rem;
+}
+
+.ab-xedit {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
+    padding: .25rem .55rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+}
+
+    .ab-xedit:hover {
+        border-color: var(--ab-border);
+        background: var(--ab-editor-bg);
+    }
+
+.ab-xedit-text {
+    font-weight: 600;
+    font-family: 'Cambria Math', 'Segoe UI Symbol', serif;
+}
+
+    .ab-xedit-text.empty {
+        color: var(--ab-muted);
+        font-style: italic;
+        font-weight: 400;
+    }
+
+.ab-xedit-pen {
+    opacity: 0;
+    color: var(--ab-accent);
+    font-size: .8rem;
+    transition: opacity .15s ease;
+}
+
+.ab-xedit:hover .ab-xedit-pen {
+    opacity: 1;
+}
+
+.ab-xedit-editing {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    flex: 1 1 14rem;
+}
+
+    .ab-xedit-editing .ab-se {
+        flex: 1;
+        margin-bottom: 0;
+    }
+
+.ab-builder-cancel {
+    margin-left: auto;
+}
+
+.ab-tabs {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    flex-wrap: wrap;
+    padding: .2rem 0;
+    margin: .3rem 0 .55rem;
+}
+
+.ab-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid var(--ab-border);
+    border-radius: 999px;
+    background: var(--ab-editor-bg);
+    color: var(--ab-muted);
+    padding: .28rem .7rem;
+    font-size: .85rem;
+    cursor: pointer;
+    transition: all .12s ease;
+}
+
+    .ab-tab.prem.active {
+        background: var(--ab-accent-soft);
+        color: var(--ab-accent);
+        border-color: var(--ab-accent);
+    }
+
+    .ab-tab.concl.active {
+        background: var(--ab-ok-soft);
+        color: var(--ab-ok);
+        border-color: var(--ab-ok);
+    }
+
+    .ab-tab:hover {
+        color: var(--ab-text);
+    }
+
+    .ab-tab.add {
+        border-style: dashed;
+        font-weight: 700;
+        min-width: 1.9rem;
+        justify-content: center;
+    }
+
+    .ab-tab.add.prem:hover { color: var(--ab-accent); border-color: var(--ab-accent); }
+    .ab-tab.add.concl:hover { color: var(--ab-ok); border-color: var(--ab-ok); }
+
+.ab-tabs-spacer {
+    flex: 1;
+    min-width: 1.2rem;
+}
+
+.ab-tab-dot {
+    width: .45rem;
+    height: .45rem;
+    border-radius: 50%;
+}
+
+    .ab-tab-dot.ok { background: var(--ab-ok); }
+    .ab-tab-dot.bad { background: var(--ab-bad); opacity: .55; }
+
+.ab-tab-x {
+    margin-left: .1rem;
+    opacity: .6;
+    font-weight: 700;
+}
+
+    .ab-tab-x:hover {
+        opacity: 1;
+        color: var(--ab-bad);
+    }
+
+.ab-builder-foot {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin-top: .6rem;
+}
 
 .ab-ctx-hint {
     color: var(--ab-muted);
@@ -1138,10 +1475,131 @@ div.page main .top-row.ab-top-row {
     .ab-rule.k-construction { border-left-color: #f59e0b; }
     .ab-rule.k-computational { border-left-color: var(--ab-accent-2); }
     .ab-rule.k-structural { border-left-color: var(--ab-muted); }
+    .ab-rule.k-theorem { border-left-color: #d4a017; }
 
 .ab-pal-kind.k-structural {
     background: color-mix(in srgb, var(--ab-muted) 18%, transparent);
     color: var(--ab-muted);
+}
+
+.ab-pal-kind.k-theorem {
+    background: color-mix(in srgb, #d4a017 18%, transparent);
+    color: #b8860b;
+}
+
+/* ---------- prover ---------- */
+
+.ab-step-list {
+    margin: 0;
+    padding-left: 1.4rem;
+}
+
+.ab-step {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .3rem .4rem;
+    border-radius: 8px;
+}
+
+    .ab-step:hover {
+        background: var(--ab-editor-bg);
+    }
+
+    .ab-step.invalid {
+        color: var(--ab-bad);
+        text-decoration: line-through;
+    }
+
+    .ab-step.goal-step {
+        background: var(--ab-ok-soft);
+    }
+
+.ab-step-expr {
+    font-family: 'Cambria Math', 'Segoe UI Symbol', monospace;
+    font-size: 1.05rem;
+}
+
+.ab-step-just {
+    margin-left: auto;
+    font-size: .8rem;
+    font-style: italic;
+    color: var(--ab-muted);
+    white-space: nowrap;
+}
+
+.ab-goal-proven {
+    border-color: var(--ab-ok);
+}
+
+.ab-proven-chip {
+    background: var(--ab-ok);
+    color: #fff;
+    border-radius: 999px;
+    padding: .15rem .7rem;
+    font-size: .8rem;
+    margin-left: .6rem;
+}
+
+.ab-engine-box {
+    border-radius: 10px;
+    padding: .6rem .9rem;
+    margin-top: .6rem;
+    font-size: .92rem;
+}
+
+    .ab-engine-box.ok {
+        background: var(--ab-ok-soft);
+        color: var(--ab-ok);
+        border: 1px solid color-mix(in srgb, var(--ab-ok) 40%, transparent);
+    }
+
+    .ab-engine-box.bad {
+        background: var(--ab-bad-soft);
+        color: var(--ab-bad);
+        border: 1px solid color-mix(in srgb, var(--ab-bad) 35%, transparent);
+    }
+
+.ab-engine-sub {
+    font-family: 'Cambria Math', 'Segoe UI Symbol', monospace;
+    margin-left: .4rem;
+    color: var(--ab-text);
+}
+
+.ab-engine-concl {
+    margin: .35rem 0 .5rem;
+    padding-left: 1.4rem;
+    color: var(--ab-text);
+    font-family: 'Cambria Math', 'Segoe UI Symbol', monospace;
+}
+
+.ab-manual-grid {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin: .5rem 0;
+    max-width: 30rem;
+}
+
+.ab-manual-row {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    align-items: center;
+    gap: .5rem;
+}
+
+.ab-manual-var {
+    font-family: 'Cambria Math', 'Segoe UI Symbol', monospace;
+    text-align: right;
+}
+
+.ab-manual-ok {
+    color: var(--ab-ok);
+    margin: 0 .6rem;
+}
+
+.ab-thm-card {
+    border-color: #d4a017;
 }
 
 /* ---------- rule palette ---------- */

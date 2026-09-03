@@ -1,0 +1,79 @@
+@using System.Text
+@using System.Text.RegularExpressions
+@inject IJSRuntime JS
+@implements IDisposable
+
+@foreach (var s in segs)
+{
+    if (s.IsRef)
+    {
+        var name = s.Value;
+        <span class="ab-sketch-ref" title="Click to view the diagram" role="link"
+              @onclick="() => Open(name)" @onclick:stopPropagation>[@name]</span>
+    }
+    else
+    {
+        @s.Value
+    }
+}
+
+@code {
+    // Renders text with every known [sketch] reference turned into a link that
+    // pops the diagram open in the full-screen zoom overlay — with an edit
+    // button on the overlay when OnEdit is wired.
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    /// <summary>sketch name → quiver JSON/base64; unknown names stay as text</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Sketches { get; set; }
+    [Parameter] public EventCallback<string> OnEdit { get; set; }
+
+    private static readonly Regex SketchRef = new(@"\[([^\[\]\s]+)\]", RegexOptions.Compiled);
+
+    private record Seg(bool IsRef, string Value);
+    private List<Seg> segs = new();
+    // the EventCallback parameter defeats Blazor's unchanged-parameter skip, so
+    // guard the re-segmentation by hand
+    private string? lastText;
+    private IReadOnlyDictionary<string, string>? lastSketches;
+    private DotNetObjectReference<RefText>? selfRef;
+
+    protected override void OnParametersSet()
+    {
+        if (Text == lastText && ReferenceEquals(Sketches, lastSketches)) return;
+        lastText = Text;
+        lastSketches = Sketches;
+        segs = new List<Seg>();
+        var t = Text ?? "";
+        var pos = 0;
+        foreach (Match m in SketchRef.Matches(t))
+        {
+            var name = m.Groups[1].Value;
+            if (Sketches != null && Sketches.ContainsKey(name))
+            {
+                if (m.Index > pos) segs.Add(new(false, t[pos..m.Index]));
+                segs.Add(new(true, name));
+                pos = m.Index + m.Length;
+            }
+        }
+        if (pos < t.Length) segs.Add(new(false, t[pos..]));
+    }
+
+    async Task Open(string name)
+    {
+        if (Sketches is null || !Sketches.TryGetValue(name, out var json) || string.IsNullOrWhiteSpace(json)) return;
+        var trimmed = json.Trim();
+        var b64 = trimmed.StartsWith("[") ? Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmed)) : trimmed;
+        var src = "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed";
+        if (OnEdit.HasDelegate)
+            await JS.InvokeVoidAsync("abEditor.showZoom", src, selfRef ??= DotNetObjectReference.Create(this), name);
+        else
+            await JS.InvokeVoidAsync("abEditor.showZoom", src);
+    }
+
+    [JSInvokable]
+    public async Task ZoomEdit(string name)
+    {
+        if (OnEdit.HasDelegate) await OnEdit.InvokeAsync(name);
+    }
+
+    public void Dispose() => selfRef?.Dispose();
+}
