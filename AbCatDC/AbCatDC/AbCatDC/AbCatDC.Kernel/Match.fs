@@ -21,7 +21,7 @@ let private mentionedVars (t: Ty) : Set<Name> =
         match t with
         | Ty.Var v -> if not (shadow.Contains v) then acc.Add v |> ignore
         | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ()
-        | Ty.Power (b, _) | Ty.Commutes b -> go shadow b
+        | Ty.Power (b, _) | Ty.Commutes b | Ty.Exact (b, _) -> go shadow b
         | Ty.InCategory (a, b) | Ty.HasType (a, b) | Ty.Eq (a, b)
         | Ty.Function (a, b) | Ty.Product (a, b) | Ty.Sum (a, b)
         | Ty.Intersection (a, b) | Ty.Union (a, b) -> go shadow a; go shadow b
@@ -44,9 +44,30 @@ let private mentionedVars (t: Ty) : Set<Name> =
     go Set.empty t
     Set.ofSeq acc
 
+/// Whether a term mentions a diagram anywhere.
+let rec mentionsSketch (t: Ty) : bool =
+    match t with
+    | Ty.Sketch _ -> true
+    | Ty.Atom _ | Ty.Var _ | Ty.Lit _ -> false
+    | Ty.Power (b, _) | Ty.Commutes b | Ty.Exact (b, _) -> mentionsSketch b
+    | Ty.InCategory (a, b) | Ty.HasType (a, b) | Ty.Eq (a, b)
+    | Ty.Function (a, b) | Ty.Product (a, b) | Ty.Sum (a, b)
+    | Ty.Intersection (a, b) | Ty.Union (a, b) -> mentionsSketch a || mentionsSketch b
+    | Ty.Record ms -> ms |> List.exists (fun (_, mt) -> mentionsSketch mt)
+    | Ty.Polymorphic (_, b) | Ty.Existential (_, b) | Ty.Recursive (_, b) -> mentionsSketch b
+    | Ty.DependentFunction (_, a, b) | Ty.DependentPair (_, a, b)
+    | Ty.DependentIntersection (_, a, b)
+    | Ty.FamilialIntersection (_, a, b) | Ty.FamilialUnion (_, a, b) -> mentionsSketch a || mentionsSketch b
+    | Ty.Entails (ctx, goal) ->
+        mentionsSketch goal
+        || ctx |> List.exists (function CtxVar _ -> false | Hyp (_, h) -> mentionsSketch h | Anon a -> mentionsSketch a)
+
 /// One matching attempt: pattern (schematic in `metas`) against term, seeded
-/// with an existing substitution. Returns the extended substitution.
-let matchPattern (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term: Ty) : Map<Name, Ty> option =
+/// with an existing substitution. Returns the extended substitution. A
+/// picture in the pattern may embed into the term's picture in several
+/// ways; `nth` selects which consistent embedding to take (0 = the first),
+/// so a caller can enumerate them when a later premise rules the first out.
+let matchPatternNth (nth: int) (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term: Ty) : Map<Name, Ty> option =
     // p2t / t2p: bound-name correspondence between the two sides
     let rec go (p2t: Map<Name, Name>) (t2p: Map<Name, Name>) (subst: Map<Name, Ty>) p t : Map<Name, Ty> option =
         match p, t with
@@ -64,7 +85,10 @@ let matchPattern (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term
                 && (let pu = Ty.nameUnits pv
                     let tu = Ty.nameUnits tv
                     Ty.isCompositeName pv && Ty.isCompositeName tv && pu.Length = tu.Length
-                    && pu |> List.forall metas.Contains
+                    // each unit is either a metavariable to bind, or a name a
+                    // surrounding binder owns (matched through p2t) — so
+                    // "fx" inside ⋂(x:σ) really does tie f to the term's f
+                    && pu |> List.forall (fun u -> metas.Contains u || p2t.ContainsKey u)
                     && tu |> List.forall (fun u -> System.Char.IsLetter u.[0])) ->
             // composite of metavariable units (e.g. mu read m∘u, i₁p₁ read
             // i₁∘p₁): decompose unit-wise so each component binds consistently
@@ -81,9 +105,27 @@ let matchPattern (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term
              | None -> if pv = tv && not (t2p.ContainsKey tv) then Some subst else None)
         | Ty.Atom a, Ty.Atom b when a = b -> Some subst
         | Ty.Lit a, Ty.Lit b when a = b -> Some subst
-        | Ty.Sketch a, Ty.Sketch b when a = b -> Some subst
+        | Ty.Sketch a, Ty.Sketch b ->
+            // A diagram is matched by SHAPE: any embedding of the pattern's
+            // diagram into the term's, with each pattern label bound (through
+            // the ordinary metavariable/bound-name logic of `go`) to the
+            // label it lands on — so "[Sq] commutes" fires on any commuting
+            // square, and "[Four]" binds p, q, r, … for the conclusion. Names
+            // the registry does not know fall back to the opaque token.
+            if not Ty.diagramSemantics then (if a = b then Some subst else None)
+            else
+            match QuiverImport.LookupSketch a, QuiverImport.LookupSketch b with
+            | Some ga, Some gb ->
+                QuiverImport.Embeddings ga gb
+                |> Seq.choose (fun pairs ->
+                    pairs
+                    |> List.fold (fun acc (pl, tl) ->
+                        acc |> Option.bind (fun s -> go p2t t2p s (Ty.Var pl) (Ty.Var tl))) (Some subst))
+                |> Seq.tryItem nth
+            | _ -> if a = b then Some subst else None
         | Ty.Power (a, n), Ty.Power (b, m) when n = m -> go p2t t2p subst a b
         | Ty.Commutes a, Ty.Commutes b -> go p2t t2p subst a b
+        | Ty.Exact (a, ax), Ty.Exact (b, bx) when ax = bx -> go p2t t2p subst a b
         | Ty.InCategory (a, b), Ty.InCategory (c, d)
         | Ty.HasType (a, b), Ty.HasType (c, d)
         | Ty.Function (a, b), Ty.Function (c, d)
@@ -128,18 +170,57 @@ let matchPattern (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term
         | _ -> None
     go Map.empty Map.empty initial pattern term
 
-/// Backtracking assignment of proven steps to premises. Returns the combined
-/// substitution and, for each premise in order, the index (into `steps`) of
-/// the step it matched.
-let applyRule (metas: Set<Name>) (premises: Ty list) (steps: Ty[]) : (Map<Name, Ty> * int list) option =
+let matchPattern (metas: Set<Name>) (initial: Map<Name, Ty>) (pattern: Ty) (term: Ty) : Map<Name, Ty> option =
+    matchPatternNth 0 metas initial pattern term
+
+/// A coarse discriminator so a premise only tries pool entries of its own
+/// shape: (is a sequent, kind of the goal). Kind 0 is a bare metavariable,
+/// which may match any goal.
+let shapeKey (t: Ty) : bool * int =
+    let goal, entails = match t with Ty.Entails (_, g) -> g, true | g -> g, false
+    let kind =
+        match goal with
+        | Ty.Var _ -> 0
+        | Ty.HasType _ -> 1
+        | Ty.Eq _ -> 2
+        | Ty.Commutes _ -> 3
+        | Ty.Exact _ -> 7
+        | Ty.InCategory _ -> 4
+        | Ty.Function _ -> 5
+        | _ -> 6
+    entails, kind
+
+/// Backtracking assignment of pool entries to premises. The pool is every
+/// proven step plus the judgments a diagram step contributes, each tagged
+/// with the index of the step it came from. Returns the combined
+/// substitution and, per premise in order, (step index, the entry matched).
+let applyRuleFrom (initial: Map<Name, Ty>) (metas: Set<Name>) (premises: Ty list) (pool: (Ty * int)[]) : (Map<Name, Ty> * (int * Ty) list) option =
+    let keyed = pool |> Array.map (fun (t, i) -> shapeKey t, t, i)
     let rec search subst used prems =
         match prems with
         | [] -> Some (subst, List.rev used)
         | p :: rest ->
-            steps
-            |> Seq.indexed
-            |> Seq.tryPick (fun (i, s) ->
-                match matchPattern metas subst p s with
-                | Some subst' -> search subst' (i :: used) rest
-                | None -> None)
-    search Map.empty [] premises
+            let (pe, pk) = shapeKey p
+            // prefer a step no earlier premise used: two premises MAY share
+            // a step, but "u : T → A, v : T → A" should not both land on the
+            // same arrow when a second one is available
+            let usedIdx = used |> List.map fst |> Set.ofList
+            keyed
+            |> Seq.filter (fun ((te, tk), _, _) -> te = pe && (pk = 0 || tk = pk))
+            |> Seq.sortBy (fun (_, _, i) -> if usedIdx.Contains i then 1 else 0)
+            |> Seq.tryPick (fun (_, t, i) ->
+                // a picture may embed into the step's picture in several ways:
+                // try each consistent embedding in turn, so a later premise
+                // (an equation, a typing) can rule the first one out
+                let attempts = if mentionsSketch p then Seq.initInfinite id else Seq.singleton 0
+                attempts
+                |> Seq.map (fun k -> matchPatternNth k metas subst p t)
+                |> Seq.takeWhile Option.isSome
+                |> Seq.tryPick (fun s ->
+                    match s with
+                    | Some subst' -> search subst' ((i, t) :: used) rest
+                    | None -> None))
+    search initial [] premises
+
+let applyRule (metas: Set<Name>) (premises: Ty list) (pool: (Ty * int)[]) : (Map<Name, Ty> * (int * Ty) list) option =
+    applyRuleFrom Map.empty metas premises pool

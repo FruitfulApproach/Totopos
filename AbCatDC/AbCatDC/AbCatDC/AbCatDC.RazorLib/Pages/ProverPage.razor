@@ -81,7 +81,25 @@
                         }
                         else
                         {
-                            <InlineExpr Text="@st.Result!.Formatted" Sketches="SketchMap" Height="60" />
+                            <InlineExpr Text="@st.Result!.Formatted" Sketches="SketchMap" Snapshots="SnapshotMap" Height="60" />
+                            var facts = DerivedFor(st.Raw);
+                            var idx = i;
+                            if (facts.Length > 0)
+                            {
+                                <span class="ab-step-derived">
+                                    <button type="button" class="ab-link-btn"
+                                            @onclick="() => { if (!openDerived.Remove(idx)) openDerived.Add(idx); }">
+                                        <i class="fa-solid @(openDerived.Contains(idx) ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                                        this diagram gives you @facts.Length judgment@(facts.Length == 1 ? "" : "s")
+                                    </button>
+                                    @if (openDerived.Contains(idx))
+                                    {
+                                        <ul class="ab-derived-list">
+                                            @foreach (var f in facts) { <li>@f</li> }
+                                        </ul>
+                                    }
+                                </span>
+                            }
                         }
                     </span>
                     <span class="ab-step-just">@st.Just</span>
@@ -184,6 +202,12 @@
                         @if (engine.UsedSteps.Length > 0)
                         {
                             <span class="ab-muted"> from step@(engine.UsedSteps.Length > 1 ? "s" : "") @(string.Join(", ", engineUsedDisplay.Select(i => i + 1)))</span>
+                        }
+                        @if (engine.UsedVia.Any(v => !string.IsNullOrEmpty(v)))
+                        {
+                            <span class="ab-engine-via" title="judgments a diagram step contributed, matched in place of a written step">
+                                via @(string.Join(";  ", engine.UsedVia.Where(v => !string.IsNullOrEmpty(v))))
+                            </span>
                         }
                     </div>
                     <ul class="ab-engine-concl">
@@ -309,6 +333,9 @@
         public string SystemName { get; set; } = "";
         public string GoalRaw { get; set; } = "";
         public List<StepDto> Steps { get; set; } = new();
+        /// <summary>this proof's own diagrams: rule conclusions instantiated by
+        /// a match, with their witnesses drawn dashed until used</summary>
+        public List<SketchDto> Sketches { get; set; } = new();
     }
     class ProofsBlob
     {
@@ -362,7 +389,21 @@
     // cached: a stable reference lets Blazor skip re-rendering every InlineExpr
     IReadOnlyDictionary<string, string> sketchMapCache = new Dictionary<string, string>();
     IReadOnlyDictionary<string, string> SketchMap => sketchMapCache;
-    void RefreshSketchMap() => sketchMapCache = sys.Sketches.ToDictionary(s => s.Name, s => s.Json);
+    Dictionary<string, string> snapshotMapCache = new();
+    IReadOnlyDictionary<string, string> SnapshotMap => snapshotMapCache;
+    // the system's diagrams plus this proof's own (instantiated conclusions,
+    // witnesses drawn dashed) — the proof's shadow the system's on a name clash
+    void RefreshSketchMap()
+    {
+        var all = new Dictionary<string, string>();
+        foreach (var s in sys.Sketches) all[s.Name] = s.Json;
+        foreach (var s in Active.Sketches) all[s.Name] = s.Json;
+        sketchMapCache = all;
+        var snaps = new Dictionary<string, string>();
+        foreach (var s in sys.Sketches.Concat(Active.Sketches)) if (!string.IsNullOrEmpty(s.Snapshot)) snaps[s.Name] = s.Snapshot!;
+        snapshotMapCache = snaps;
+        Api.SetSketches(all.Select(kv => Tuple.Create(kv.Key, kv.Value)).ToArray());
+    }
 
     // memoized: Api.SameExpr per step is CPU work, not per-render work
     int provenStep = -1;
@@ -390,7 +431,7 @@
         loaded = true;
         sys = await SystemStore.LoadAsync(JS);
         Api.SetConstants(sys.Constants.ToArray());
-        RefreshSketchMap();
+        Api.SetDiagramSemantics(sys.DiagramSemantics);
         try
         {
             var json = await JS.InvokeAsync<string?>("abEditor.loadItem", "abcatdc-proofs");
@@ -409,6 +450,8 @@
     async Task LoadActive()
     {
         var p = Active;
+        p.Sketches ??= new();
+        RefreshSketchMap();   // this proof's diagrams join the registry
         goalText = p.GoalRaw;
         selRuleIdx = -1;
         engine = null;
@@ -529,13 +572,65 @@
         var lines = (text ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
         var results = await Task.Run(() => lines.Select(l => (line: l, r: Api.Run(l))).ToList());
         var failed = new List<string>();
-        foreach (var (line, r) in results)
+        foreach (var (line0, r0) in results)
         {
+            var line = line0;
+            var r = r0;
+            if (r.Success)
+            {
+                var adopted = AdoptGivenWitnesses(line);
+                if (adopted != line)
+                {
+                    RefreshSketchMap();
+                    line = adopted;
+                    r = Api.Run(line);
+                }
+            }
             if (r.Success) steps.Add(new Step { Raw = line, Just = "given", Result = r });
             else { failed.Add(line); givenError = r.Error; }
         }
         givenInput = string.Join("\n", failed);
         await AfterStepsChanged();
+    }
+
+    // A given that asserts a SYSTEM diagram with dashed (existential) items
+    // becomes a proof-local copy whose witnesses carry fresh names: the dashed
+    // arrow is then the proof's own — it turns solid once a step uses it —
+    // and two such givens never share a witness.
+    static readonly System.Text.RegularExpressions.Regex SketchRefRx = new(@"\[([^\[\]\s]+)\]");
+    string AdoptGivenWitnesses(string line)
+    {
+        if (!sys.DiagramSemantics || !line.Contains('[')) return line;
+        var p = Active;
+        p.Sketches ??= new();
+        var inUse = new HashSet<string>(steps.SelectMany(st => Api.MentionedNames(st.Raw)));
+        foreach (var n in Api.MentionedNames(SketchRefRx.Replace(line, ""))) inUse.Add(n);
+        return SketchRefRx.Replace(line, m =>
+        {
+            var name = m.Groups[1].Value;
+            var sysSk = sys.Sketches.FirstOrDefault(sk => sk.Name == name);
+            if (sysSk is null || p.Sketches.Any(sk => sk.Name == name)) return m.Value;
+            var dashed = QuiverImport.DashedLabels(sysSk.Json);
+            if (dashed.Length == 0) return m.Value;
+            var rename = new List<Tuple<string, string>>();
+            foreach (var d in dashed)
+            {
+                var cand = d;
+                var k = 0;
+                while (inUse.Contains(cand)) { k++; cand = d + QuiverImport.SubscriptDigits(k); }
+                inUse.Add(cand);
+                rename.Add(Tuple.Create(d, cand));
+            }
+            var fresh = name;
+            var j = 0;
+            while (sys.Sketches.Any(sk => sk.Name == fresh) || p.Sketches.Any(sk => sk.Name == fresh))
+            {
+                j++;
+                fresh = name + QuiverImport.SubscriptDigits(j);
+            }
+            p.Sketches.Add(new SketchDto { Name = fresh, Json = QuiverImport.Relabel(sysSk.Json, rename.ToArray()) });
+            return "[" + fresh + "]";
+        });
     }
 
     async Task UndoLast()
@@ -616,7 +711,10 @@
         manualOutcome = null;
         if (SelRule is null) return;
         var (raws, display) = ValidSteps();
-        var bindings = metaNames.Zip(manualVals, (n, v) => Tuple.Create(n, v ?? "")).ToArray();
+        // blank fields are left to the engine: the bindings given SEED the
+        // match and the matcher completes the rest
+        var bindings = metaNames.Zip(manualVals, (n, v) => Tuple.Create(n, (v ?? "").Trim()))
+                                .Where(b => b.Item2.Length > 0).ToArray();
         var prem = SelRule.Premises.ToArray();
         var concl = SelRule.Conclusions.ToArray();
         var introduces = SelRule.Kind == "Construction";
@@ -658,10 +756,54 @@
             added++;
         }
         applyMessage = added == 0 ? "all conclusions already present" : $"added {added} step{(added > 1 ? "s" : "")}";
+        AdoptSketches(outc);
         await RunEngine();
         await RecomputeProven();
         await SaveProofs();
     }
+
+    // ---- living diagrams ------------------------------------------------------
+
+    /// <summary>After an application: the proof adopts the diagrams the rule's
+    /// conclusions introduced (their witnesses drawn dashed), and any dashed
+    /// witness this application USED — bound by the match, or borrowed as a
+    /// derived judgment — is drawn solid from now on.</summary>
+    void AdoptSketches(ApplyOutcome outc)
+    {
+        var p = Active;
+        p.Sketches ??= new();
+        foreach (var (name, json) in outc.NewSketches)
+        {
+            var existing = p.Sketches.FirstOrDefault(s => s.Name == name);
+            if (existing is null) p.Sketches.Add(new SketchDto { Name = name, Json = json });
+            else existing.Json = json;
+        }
+        var touched = new HashSet<string>();
+        foreach (var b in outc.Bindings)
+            foreach (var u in Api.MentionedNames(b.Item2)) touched.Add(u);
+        foreach (var via in outc.UsedVia)
+            if (!string.IsNullOrEmpty(via))
+                foreach (var u in Api.MentionedNames(via)) touched.Add(u);
+        foreach (var s in p.Sketches)
+            foreach (var dashed in QuiverImport.DashedLabels(s.Json))
+                if (touched.Contains(dashed))
+                    s.Json = QuiverImport.SetEdgeStyle(s.Json, dashed, true);
+        RefreshSketchMap();
+    }
+
+    /// <summary>What a diagram step contributes to the proof, for display.</summary>
+    readonly Dictionary<string, string[]> derivedCache = new();
+    string[] DerivedFor(string raw)
+    {
+        if (!raw.Contains('[')) return Array.Empty<string>();
+        if (!derivedCache.TryGetValue(raw, out var facts))
+        {
+            facts = Api.DerivedFacts(raw);
+            derivedCache[raw] = facts;
+        }
+        return facts;
+    }
+    readonly HashSet<int> openDerived = new();
 
     // ---- theorem ------------------------------------------------------------
     async Task SaveTheorem()
@@ -683,6 +825,7 @@
         await SystemStore.SaveAsync(JS, fresh);
         sys = fresh;
         Api.SetConstants(sys.Constants.ToArray());
+        Api.SetDiagramSemantics(sys.DiagramSemantics);
         RefreshSketchMap();
         thmSaved = $"“{name}” saved to the system — available on the Rules page and in the rule picker above.";
         thmName = "";

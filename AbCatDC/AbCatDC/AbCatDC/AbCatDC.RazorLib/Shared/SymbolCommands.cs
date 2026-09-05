@@ -10,6 +10,8 @@ public static class SymbolCommands
 
     public static readonly Entry[] All =
     {
+        new("circ", "∘"),
+        new("compose", "∘"),
         new("forall", "∀"),
         new("exists", "∃"),
         new("mu", "μ"),

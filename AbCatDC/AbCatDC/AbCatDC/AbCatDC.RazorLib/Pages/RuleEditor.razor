@@ -2,6 +2,8 @@
 @using AbCatDC.Kernel
 @using System.Text.Json
 @inject IJSRuntime JS
+@inject IServiceProvider Services
+@inject NavigationManager Nav
 
 <div class="ab-hero">
     <h1><i class="fa-solid fa-scale-balanced"></i> Inference Rule Editor</h1>
@@ -26,6 +28,12 @@
             </label>
             <input id="sysconsts" class="ab-text-input" value="@constantsInput" @onchange="OnConstantsChanged"
                    placeholder="e.g. Ring Mod Grp — space-separated" />
+        </div>
+        <div class="ab-sem-toggle" title="[D] commutes ≡ ∀ unbound labels . ∃ dashed arrows . the diagram commutes — diagrams match by shape, contribute their typings and equations, and a dashed arrow is a witness drawn into the proof. Off = the opaque, name-matched token of older systems.">
+            <label class="ab-setting-label">
+                <input type="checkbox" checked="@(semanticsVersion >= 2)" @onchange="OnSemanticsToggle" />
+                Diagram semantics (∀∃)
+            </label>
         </div>
     </div>
 </div>
@@ -65,44 +73,60 @@
             }
         </div>
 
-        <div class="ab-tabs">
-            @for (var i = 0; i < premises.Count; i++)
-            {
-                var idx = i;
-                <button type="button" draggable="true"
-                        class="ab-tab prem @(activeIsPremise && activeIdx == idx ? "active" : "") @DragClass(true, idx)"
-                        title="@premises[idx].Raw — drag to reorder" @onclick="() => SelectTab(true, idx)"
-                        @ondragstart="() => DragStart(true, idx)" @ondragenter="() => DragEnter(true, idx)"
-                        @ondragover:preventDefault @ondragend="DragEnd" @ondrop="() => Drop(true, idx)">
-                    <RefText Text='@TabLabel(premises[idx], "P", idx)' Sketches="SketchMap" OnEdit="EditSketchByName" />
-                    <span class="ab-tab-dot @(premises[idx].Result.Success ? "ok" : "bad")"></span>
-                    @if (activeIsPremise && activeIdx == idx)
-                    {
-                        <span class="ab-tab-x" title="Delete premise"
-                              @onclick='() => AskDelete("premise", idx, premises[idx].Raw)' @onclick:stopPropagation>×</span>
-                    }
-                </button>
-            }
-            <button type="button" class="ab-tab add prem" title="New premise" @onclick="() => NewTab(true)">+</button>
-            <span class="ab-tabs-spacer"></span>
-            @for (var i = 0; i < conclusions.Count; i++)
-            {
-                var idx = i;
-                <button type="button" draggable="true"
-                        class="ab-tab concl @(!activeIsPremise && activeIdx == idx ? "active" : "") @DragClass(false, idx)"
-                        title="@conclusions[idx].Raw — drag to reorder" @onclick="() => SelectTab(false, idx)"
-                        @ondragstart="() => DragStart(false, idx)" @ondragenter="() => DragEnter(false, idx)"
-                        @ondragover:preventDefault @ondragend="DragEnd" @ondrop="() => Drop(false, idx)">
-                    <RefText Text='@TabLabel(conclusions[idx], "C", idx)' Sketches="SketchMap" OnEdit="EditSketchByName" />
-                    <span class="ab-tab-dot @(conclusions[idx].Result.Success ? "ok" : "bad")"></span>
-                    @if (!activeIsPremise && activeIdx == idx)
-                    {
-                        <span class="ab-tab-x" title="Delete conclusion"
-                              @onclick='() => AskDelete("conclusion", idx, conclusions[idx].Raw)' @onclick:stopPropagation>×</span>
-                    }
-                </button>
-            }
-            <button type="button" class="ab-tab add concl" title="New conclusion" @onclick="() => NewTab(false)">+</button>
+        <div class="ab-tabs-group">
+            @* premises above the rule, conclusions below — drag a pill within
+               its row to reorder, or across the rule to change its side *@
+            <div class="ab-tabs-row prem @(dragIdx >= 0 ? "ab-drop-open" : "")" @ondragover:preventDefault @ondrop="() => Drop(true, premises.Count)">
+                <span class="ab-tabs-label">Premises</span>
+                @for (var i = 0; i < premises.Count; i++)
+                {
+                    var idx = i;
+                    <button type="button" draggable="true"
+                            class="ab-tab prem @(activeIsPremise && activeIdx == idx ? "active" : "") @DragClass(true, idx)"
+                            title="@premises[idx].Raw — drag to reorder, or below the line to make it a conclusion"
+                            @onclick="() => SelectTab(true, idx)"
+                            @ondragstart="() => DragStart(true, idx)" @ondragenter="() => DragEnter(true, idx)"
+                            @ondragover:preventDefault @ondragend="DragEnd" @ondrop="() => Drop(true, idx)">
+                        <RefText Text='@TabLabel(premises[idx], "P", idx)' Sketches="SketchMap" OnEdit="EditSketchByName" />
+                        <span class="ab-tab-dot @(premises[idx].Result.Success ? "ok" : "bad")"></span>
+                        @if (activeIsPremise && activeIdx == idx)
+                        {
+                            <span class="ab-tab-x" title="Delete premise"
+                                  @onclick='() => AskDelete("premise", idx, premises[idx].Raw)' @onclick:stopPropagation>×</span>
+                        }
+                    </button>
+                }
+                <button type="button" class="ab-tab add prem" title="New premise" @onclick="() => NewTab(true)">+</button>
+                @if (premises.Count == 0)
+                {
+                    <span class="ab-muted ab-tabs-hint">no premises — this rule is an axiom</span>
+                }
+            </div>
+
+            <div class="ab-tabs-rule"></div>
+
+            <div class="ab-tabs-row concl @(dragIdx >= 0 ? "ab-drop-open" : "")" @ondragover:preventDefault @ondrop="() => Drop(false, conclusions.Count)">
+                <span class="ab-tabs-label">Conclusions</span>
+                @for (var i = 0; i < conclusions.Count; i++)
+                {
+                    var idx = i;
+                    <button type="button" draggable="true"
+                            class="ab-tab concl @(!activeIsPremise && activeIdx == idx ? "active" : "") @DragClass(false, idx)"
+                            title="@conclusions[idx].Raw — drag to reorder, or above the line to make it a premise"
+                            @onclick="() => SelectTab(false, idx)"
+                            @ondragstart="() => DragStart(false, idx)" @ondragenter="() => DragEnter(false, idx)"
+                            @ondragover:preventDefault @ondragend="DragEnd" @ondrop="() => Drop(false, idx)">
+                        <RefText Text='@TabLabel(conclusions[idx], "C", idx)' Sketches="SketchMap" OnEdit="EditSketchByName" />
+                        <span class="ab-tab-dot @(conclusions[idx].Result.Success ? "ok" : "bad")"></span>
+                        @if (!activeIsPremise && activeIdx == idx)
+                        {
+                            <span class="ab-tab-x" title="Delete conclusion"
+                                  @onclick='() => AskDelete("conclusion", idx, conclusions[idx].Raw)' @onclick:stopPropagation>×</span>
+                        }
+                    </button>
+                }
+                <button type="button" class="ab-tab add concl" title="New conclusion" @onclick="() => NewTab(false)">+</button>
+            </div>
         </div>
 
         @if (dragError is not null)
@@ -168,6 +192,14 @@
             {
                 <div class="ab-analysis-row"><span>Leaf typings</span><pre>@analysis.Inference</pre></div>
             }
+            @if (semanticsVersion >= 2)
+            {
+                @foreach (var dm in Api.DiagramMeanings(analysis.Formatted))
+                {
+                    var mo = dm.Item2;
+                    <div class="ab-analysis-row"><span>@dm.Item1 means</span><pre class="ab-meaning">@(mo.Prefix.Length > 0 ? mo.Prefix + "\n" : "")@(string.Join("\n", mo.Typings.Concat(mo.Equations).Concat(mo.Uniqueness)))@(mo.Notes.Length > 0 ? "\n" + string.Join("\n", mo.Notes.Select(n => "— " + n)) : "")</pre></div>
+                }
+            }
         }
     </div>
 </div>
@@ -192,7 +224,16 @@
                         <button type="button" class="ab-tag-x" title="Delete sketch"
                                 @onclick='() => AskDelete("sketch", sketches.IndexOf(ss), ss.Name)'>×</button>
                     </div>
-                    <QuiverPreview Json="@ss.Json" Height="170" OnEdit="() => OpenSketchOverlay(ss)" />
+                    @if (!string.IsNullOrEmpty(ss.Snapshot))
+                    {
+                        <img class="ab-snap-card" src="@ss.Snapshot" alt="[@ss.Name]" title="click to edit" @onclick="() => OpenSketchOverlay(ss)" />
+                    }
+                    else
+                    {
+                        <button type="button" class="ab-snap-missing-card" @onclick="() => OpenSketchOverlay(ss)">
+                            <i class="fa-solid fa-camera"></i> no snapshot — open the editor and take one
+                        </button>
+                    }
                 </div>
             }
         </div>
@@ -236,14 +277,13 @@
         @if (readingOpen)
         {
             <ul class="ab-reading-list">
-                <li>Premises sit <em>above</em> the inference line, conclusions <em>below</em>; the rule's name is on the right.</li>
-                <li><strong>Sequents and typing</strong>: write judgments as <code>Γ, x : σ ⊢ M : τ</code> — Γ, Δ, Θ, Ξ are context metavariables, <code>x : σ</code> adds a hypothesis (binding x to its right), and the goal may be a bare formula or a typing judgment <code>M : τ</code>. Type <code>\vdash</code> or <code>|-</code> for ⊢, <code>\Gamma</code> for Γ.</li>
-                <li><strong>Greek letters (σ, τ, ρ, …) are schematic metavariables</strong>: each rule is a template, valid under any uniform substitution of types for them — they are implicitly ∀-quantified at the <em>meta</em> level. In ∀α. τ the α is different: it is an object-level type variable bound by that quantifier.</li>
-                <li>Latin letters follow the ℤ-defaults: <code>a : ℕ</code> (an integer), <code>A ⊆ ℤ</code> (a set of integers), <code>AB</code> the elementwise product, <code>A^n</code> the diagonal power.</li>
-                <li><strong>Underscore names are rigid tags</strong>: an identifier containing <code>_</code> — e.g. <code>Mono_C</code> — is a user-defined constant, never a metavariable, and takes following atoms as arguments: <code>f : Mono_C (A → B)</code>. Type <code>\_C</code> in the editor; letters with no Unicode subscript form keep a literal underscore.</li>
-                <li><strong>Declared constants</strong>: names listed in the <em>Rigid constants</em> box above (e.g. <code>Ring Mod</code>) behave the same way without the underscore — so <code>R : Ring, M : Mod R, x : M ⊢ …</code> keeps Ring and Mod rigid while R, M, x are bound hypotheses.</li>
-                <li>Click any expression — in a tag or inside a rule — to see its parse, canonical form, and leaf typings in the Analysis panel.</li>
-                <li>The <i class="fa-solid fa-circle-info"></i> button on each rule shows its remark: what the rule means and what each symbol is typed as.</li>
+                <li>Premises sit <em>above</em> the line, conclusions <em>below</em>; the name is on the right.</li>
+                <li><strong>Sequents</strong>: <code>Γ, x : σ ⊢ M : τ</code> — Γ, Δ, Θ, Ξ stand for whole contexts; <code>x : σ</code> adds a hypothesis, binding x to its right. Type <code>\vdash</code>, <code>\Gamma</code>.</li>
+                <li><strong>Greek letters are schematic</strong>: σ, τ, … range over any type, so a rule is a template. (In <code>∀α. τ</code>, α is object-level.)</li>
+                <li><strong>Composition</strong>: <code>gf</code> and <code>g ∘ f</code> (<code>\circ</code>) are one term, applied right to left. Operands are plain names — for (f + g)∘e set <code>s = f + g</code>, then <code>s ∘ e</code>.</li>
+                <li><strong>Rigid names</strong>: anything in <em>Rigid constants</em>, or containing <code>_</code>, is a constant taking arguments — <code>M : Mod(R)</code>. Other letters get the ℤ-defaults (<code>a : ℕ</code>, <code>A ⊆ ℤ</code>).</li>
+                <li><strong>Diagrams</strong>: <code>[D] commutes</code> means ∀ unbound labels . ∃ dashed/dotted arrows (and <code>∃X</code> objects) . every two parallel paths agree; <code>!u</code> marks a unique arrow. A diagram premise matches any proven diagram of the same shape, and <code>[D] in C</code> supplies its typings. <code>[D] has exact rows</code> (or <code>columns</code>) asserts <code>exact(f, g)</code> at every interior object of each row — label a zero arrow <code>0</code> to state exactness at the ends.</li>
+                <li>Click an expression for its parse and typings; <i class="fa-solid fa-circle-info"></i> shows a rule's remark.</li>
             </ul>
         }
     </div>
@@ -267,7 +307,7 @@
                     @foreach (var r in kindRules)
                     {
                         var rr = r;
-                        <div class="ab-rule k-@rr.Kind.ToLowerInvariant() @(rr == editingRule ? "editing" : "")">
+                        <div class="ab-rule k-@rr.Kind.ToLowerInvariant() @(rr == editingRule ? "editing" : "") @(rr == highlightRule ? "highlight" : "")" id="rule-card-@rules.IndexOf(rr)">
                             <div class="ab-rule-row">
                                 <div class="ab-rule-frac">
                                     <div class="ab-rule-prem">
@@ -278,7 +318,7 @@
                                         @foreach (var p in rr.Premises)
                                         {
                                             <span class="@(p.Result.Success ? "" : "ab-bad-expr")" title="@(p.Result.Success ? "" : p.Result.Error)"
-                                                  @onclick="() => ShowAnalysis(p)"><InlineExpr Text="@(p.Result.Success ? p.Result.Formatted : p.Raw)" Sketches="SketchMap" Height="84" OnEdit="EditSketchByName" /></span>
+                                                  @onclick="() => ShowAnalysis(p)"><InlineExpr Text="@(p.Result.Success ? p.Result.Formatted : p.Raw)" Sketches="SketchMap" Snapshots="SnapshotMap" Height="84" OnEdit="EditSketchByName" OnSnapshot="EditSketchByName" /></span>
                                         }
                                     </div>
                                     <div class="ab-rule-mid">
@@ -289,7 +329,7 @@
                                         @foreach (var c in rr.Conclusions)
                                         {
                                             <span class="@(c.Result.Success ? "" : "ab-bad-expr")" title="@(c.Result.Success ? "" : c.Result.Error)"
-                                                  @onclick="() => ShowAnalysis(c)"><InlineExpr Text="@(c.Result.Success ? c.Result.Formatted : c.Raw)" Sketches="SketchMap" Height="84" OnEdit="EditSketchByName" /></span>
+                                                  @onclick="() => ShowAnalysis(c)"><InlineExpr Text="@(c.Result.Success ? c.Result.Formatted : c.Raw)" Sketches="SketchMap" Snapshots="SnapshotMap" Height="84" OnEdit="EditSketchByName" OnSnapshot="EditSketchByName" /></span>
                                         }
                                     </div>
                                 </div>
@@ -339,7 +379,16 @@
             <label class="ab-setting-label">Diagram (quiver JSON / base64 — or draw it in the editor)</label>
             <textarea class="ab-editor" rows="3" spellcheck="false" style="font-size:.9rem; font-family:Consolas, monospace"
                       value="@sketchJsonInput" @oninput="e => sketchJsonInput = e.Value?.ToString() ?? string.Empty"></textarea>
-            <QuiverPreview Json="@sketchJsonInput" Height="170" OnEdit="OpenSketchOverlayFromModal" />
+            @if (!string.IsNullOrEmpty(sketchSnapshotInput))
+            {
+                <img class="ab-snap-card" src="@sketchSnapshotInput" alt="snapshot" title="click to edit" @onclick="OpenSketchOverlayFromModal" />
+            }
+            else
+            {
+                <button type="button" class="ab-snap-missing-card" @onclick="OpenSketchOverlayFromModal">
+                    <i class="fa-solid fa-camera"></i> draw it in the editor and take the snapshot
+                </button>
+            }
             <div class="ab-modal-btns">
                 <button type="button" class="ab-kind-btn" @onclick="CloseSketchModal">Cancel</button>
                 <button type="button" class="ab-kind-btn" @onclick="OpenSketchOverlayFromModal">
@@ -354,6 +403,10 @@
             {
                 <div class="ab-muted" style="margin-top:.4rem">Name must be letters/digits/underscore/hyphen, start with a letter, not end with a hyphen, and be unused.</div>
             }
+            @foreach (var w in SketchWarnings())
+            {
+                <div class="ab-muted ab-sketch-warn"><i class="fa-solid fa-triangle-exclamation"></i> @w</div>
+            }
         </div>
     </div>
 }
@@ -364,6 +417,20 @@
         <iframe id="sketch-frame" class="ab-sketch-frame" src="@sketchOverlaySrc" title="quiver editor"></iframe>
         <div class="ab-sketch-overlay-bar">
             <span>Draw the diagram, press quiver's <strong>Save</strong> (Ctrl+S), then the check to bring it back.</span>
+            @if (SnapshotSvc is not null)
+            {
+                <button type="button" id="re-snap-btn" class="ab-kind-btn ab-snap-btn" @onclick="TakeSnapshot" disabled="@snapBusy"
+                        title="Store a picture of the diagram as drawn; previews then show it instead of loading a live quiver frame">
+                    <i class="fa-solid fa-camera"></i> @(snapBusy ? "…" : "Snapshot")
+                </button>
+                @if (HasSnapshotInOverlay)
+                {
+                    <button type="button" class="ab-kind-btn ab-snap-btn" @onclick="ClearSnapshot" title="drop the stored picture — previews load the live frame again">
+                        <i class="fa-solid fa-camera-slash"></i> Clear
+                    </button>
+                }
+                @if (snapNote is not null) { <span class="ab-snap-note">@snapNote</span> }
+            }
         </div>
         <button type="button" class="ab-sketch-done" title="Done — import the diagram and close" @onclick="CloseSketchOverlay">
             <svg viewBox="0 0 24 24" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
@@ -372,6 +439,11 @@
             </svg>
         </button>
     </div>
+}
+
+@if (snapToast is not null)
+{
+    <div class="ab-snap-toast"><img src="@snapToast" alt="snapshot" /><span><i class="fa-solid fa-check"></i> snapshot stored</span></div>
 }
 
 @if (pendingExample is not null)
@@ -432,6 +504,7 @@
     {
         public string Name = "";
         public string Json = "";
+        public string? Snapshot;
     }
 
     string systemName = "";
@@ -508,13 +581,14 @@
 
     bool dragIsPremise;
     int dragIdx = -1;
+    bool dragOverIsPremise;
     int dragOverIdx = -1;
     string? dragError;
 
     string DragClass(bool isPrem, int idx) =>
-        dragIdx < 0 || isPrem != dragIsPremise ? ""
-        : dragIdx == idx ? "dragging"
-        : dragOverIdx == idx ? "dropzone" : "";
+        dragIdx < 0 ? ""
+        : isPrem == dragIsPremise && dragIdx == idx ? "dragging"
+        : isPrem == dragOverIsPremise && dragOverIdx == idx ? "dropzone" : "";
 
     void DragStart(bool isPrem, int idx)
     {
@@ -526,7 +600,9 @@
 
     void DragEnter(bool isPrem, int idx)
     {
-        if (dragIdx >= 0 && isPrem == dragIsPremise) dragOverIdx = idx;
+        if (dragIdx < 0) return;
+        dragOverIsPremise = isPrem;
+        dragOverIdx = idx;
     }
 
     void DragEnd()
@@ -535,33 +611,58 @@
         dragOverIdx = -1;
     }
 
-    void Drop(bool isPrem, int idx)
+    /// <summary>Drop the dragged tab at <paramref name="idx"/> of the premise
+    /// (or conclusion) row — reordering within a row, or switching its side.
+    /// A drop onto a pill also bubbles to its row; DragEnd clears the drag
+    /// first, so the row's handler is a no-op after a pill handled it.</summary>
+    void Drop(bool toPrem, int idx)
     {
         var from = dragIdx;
-        var sameSide = isPrem == dragIsPremise;
+        var fromPrem = dragIsPremise;
         DragEnd();
-        if (from < 0 || !sameSide || from == idx) return;
-        var list = isPrem ? premises : conclusions;
-        if (from >= list.Count || idx >= list.Count) return;
+        if (from < 0) return;
+        var src = fromPrem ? premises : conclusions;
+        if (from >= src.Count) return;
+        var moved = src[from];
 
-        var moved = list[from];
-        var candidate = list.ToList();
-        candidate.RemoveAt(from);
-        candidate.Insert(idx, moved);
-
-        if (DependencyViolation(candidate) is { } why)
+        if (fromPrem == toPrem)
         {
-            dragError = "Can't move there — " + why;
-            return;
+            if (from == idx) return;
+            var cand = src.ToList();
+            cand.RemoveAt(from);
+            cand.Insert(Math.Clamp(idx, 0, cand.Count), moved);
+            if (DependencyViolation(cand) is { } why)
+            {
+                dragError = "Can't move there — " + why;
+                return;
+            }
+            dragError = null;
+            var keep = ActiveTag;
+            if (toPrem) premises = cand; else conclusions = cand;
+            if (keep is not null && activeIsPremise == toPrem)
+            {
+                var at = cand.IndexOf(keep);
+                if (at >= 0) activeIdx = at;
+            }
         }
-        dragError = null;
-        // keep the same tab selected after the move
-        var activeTag = ActiveTag;
-        if (isPrem) premises = candidate; else conclusions = candidate;
-        if (activeTag is not null && activeIsPremise == isPrem)
+        else
         {
-            var at = candidate.IndexOf(activeTag);
-            if (at >= 0) activeIdx = at;
+            // crossing the line: the tab changes side, keeping its text
+            var dst = (toPrem ? premises : conclusions).ToList();
+            dst.Insert(Math.Clamp(idx, 0, dst.Count), moved);
+            if (DependencyViolation(dst) is { } why)
+            {
+                dragError = "Can't move there — " + why;
+                return;
+            }
+            var rest = src.ToList();
+            rest.RemoveAt(from);
+            if (fromPrem) { premises = rest; conclusions = dst; }
+            else { conclusions = rest; premises = dst; }
+            dragError = null;
+            // follow the tab to its new side so the editor stays on it
+            activeIsPremise = toPrem;
+            activeIdx = dst.IndexOf(moved);
         }
     }
 
@@ -578,9 +679,11 @@
         }
     }
 
-    // (declaredName, mentionedNames) per tab — parse-only, so cheap
-    static (List<string> Declared, List<HashSet<string>> Mentions) DepInfo(List<TagItem> items) =>
-        (items.Select(t => Api.DeclaredName(t.Raw)).ToList(),
+    // (declaredNames, mentionedNames) per tab — parse-only, so cheap. A tab can
+    // declare several names at once: "[Four] in C" declares every object and
+    // arrow of the diagram.
+    static (List<HashSet<string>> Declared, List<HashSet<string>> Mentions) DepInfo(List<TagItem> items) =>
+        (items.Select(t => new HashSet<string>(Api.DeclaredNames(t.Raw))).ToList(),
          items.Select(t => new HashSet<string>(Api.MentionedNames(t.Raw))).ToList());
 
     /// <summary>The first use-before-declaration in this order, if any.</summary>
@@ -590,8 +693,9 @@
         for (var x = 0; x < order.Count; x++)
             for (var y = x + 1; y < order.Count; y++)
             {
-                var d = declared[y];
-                if (!string.IsNullOrEmpty(d) && d != declared[x] && mentions[x].Contains(d))
+                // the later tab declares a name the earlier one uses without declaring
+                var d = declared[y].FirstOrDefault(n => !declared[x].Contains(n) && mentions[x].Contains(n));
+                if (d is not null)
                     return $"“{TabLabel(order[x], "P", x)}” uses {d}, which “{TabLabel(order[y], "P", y)}” declares — a declaration has to come before its uses.";
             }
         return null;
@@ -608,9 +712,7 @@
             // on a dependency cycle, fall back to the original order
             var pick = remaining.FirstOrDefault(
                 i => remaining.All(j => j == i
-                                        || string.IsNullOrEmpty(declared[j])
-                                        || declared[j] == declared[i]
-                                        || !mentions[i].Contains(declared[j])),
+                                        || !declared[j].Any(n => !declared[i].Contains(n) && mentions[i].Contains(n))),
                 -1);
             if (pick < 0) pick = remaining[0];
             result.Add(items[pick]);
@@ -729,6 +831,7 @@
         var dto = new SystemDto
         {
             Name = systemName,
+            SemanticsVersion = semanticsVersion,
             Constants = ConstantsList.ToList(),
             Rules = rules.Select(r => new RuleDto
             {
@@ -736,7 +839,7 @@
                 Premises = r.Premises.Select(t => t.Raw).ToList(),
                 Conclusions = r.Conclusions.Select(t => t.Raw).ToList(),
             }).ToList(),
-            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json }).ToList(),
+            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json, Snapshot = s.Snapshot }).ToList(),
         };
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions { WriteIndented = true });
         try
@@ -800,7 +903,16 @@
         {
             rules.Clear();
             systemName = ex.Name;
+            constantsInput = "";
         }
+        // the palette's rigid constants must be declared BEFORE its rules are
+        // parsed, or its own names would come out as metavariables
+        var consts = ConstantsList.Concat(ex.Constants ?? Array.Empty<string>()).Distinct().ToArray();
+        constantsInput = string.Join(" ", consts);
+        Api.SetConstants(consts);
+        // the palettes are written for the built-in diagram semantics
+        semanticsVersion = 2;
+        Api.SetDiagramSemantics(true);
         // parsing every rule of an example palette is CPU work — keep it off the UI thread
         var built = await Task.Run(() => ex.Rules
             .Select(en => new Rule
@@ -819,17 +931,28 @@
             if (!sketches.Any(s => s.Name == name))
                 sketches.Add(new Sketch { Name = name, Json = json });
         }
+        // rules already in the system may read differently under the new
+        // constants, so re-read everything
+        await ReparseAll();
         await Save();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (teachPending && sketchOverlayOpen)
+        {
+            teachPending = false;
+            try { await JS.InvokeVoidAsync("abEditor.teach", "re-snap-btn", "Position the diagram so it is fully in view, press quiver's Save (Ctrl+S), then take the Snapshot — it becomes the picture shown everywhere.", 20000); } catch { }
+        }
         if (firstRender)
         {
             var dto = await SystemStore.LoadAsync(JS);
             systemName = dto.Name;
             constantsInput = string.Join(" ", dto.Constants);
+            semanticsVersion = dto.SemanticsVersion;
             Api.SetConstants(dto.Constants.ToArray());
+            Api.SetDiagramSemantics(dto.DiagramSemantics);
+            Api.SetSketches(dto.Sketches.Select(s => Tuple.Create(s.Name, s.Json)).ToArray());
             // parsing + canonicalization is CPU work — keep it off the UI thread
             var (loadedRules, loadedSketches) = await Task.Run(() =>
             {
@@ -844,7 +967,7 @@
                         Conclusions = r.Conclusions.Select(MakeTag).Where(t => t != null).Select(t => t!).ToList(),
                     })
                     .ToList();
-                var sk = dto.Sketches.Select(s => new Sketch { Name = s.Name, Json = QuiverImport.NormalizePositions(s.Json) }).ToList();
+                var sk = dto.Sketches.Select(s => new Sketch { Name = s.Name, Json = QuiverImport.NormalizePositions(s.Json), Snapshot = s.Snapshot }).ToList();
                 return (rs, sk);
             });
             rules = loadedRules;
@@ -852,7 +975,42 @@
             RefreshSketchMap();
             rulesLoading = false;
             StateHasChanged();
+            await OpenRequestedRule();
         }
+    }
+
+    // a link from another page: rules?edit=<name> — load that rule into the
+    // builder and light its card up in the palette
+    Rule? highlightRule;
+    async Task OpenRequestedRule()
+    {
+        string? wanted = null;
+        try
+        {
+            var q = new Uri(Nav.Uri).Query.TrimStart('?');
+            foreach (var part in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var kv = part.Split('=', 2);
+                if (kv.Length == 2 && kv[0] == "edit") wanted = Uri.UnescapeDataString(kv[1].Replace('+', ' '));
+            }
+        }
+        catch { }
+        if (string.IsNullOrEmpty(wanted)) return;
+        var r = rules.FirstOrDefault(x => x.Name == wanted);
+        if (r is null) return;
+        highlightRule = r;
+        await EditRule(r);
+        StateHasChanged();
+        // the palette's snapshots decode after the first paint and shift the
+        // layout under the scroll, so scroll now and again once every picture is in
+        var js = "setTimeout(function(){"
+            + $"var el=document.getElementById('rule-card-{rules.IndexOf(r)}'); if(!el) return;"
+            + "var go=function(){el.scrollIntoView({behavior:'smooth', block:'center'});}; go();"
+            + "var pending=[].slice.call(document.images).filter(function(i){return !i.complete;});"
+            + "if(pending.length) Promise.all(pending.map(function(i){return new Promise(function(d){i.onload=i.onerror=d;});})).then(function(){setTimeout(go, 60);});"
+            + "}, 400)";
+        try { await JS.InvokeVoidAsync("eval", js); } catch { }
+        _ = Task.Run(async () => { await Task.Delay(6000); highlightRule = null; await InvokeAsync(StateHasChanged); });
     }
 
     static TagItem? MakeTag(string raw)
@@ -871,6 +1029,7 @@
         var dto = new SystemDto
         {
             Name = systemName,
+            SemanticsVersion = semanticsVersion,
             Constants = ConstantsList.ToList(),
             Rules = rules.Select(r => new RuleDto
             {
@@ -881,7 +1040,7 @@
                 Premises = r.Premises.Select(t => t.Raw).ToList(),
                 Conclusions = r.Conclusions.Select(t => t.Raw).ToList(),
             }).ToList(),
-            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json }).ToList(),
+            Sketches = sketches.Select(s => new SketchDto { Name = s.Name, Json = s.Json, Snapshot = s.Snapshot }).ToList(),
         };
         await SystemStore.SaveAsync(JS, dto);
     }
@@ -895,6 +1054,18 @@
     // ---- per-system rigid constants ----------------------------------------
 
     string constantsInput = "";
+    // 2 = the built-in ∀∃ reading of "[D] commutes"; 1 = opaque token (older systems)
+    int semanticsVersion = 2;
+
+    async Task OnSemanticsToggle(ChangeEventArgs e)
+    {
+        var on = e.Value is bool b && b;
+        semanticsVersion = on ? 2 : 1;
+        Api.SetDiagramSemantics(on);
+        await ReparseAll();
+        await Save();
+    }
+
     string[] ConstantsList =>
         constantsInput.Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
                       .Distinct().ToArray();
@@ -978,7 +1149,14 @@
     // (and its per-sketch JSON parse) on unrelated state changes
     IReadOnlyDictionary<string, string> sketchMapCache = new Dictionary<string, string>();
     IReadOnlyDictionary<string, string> SketchMap => sketchMapCache;
-    void RefreshSketchMap() => sketchMapCache = sketches.ToDictionary(s => s.Name, s => s.Json);
+    void RefreshSketchMap()
+    {
+        sketchMapCache = sketches.ToDictionary(s => s.Name, s => s.Json);
+        snapshotMapCache = sketches.Where(s => !string.IsNullOrEmpty(s.Snapshot)).ToDictionary(s => s.Name, s => s.Snapshot!);
+        // the kernel matches diagrams by shape and reads their labels — it
+        // needs the pictures, not just the names
+        Api.SetSketches(sketches.Select(s => Tuple.Create(s.Name, s.Json)).ToArray());
+    }
     bool sketchModalOpen;
     string sketchNameInput = "";
     string sketchJsonInput = "";
@@ -986,6 +1164,21 @@
     bool sketchOverlayOpen;
     string sketchOverlaySrc = "";
     Sketch? overlaySketch;   // set when editing an existing sketch from the gallery
+
+    // save-time advice for the sketch being added (∀∃ reading), cached per JSON
+    string sketchWarnJson = "";
+    string[] sketchWarnings = Array.Empty<string>();
+    string[] SketchWarnings()
+    {
+        if (semanticsVersion < 2 || string.IsNullOrWhiteSpace(sketchJsonInput)) return Array.Empty<string>();
+        if (sketchWarnJson != sketchJsonInput)
+        {
+            sketchWarnJson = sketchJsonInput;
+            try { sketchWarnings = QuiverImport.LabelWarnings(sketchJsonInput); }
+            catch { sketchWarnings = Array.Empty<string>(); }
+        }
+        return sketchWarnings;
+    }
 
     bool SketchNameValid =>
         sketchNameInput.Length > 0
@@ -1009,7 +1202,8 @@
     async Task SaveSketch()
     {
         if (!SketchNameValid) return;
-        sketches.Add(new Sketch { Name = sketchNameInput, Json = QuiverImport.NormalizePositions(sketchJsonInput) });
+        sketches.Add(new Sketch { Name = sketchNameInput, Json = QuiverImport.NormalizePositions(sketchJsonInput), Snapshot = sketchSnapshotInput });
+        sketchSnapshotInput = null;
         sketchModalOpen = false;
         // append the reference into the active tab on the target side
         if (activeIsPremise != sketchTargetIsPremise || ActiveTag is null)
@@ -1033,6 +1227,7 @@
 
     void OpenSketchOverlayFromModal()
     {
+        teachPending = SnapshotSvc is not null;
         overlaySketch = null;   // result goes back into the modal's JSON box
         sketchOverlaySrc = "_content/AbCatDC.RazorLib/quiver/index.html" + ToQuiverFragment(sketchJsonInput);
         sketchOverlayOpen = true;
@@ -1040,6 +1235,7 @@
 
     void OpenSketchOverlay(Sketch s)
     {
+        teachPending = SnapshotSvc is not null;
         overlaySketch = s;
         sketchOverlaySrc = "_content/AbCatDC.RazorLib/quiver/index.html" + ToQuiverFragment(s.Json);
         sketchOverlayOpen = true;
@@ -1052,8 +1248,61 @@
         if (s is not null) OpenSketchOverlay(s);
     }
 
+    AbCatDC.RazorLib.Services.ISnapshotService? SnapshotSvc =>
+        (AbCatDC.RazorLib.Services.ISnapshotService?)Services.GetService(typeof(AbCatDC.RazorLib.Services.ISnapshotService));
+    bool snapBusy, teachPending;
+    string? snapNote, snapToast;
+    int snapToastSerial;
+
+    async Task ShowSnapToast(string url)
+    {
+        snapToast = url;
+        var serial = ++snapToastSerial;
+        StateHasChanged();
+        await Task.Delay(4200);
+        if (serial == snapToastSerial) { snapToast = null; StateHasChanged(); }
+    }
+    string? sketchSnapshotInput;   // the modal path: a snapshot taken before the sketch is named
+    bool HasSnapshotInOverlay => overlaySketch is not null ? overlaySketch.Snapshot is not null : sketchSnapshotInput is not null;
+
+    // name → PNG data URL, for previews; a fresh dictionary only when it changes
+    Dictionary<string, string> snapshotMapCache = new();
+    IReadOnlyDictionary<string, string> SnapshotMap => snapshotMapCache;
+
+    async Task TakeSnapshot()
+    {
+        var svc = SnapshotSvc;
+        if (svc is null || snapBusy) return;
+        snapBusy = true;
+        snapNote = null;
+        try
+        {
+            var b64 = await svc.CapturePngBase64Async();
+            var url = string.IsNullOrEmpty(b64) ? "" : await JS.InvokeAsync<string>("abEditor.cropSnapshot", b64, "sketch-frame", 900);
+            if (string.IsNullOrEmpty(url)) { snapNote = "could not capture"; }
+            else
+            {
+                if (overlaySketch is not null) { overlaySketch.Snapshot = url; RefreshSketchMap(); await Save(); }
+                else sketchSnapshotInput = url;
+                snapNote = "stored";
+                try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
+                _ = ShowSnapToast(url);
+            }
+        }
+        catch (Exception ex) { snapNote = "capture failed: " + ex.Message; }
+        snapBusy = false;
+    }
+
+    async Task ClearSnapshot()
+    {
+        if (overlaySketch is not null) { overlaySketch.Snapshot = null; RefreshSketchMap(); await Save(); }
+        else sketchSnapshotInput = null;
+        snapNote = "cleared";
+    }
+
     async Task CloseSketchOverlay()
     {
+        try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
         // quiver writes #q=... into its URL on Save; same-origin lets us read it
         var b64 = "";
         try { b64 = await JS.InvokeAsync<string>("abEditor.readQuiverFrame", "sketch-frame"); }

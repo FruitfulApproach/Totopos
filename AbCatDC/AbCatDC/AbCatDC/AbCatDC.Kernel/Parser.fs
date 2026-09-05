@@ -13,10 +13,12 @@ type Token =
     | TLParen | TRParen | TLAngle | TRAngle
     | TLBracket | TRBracket
     | TCommutes
+    | THas
     | TIn
     | TTurnstile
     | TEquals
     | TDot | TColon | TComma
+    | TCompose
     | TEnd
 
 let private describe tok =
@@ -41,12 +43,14 @@ let private describe tok =
     | TLBracket -> "'['"
     | TRBracket -> "']'"
     | TCommutes -> "'commutes'"
+    | THas -> "'has'"
     | TIn -> "'in'"
     | TTurnstile -> "'⊢'"
     | TEquals -> "'='"
     | TDot -> "'.'"
     | TColon -> "':'"
     | TComma -> "','"
+    | TCompose -> "'∘'"
     | TEnd -> "end of input"
 
 exception private ParseError of string
@@ -80,6 +84,7 @@ let private lex (s: string) : Token list =
         elif c = '.' then toks.Add TDot; i <- i + 1
         elif c = ':' then toks.Add TColon; i <- i + 1
         elif c = ',' then toks.Add TComma; i <- i + 1
+        elif c = '∘' then toks.Add TCompose; i <- i + 1
         elif c = '^' then toks.Add TCaret; i <- i + 1
         elif "⁰¹²³⁴⁵⁶⁷⁸⁹".IndexOf c >= 0 then
             // a superscript run is sugar for ^n, so formatted output re-parses
@@ -115,12 +120,14 @@ let private lex (s: string) : Token list =
                 && (Char.IsLetterOrDigit s.[j + 1] || isSubscript s.[j + 1] || s.[j + 1] = '_')
             let start = i
             while i < s.Length && s.[i] <> 'μ'
+
                   && (Char.IsLetterOrDigit s.[i] || s.[i] = '_' || s.[i] = '\'' || isSubscript s.[i] || isHyphenJoin i) do
                 i <- i + 1
             let word = s.Substring(start, i - start)
             toks.Add (
                 match word with
                 | "commutes" -> TCommutes
+                | "has" -> THas
                 | "in" -> TIn
                 | _ -> TIdent word)
         else
@@ -201,6 +208,17 @@ and private parseType (st: State) : Ty =
             if peek st = TArrow then
                 advance st
                 t <- Ty.Function (t, parseType st)
+        | THas ->
+            // '[D] has exact rows' / '[D] has exact columns'
+            advance st
+            let w = ident st
+            if w <> "exact" then raise (ParseError $"Expected 'exact' after 'has' but found '{w}'.")
+            let ax =
+                match ident st with
+                | "rows" -> Axis.Rows
+                | "columns" -> Axis.Columns
+                | w -> raise (ParseError $"Expected 'rows' or 'columns' after 'has exact' but found '{w}'.")
+            t <- Ty.Exact (t, ax)
         | TIn ->
             advance st
             t <- Ty.InCategory (t, parseAtom st)
@@ -261,12 +279,26 @@ and private parseSum st = parseChain parseProduct TPlus Ty.Sum st
 and private parseProduct st = parseChain parsePower TTimes Ty.Product st
 
 and private parsePower st =
-    let mutable acc = parseAtom st
+    let mutable acc = parseCompose st
     while peek st = TCaret do
         advance st
         match peek st with
         | TInt n -> advance st; acc <- Ty.Power (acc, n)
         | t -> raise (ParseError $"Expected an integer exponent after '^' but found {describe t}.")
+    acc
+
+/// f ∘ g — explicit composition, the SAME term as the juxtaposition fg.
+/// Both operands must be plain names, since a juxtaposition IS a name.
+and private parseCompose st =
+    let mutable acc = parseAtom st
+    while peek st = TCompose do
+        advance st
+        let rhs = parseAtom st
+        match Ty.simpleName acc, Ty.simpleName rhs with
+        | Some a, Some b -> acc <- Ty.Var (a + b)
+        | _ ->
+            raise (ParseError
+                "'∘' composes plain names — g ∘ f is the same term as gf. A compound operand (a sum, an arrow, a parenthesized expression) cannot be juxtaposed: name it with an equation first, e.g. s = f + g, then write h ∘ s.")
     acc
 
 and private parseAtom st =
@@ -278,11 +310,21 @@ and private parseAtom st =
             // user-defined rigid tags — any identifier containing '_', e.g.
             // "Mono_C (A → B)" or "Mono_C A B" — are function-like constants
             // taking each following atom as an argument (left-nested)
+            // A parenthesized group after a tag is an ARGUMENT LIST, so the
+            // familiar mathematical spelling works: Ob(C), Hom(C, X, Y). One
+            // argument in parens is just grouping, as before: Coker (gf).
             let mutable acc = Ty.Atom n
             let mutable more = true
             while more do
                 match peek st with
-                | TIdent _ | TInt _ | TLParen | TLBracket -> acc <- Ty.Product (acc, parseAtom st)
+                | TLParen ->
+                    advance st
+                    acc <- Ty.Product (acc, parseType st)
+                    while peek st = TComma do
+                        advance st
+                        acc <- Ty.Product (acc, parseType st)
+                    expect st TRParen
+                | TIdent _ | TInt _ | TLBracket -> acc <- Ty.Product (acc, parseAtom st)
                 | _ -> more <- false
             acc
         elif Set.contains n Ty.constantAtoms then Ty.Atom n

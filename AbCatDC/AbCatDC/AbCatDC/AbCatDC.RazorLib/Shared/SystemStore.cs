@@ -12,6 +12,9 @@ public class RuleDto
     public string Name { get; set; } = "";
     public string Kind { get; set; } = "Introduction";
     public string LongName { get; set; } = "";
+    /// <summary>A rule recorded in the proof assistant: it also appears as a button
+    /// under the diagram whenever it applies.</summary>
+    public bool IsButton { get; set; }
     public string Description { get; set; } = "";
     public List<string> Premises { get; set; } = new();
     public List<string> Conclusions { get; set; } = new();
@@ -21,11 +24,20 @@ public class SketchDto
 {
     public string Name { get; set; } = "";
     public string Json { get; set; } = "";
+    /// <summary>A PNG data URL taken in the diagram editor; previews show it
+    /// instead of loading a live quiver frame.</summary>
+    public string? Snapshot { get; set; }
 }
 
 public class SystemDto
 {
     public string Name { get; set; } = "";
+    /// <summary>Which meaning "[D] commutes" carries. 0/1 (absent in stored
+    /// systems) = the opaque, name-matched token; 2 = the built-in ∀∃ reading
+    /// (diagrams match by shape, contribute their typings and equations, and
+    /// dashed arrows are existential witnesses). New systems start at 2.</summary>
+    public int SemanticsVersion { get; set; } = 0;
+    public bool DiagramSemantics => SemanticsVersion >= 2;
     /// <summary>Rigid names of this system (Ring, Mod, …): parsed as constant
     /// atoms, never metavariables, and function-like ("Mod R").</summary>
     public List<string> Constants { get; set; } = new();
@@ -61,7 +73,8 @@ public static class SystemStore
         {
             // corrupted or unavailable store — start fresh
         }
-        return new SystemDto();
+        // a brand-new system gets the built-in diagram semantics
+        return new SystemDto { SemanticsVersion = 2 };
     }
 
     public static async Task SaveAsync(IJSRuntime js, SystemDto dto)

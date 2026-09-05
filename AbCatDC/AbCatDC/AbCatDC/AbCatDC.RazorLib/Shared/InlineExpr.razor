@@ -5,15 +5,31 @@
 
 @foreach (var s in segs)
 {
-    if (s.IsSketch)
+    if (s.IsSketch && s.Snap is not null)
     {
         var seg = s;
-        <span class="ab-inline-sketch-wrap" title="double-click to enlarge"
+        <span class="ab-inline-sketch-wrap ab-loaded" title="double-click to enlarge" data-sketch="@s.Name"
               @ondblclick="() => ShowZoom(seg)" @ondblclick:stopPropagation>
-            @* native onload (not a Blazor event): flips the spinner off with no re-render round trip *@
-            <iframe class="ab-inline-sketch" style="height: @(Height)px; width: @(s.Width)px"
-                    src="@(s.Value + "&pad=4")" title="sketch preview" loading="lazy"
-                    onload="this.parentElement.classList.add('ab-loaded')"></iframe>
+            <img class="ab-inline-snap" src="@s.Snap" style="height: @(s.SnapH)px" alt="[@s.Name]" draggable="false" />
+        </span>
+    }
+    else if (s.IsSketch)
+    {
+        var seg = s;
+        @* no live quiver frame in a preview, ever: a sketch without its snapshot is flagged *@
+        <span class="ab-inline-sketch-wrap ab-needs-snap ab-loaded" title="no snapshot yet — take one in the editor (camera)" data-sketch="@s.Name"
+              @ondblclick="() => ShowZoom(seg)" @ondblclick:stopPropagation>
+            <span class="ab-snap-missing" style="height: @(Height)px; min-width: @(Math.Max(Height, 72))px">
+                <i class="fa-solid fa-image"></i> [@s.Name]
+            </span>
+            @if (OnSnapshot.HasDelegate)
+            {
+                <button type="button" class="ab-snap-cta" title="open the editor and take the snapshot"
+                        @onclick="() => OnSnapshot.InvokeAsync(seg.Name)" @onclick:stopPropagation
+                        @onpointerdown:stopPropagation @ondblclick:stopPropagation>
+                    <i class="fa-solid fa-camera"></i>
+                </button>
+            }
         </span>
     }
     else
@@ -29,17 +45,40 @@
     /// <summary>sketch name → quiver JSON/base64; unknown names stay as text</summary>
     [Parameter] public IReadOnlyDictionary<string, string>? Sketches { get; set; }
     [Parameter] public int Height { get; set; } = 84;
+    /// <summary>sketch name → PNG data URL; a name with a snapshot renders the
+    /// image instead of embedding a quiver frame</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Snapshots { get; set; }
     /// <summary>when wired, the zoom overlay grows an edit button for the sketch</summary>
     [Parameter] public EventCallback<string> OnEdit { get; set; }
+    /// <summary>when wired, a double-click hands the sketch name to the page
+    /// (its own modal) instead of the built-in zoom overlay</summary>
+    [Parameter] public EventCallback<string> OnOpen { get; set; }
+    /// <summary>when wired, a sketch WITHOUT a snapshot is shown flagged (red
+    /// border) with a camera button that hands its name to the page, which
+    /// opens the editor to take one</summary>
+    [Parameter] public EventCallback<string> OnSnapshot { get; set; }
 
     private static readonly Regex SketchRef = new(@"\[([^\[\]\s]+)\]", RegexOptions.Compiled);
 
-    private record Seg(bool IsSketch, string Value, int Width = 0, string Name = "");
+    private record Seg(bool IsSketch, string Value, int Width = 0, string Name = "", string? Snap = null, int SnapH = 0);
+
+    // a snapshot's display height grows with the diagram's grid: a one-row
+    // triangle stays small, a two-row ladder or a snake gets room to be read
+    private int HeightFor(string json)
+    {
+        var g = AbCatDC.Kernel.QuiverImport.TryParse(json);
+        if (!g.Ok || g.Graph.VertexCount == 0) return Height;
+        var cols = g.Graph.Positions.Max(p => p.Item1) - g.Graph.Positions.Min(p => p.Item1) + 1;
+        var rows = g.Graph.Positions.Max(p => p.Item2) - g.Graph.Positions.Min(p => p.Item2) + 1;
+        var factor = 0.95 + 0.6 * (rows - 1) + 0.12 * Math.Max(0, cols - 2);
+        return (int)(Height * Math.Clamp(factor, 1.0, 3.2));
+    }
     private List<Seg> segs = new();
     // the EventCallback parameter defeats Blazor's unchanged-parameter skip, so
     // guard the re-segmentation (regex + per-sketch JSON parse) by hand
     private string? lastText;
     private IReadOnlyDictionary<string, string>? lastSketches;
+    private IReadOnlyDictionary<string, string>? lastSnapshots;
     private DotNetObjectReference<InlineExpr>? selfRef;
 
     // width proportional to the diagram's grid aspect, so wide diagrams don't
@@ -56,9 +95,10 @@
 
     protected override void OnParametersSet()
     {
-        if (Text == lastText && ReferenceEquals(Sketches, lastSketches)) return;
+        if (Text == lastText && ReferenceEquals(Sketches, lastSketches) && ReferenceEquals(Snapshots, lastSnapshots)) return;
         lastText = Text;
         lastSketches = Sketches;
+        lastSnapshots = Snapshots;
         segs = new List<Seg>();
         var t = Text ?? "";
         var pos = 0;
@@ -70,7 +110,9 @@
                 if (m.Index > pos) segs.Add(new(false, t[pos..m.Index]));
                 var trimmed = json.Trim();
                 var b64 = trimmed.StartsWith("[") ? Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmed)) : trimmed;
-                segs.Add(new(true, "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed", WidthFor(trimmed), name));
+                string? snap = null;
+                if (Snapshots != null && Snapshots.TryGetValue(name, out var png) && !string.IsNullOrEmpty(png)) snap = png;
+                segs.Add(new(true, "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + "&embed", WidthFor(trimmed), name, snap, snap is null ? Height : HeightFor(trimmed)));
                 pos = m.Index + m.Length;
             }
         }
@@ -79,6 +121,7 @@
 
     async Task ShowZoom(Seg s)
     {
+        if (OnOpen.HasDelegate) { await OnOpen.InvokeAsync(s.Name); return; }
         if (OnEdit.HasDelegate)
             await JS.InvokeVoidAsync("abEditor.showZoom", s.Value, selfRef ??= DotNetObjectReference.Create(this), s.Name);
         else

@@ -135,6 +135,78 @@ window.abEditor = {
         document.body.appendChild(ov);
     },
 
+    // Crop a PNG capture of the whole web view (base64) to the diagram drawn
+    // in the quiver frame `id`: the union of the cells' boxes, padded — or the
+    // frame itself when they cannot be read. Returns a data URL, scaled down
+    // to at most maxWidth device pixels wide.
+    cropSnapshot: function (b64, id, maxWidth) {
+        return new Promise(function (resolve) {
+            var el = document.getElementById(id);
+            if (!el || !b64) { resolve(''); return; }
+            var fr = el.getBoundingClientRect();
+            var box = null;
+            try {
+                var doc = el.contentDocument;
+                var cells = doc ? doc.querySelectorAll('.vertex, .edge, .arrow, .cell') : [];
+                cells.forEach(function (c) {
+                    var b = c.getBoundingClientRect();
+                    if (b.width === 0 && b.height === 0) return;
+                    if (!box) box = { l: b.left, t: b.top, r: b.right, b: b.bottom };
+                    else { box.l = Math.min(box.l, b.left); box.t = Math.min(box.t, b.top); box.r = Math.max(box.r, b.right); box.b = Math.max(box.b, b.bottom); }
+                });
+            } catch (e) { box = null; }
+            var pad = 18;
+            var x, y, w, h;
+            if (box) { x = fr.left + box.l - pad; y = fr.top + box.t - pad; w = box.r - box.l + 2 * pad; h = box.b - box.t + 2 * pad; }
+            else { x = fr.left; y = fr.top; w = fr.width; h = fr.height; }
+            x = Math.max(0, x); y = Math.max(0, y);
+            var dpr = window.devicePixelRatio || 1;
+            var img = new Image();
+            img.onload = function () {
+                var sx = x * dpr, sy = y * dpr, sw = Math.max(1, w * dpr), sh = Math.max(1, h * dpr);
+                var scale = Math.min(1, (maxWidth || 900) / sw);
+                var c = document.createElement('canvas');
+                c.width = Math.max(1, Math.round(sw * scale)); c.height = Math.max(1, Math.round(sh * scale));
+                var ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+                resolve(c.toDataURL('image/png'));
+            };
+            img.onerror = function () { resolve(''); };
+            img.src = 'data:image/png;base64,' + b64;
+        });
+    },
+
+    // A "teach me" arrow: bounces toward the element `targetId` with a note,
+    // until the element is clicked, teachOff() is called, or the timeout.
+    teach: function (targetId, text, ms) {
+        window.abEditor.teachOff();
+        var target = document.getElementById(targetId);
+        if (!target) return;
+        var el = document.createElement('div');
+        el.className = 'ab-teach';
+        el.innerHTML = '<div class="ab-teach-note"></div><div class="ab-teach-arrow">&#10148;</div>';
+        el.querySelector('.ab-teach-note').textContent = text || '';
+        document.body.appendChild(el);
+        var place = function () {
+            var r = target.getBoundingClientRect();
+            el.style.top = (r.top + r.height / 2) + 'px';
+            el.style.left = r.left + 'px';
+        };
+        place();
+        var onResize = function () { place(); };
+        window.addEventListener('resize', onResize);
+        var off = function () { window.abEditor.teachOff(); };
+        target.addEventListener('click', off, { once: true });
+        window.__abTeach = { el: el, onResize: onResize, timer: setTimeout(off, ms || 15000) };
+    },
+    teachOff: function () {
+        var t = window.__abTeach;
+        if (!t) return;
+        window.__abTeach = null;
+        try { clearTimeout(t.timer); window.removeEventListener('resize', t.onResize); t.el.remove(); } catch (e) { }
+    },
+
     loadItem: function (key) {
         try { return localStorage.getItem(key); } catch { return null; }
     },

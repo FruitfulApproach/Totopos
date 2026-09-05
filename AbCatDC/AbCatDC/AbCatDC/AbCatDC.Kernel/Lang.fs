@@ -9,6 +9,12 @@ type Name = string
 ///  - Polymorphic/Existential/Recursive bind a type variable α in their body.
 ///  - The Dependent* and Familial* cases bind a term variable x (of the first
 ///    type) in the second type.
+/// Which lines of a drawn diagram an exactness assertion ranges over.
+[<RequireQualifiedAccess>]
+type Axis =
+    | Rows
+    | Columns
+
 [<RequireQualifiedAccess>]
 type Ty =
     /// A base type constant (leaf; not in the table but needed to build anything)
@@ -25,6 +31,9 @@ type Ty =
     | Sketch of Name
     /// τ commutes — the assertion that the referenced diagram commutes
     | Commutes of Ty
+    /// [D] has exact rows / columns — every row (column) of the drawn diagram
+    /// is an exact sequence: exact(f, g) at each interior object
+    | Exact of Ty * Axis
     /// [D] in C — the sketch's objects and morphisms all live in category C;
     /// equivalent to the textual group of judgments X : C, …, f : X → Y, …
     | InCategory of Ty * Ty
@@ -102,7 +111,11 @@ module Ty =
     /// with an arbitrary type.
     let constantAtoms =
         Set.ofList [ "ℕ"; "ℤ"; "ℚ"; "ℝ"; "ℂ"
-                     "Mono"; "Epi"; "Ker"; "Coker"; "Functor"; "Additive" ]
+                     "Type"; "Prop"
+                     "Mono"; "Epi"; "Ker"; "Coker"; "Functor"; "Additive"
+                     // exactness is a built-in tag: "[D] has exact rows" elaborates
+                     // to exact(f, g) judgments, so the spelling must be rigid
+                     "exact" ]
 
     /// Function-like marker constants: "Ker f" parses as the marker applied to
     /// the next atom ("k : Ker f" — k is a kernel of f), encoded as a Product
@@ -160,11 +173,25 @@ module Ty =
     /// time and the UI sets this before any parsing batch.
     let mutable userConstants : Set<Name> = Set.empty
 
+    /// Sketch name -> quiver JSON of the ACTIVE system's diagrams (plus a proof's
+    /// own diagrams on the Chase page). Mutable module state for the same
+    /// reason as userConstants: the matcher is static, one system is active
+    /// at a time, and the UI sets this before any parsing/matching batch.
+    let mutable userSketches : Map<Name, string> = Map.empty
+    /// registrations into userSketches happen from the UI thread and a search
+    /// thread at once; take this lock around every read-modify-write
+    let sketchLock = obj ()
+
+    /// Whether "[D] commutes" carries its built-in ∀∃ meaning (true) or is the
+    /// opaque name-matched token of stored systems authored before that
+    /// semantics existed (false). Set by the UI from the system's version.
+    let mutable diagramSemantics : bool = true
+
     /// Is this atom a function-like rigid tag — a built-in marker (Ker/Coker),
     /// an identifier containing '_' (Mono_C), or a name the active system
     /// declared as a constant (Ring, Mod — so "Mod R" applies Mod to R)?
     let isTagAtom (n: Name) =
-        Set.contains n markerAtoms || n.Contains "_" || Set.contains n userConstants
+        Set.contains n markerAtoms || n.Contains "_" || Set.contains n userConstants || n = "exact"
 
     /// The tag at the head of a left-nested application spine, if any:
     /// Product(Product(Mono_C, A), B) → Some "Mono_C".
@@ -211,6 +238,7 @@ module Ty =
                 else ty
         | Ty.Power (b, n) -> Ty.Power (s b, n)
         | Ty.Commutes b -> Ty.Commutes (s b)
+        | Ty.Exact (b, ax) -> Ty.Exact (s b, ax)
         | Ty.InCategory (d, c) -> Ty.InCategory (s d, s c)
         | Ty.Entails (ctx, goal) ->
             // hypotheses bind their name for everything to the right
@@ -259,6 +287,7 @@ module Ty =
         match ty with
         | Ty.Atom _ | Ty.Var _ | Ty.Lit _ | Ty.Sketch _ -> ty
         | Ty.Commutes b -> Ty.Commutes (expandPowers b)
+        | Ty.Exact (b, ax) -> Ty.Exact (expandPowers b, ax)
         | Ty.InCategory (d, c) -> Ty.InCategory (expandPowers d, expandPowers c)
         | Ty.Entails (ctx, goal) ->
             let item = function
@@ -309,6 +338,9 @@ module Ty =
         | Ty.Power (b, n) -> $"{atom b}{superscript n}"
         | Ty.Sketch n -> $"[{n}]"
         | Ty.Commutes b -> $"{atom b} commutes"
+        | Ty.Exact (b, ax) ->
+            let axis = match ax with Axis.Rows -> "rows" | Axis.Columns -> "columns"
+            $"{atom b} has exact {axis}"
         | Ty.InCategory (d, c) -> $"{atom d} in {atom c}"
         | Ty.Entails (ctx, goal) ->
             let item = function

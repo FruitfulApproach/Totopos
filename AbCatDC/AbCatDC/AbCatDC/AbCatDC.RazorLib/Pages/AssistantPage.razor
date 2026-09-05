@@ -1,0 +1,506 @@
+@page "/assistant"
+@using AbCatDC.Kernel
+@using System.Text.Json
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="pa-page" @onclick="() => menu = null">
+    <div class="pa-left">
+        <div class="pa-head">
+            <h5><i class="fa-solid fa-wand-magic-sparkles"></i> Proof assistant</h5>
+            <select class="ab-text-input pt-select" value="@blob.Active" @onchange="OnSessionSelected">
+                @foreach (var s in blob.Sessions) { <option value="@s.Name">@s.Name</option> }
+            </select>
+            <button type="button" class="ab-kind-btn danger" disabled="@(Active.Tree.Nodes.Count == 0)" @onclick="ResetSession" title="back to the starting diagram"><i class="fa-solid fa-rotate-left"></i> Restart</button>
+            <button type="button" class="ab-kind-btn danger" disabled="@(Active.Tree.Nodes.Count == 0)" @onclick="UnloadSession" title="back to the statement list"><i class="fa-solid fa-xmark"></i></button>
+            <label class="pa-settings" title="node positions snap to the grid">
+                <input type="checkbox" checked="@blob.Snap" @onchange="e => { blob.Snap = e.Value is bool b && b; _ = Save(); }" /> snap to grid
+                <input type="number" class="ab-text-input" min="5" max="100" step="5" value="@blob.Grid" @onchange="OnGridChanged" /> px
+            </label>
+        </div>
+
+        @if (Active.Tree.Nodes.Count == 0)
+        {
+            <div class="pa-empty">
+                <p class="ab-muted">Pick a statement, start from its picture, and prove it one inference rule at a time.</p>
+                @for (var i = 0; i < ExampleTrees.All.Length; i++)
+                {
+                    var idx = i;
+                    <button type="button" class="@(idx == 0 ? "ab-btn-primary pa-load-main" : "ab-kind-btn pa-load")" @onclick="() => LoadExample(idx)">
+                        <i class="fa-solid fa-diagram-project"></i> Load @ExampleTrees.All[idx].Name starting diagram
+                    </button>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="pa-goal @(GoalProven ? "proven" : "")">
+                <span class="pa-label"><i class="fa-solid fa-flag-checkered"></i> Goal</span>
+                <InlineExpr Text="@Active.Goal" Sketches="sketchMap" Snapshots="snapshotMap" Height="56" OnOpen="OpenSketch" OnSnapshot="OpenSketchForSnapshot" />
+                @if (GoalProven) { <span class="ab-proven-chip"><i class="fa-solid fa-check"></i> PROVEN</span> }
+                <span class="ab-muted" style="margin-left:auto">drag a rule from the list onto the canvas, or apply a green one</span>
+            </div>
+            <div class="pa-canvas-wrap">
+                <TreeCanvas @ref="canvas" Tree="Active.Tree" Sketches="sketchMap" Snapshots="snapshotMap" Snap="@blob.Snap" Grid="@blob.Grid"
+                            CanvasId="pa-tc" OnChanged="OnTreeChanged" OnDropAt="OnRuleDropped"
+                            OnOpenSketch="OpenSketch" OnSnapshot="OpenSketchForSnapshot" OnEditRule="EditRuleInEditor" OnMessage="m => toast = m" />
+            </div>
+
+            <div class="pa-buttons">
+                @foreach (var b in ApplicableButtons)
+                {
+                    var rule = b;
+                    <button type="button" class="pa-macro" title="@rule.Description — right-click for more"
+                            @onclick="() => ApplyRule(rule, null)" @oncontextmenu="e => OpenMenu(e, rule)" @oncontextmenu:preventDefault>
+                        <i class="fa-solid fa-bolt"></i> @rule.Name
+                    </button>
+                }
+                @if (!recording)
+                {
+                    <button type="button" class="ab-kind-btn pa-rec" @onclick="BeginNaming" title="record the next rule applications as a new button">
+                        <i class="fa-solid fa-circle" style="color: var(--ab-bad)"></i> Add button
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="ab-btn-primary sm pa-rec" @onclick="EndRecording" title="stop recording and make the rule">
+                        <i class="fa-solid fa-square"></i> End button “@newButtonName” (@recorded.Count step@(recorded.Count == 1 ? "" : "s"))
+                    </button>
+                    <button type="button" class="ab-kind-btn" @onclick="CancelRecording">cancel</button>
+                }
+                @if (namingButton)
+                {
+                    <span class="pa-naming">
+                        <input class="ab-text-input" placeholder="button name" value="@newButtonName" @oninput="e => newButtonName = e.Value?.ToString() ?? string.Empty" @onkeydown="OnNameKey" />
+                        <button type="button" class="ab-btn-primary sm" disabled="@(string.IsNullOrWhiteSpace(newButtonName))" @onclick="StartRecording">Start</button>
+                    </span>
+                }
+            </div>
+            @if (toast is not null) { <div class="ab-error">@toast <button type="button" class="ab-link-btn" @onclick="() => toast = null">dismiss</button></div> }
+        }
+    </div>
+
+    <aside class="pa-rules">
+        <div class="pa-rules-head">
+            <span><i class="fa-solid fa-scale-balanced"></i> Rules</span>
+            <span class="ab-muted">@(checking ? "checking…" : $"{applicable.Count} apply")</span>
+        </div>
+        @foreach (var k in SystemStore.Kinds)
+        {
+            var group = sys.Rules.Select((r, i) => (r, i)).Where(t => t.r.Kind == k).ToList();
+            if (group.Count == 0) { continue; }
+            var kind = k;
+            var isOpen = openKinds.Contains(kind);
+            <div class="pa-kind">
+                <div class="pa-kind-head" @onclick="() => ToggleKind(kind)">
+                    <i class="fa-solid @(isOpen ? "fa-chevron-down" : "fa-chevron-right")"></i>
+                    @k <span class="ab-muted">@group.Count(t => applicable.ContainsKey(t.i))/@group.Count</span>
+                </div>
+                @foreach (var (r, i) in group)
+                {
+                    if (!isOpen) { continue; }
+                    var idx = i;
+                    var rr = r;
+                    var ok = applicable.ContainsKey(idx);
+                    <div class="pa-rule pa-dragrule @(ok ? "ok" : "") @(selRule == idx ? "sel" : "")" title="@r.Description — drag onto the canvas"
+                         draggable="true" @ondragstart="() => draggingRule = rr"
+                         @onclick="() => selRule = idx" @ondblclick="() => ApplyRule(rr, null)">
+                        <span class="pa-rule-name">@(string.IsNullOrWhiteSpace(r.Name) ? $"({k} rule {idx + 1})" : r.Name)</span>
+                        @if (r.IsButton) { <i class="fa-solid fa-bolt pa-rule-btn" title="a button"></i> }
+                        @if (ok) { <button type="button" class="pa-apply" @onclick="() => ApplyRule(rr, null)" @onclick:stopPropagation>apply</button> }
+                    </div>
+                }
+            </div>
+        }
+        @if (selRule >= 0 && selRule < sys.Rules.Count)
+        {
+            var r = sys.Rules[selRule];
+            <div class="pa-rule-detail">
+                <div class="pt-ctx-title">@r.Name <span class="ab-muted">@r.Kind</span>
+                    <button type="button" class="pa-pencil" style="opacity:1" title="edit in the rule editor" @onclick="() => EditRuleInEditor(r.Name)"><i class="fa-solid fa-pencil"></i></button>
+                </div>
+                @foreach (var p in r.Premises) { <div class="pa-rule-line prem">@p</div> }
+                <div class="pa-rule-bar"></div>
+                @foreach (var c in r.Conclusions) { <div class="pa-rule-line">@c</div> }
+                @if (!string.IsNullOrEmpty(r.Description)) { <p class="ab-muted">@r.Description</p> }
+                @if (applicable.TryGetValue(selRule, out var outc)) { <div class="pa-rule-would">would add: @string.Join(" · ", outc.NewConclusions)</div> }
+            </div>
+        }
+    </aside>
+
+    @if (modalName is not null && sketchMap.TryGetValue(modalName, out var modalJson))
+    {
+        <SketchModal Name="@modalName" Json="@modalJson" Snapshot="@(snapshotMap.TryGetValue(modalName, out var msnap) ? msnap : null)"
+                     StartEditing="@modalEdit" OnSaved="OnSketchSaved" OnSnapshot="OnSketchSnapshot" OnClosed="() => modalName = null" />
+    }
+
+    @if (menu is not null)
+    {
+        <div class="pa-menu" style="left:@(Px(menu.X)); top:@(Px(menu.Y))" @onclick:stopPropagation>
+            <button type="button" @onclick="() => LoadInProofTree(menu.Rule)"><i class="fa-solid fa-sitemap"></i> Load in proof tree</button>
+            <button type="button" @onclick="() => ApplyRule(menu.Rule, null)"><i class="fa-solid fa-bolt"></i> Apply</button>
+            <button type="button" @onclick="GoRules"><i class="fa-solid fa-scale-balanced"></i> Open in rule editor</button>
+            <button type="button" class="danger" @onclick="() => RemoveButton(menu.Rule)"><i class="fa-solid fa-trash-can"></i> Delete button</button>
+        </div>
+    }
+</div>
+
+@code {
+    class SessionDto
+    {
+        public string Name { get; set; } = "";
+        public string Goal { get; set; } = "";
+        public int GoalNode { get; set; } = -1;
+        public TreeDto Tree { get; set; } = new();
+    }
+    class AssistantBlob
+    {
+        public string Active { get; set; } = "";
+        public bool Snap { get; set; } = true;
+        public double Grid { get; set; } = 20;
+        public List<SessionDto> Sessions { get; set; } = new();
+    }
+    class Menu { public double X, Y; public RuleDto Rule = new(); }
+    record Recorded(RuleDto Rule, string[] Used, string[] Added);
+
+    const string StoreKey = "abcatdc-assistant";
+    SystemDto sys = new();
+    AssistantBlob blob = new();
+    SessionDto Active => blob.Sessions.FirstOrDefault(s => s.Name == blob.Active) ?? blob.Sessions.FirstOrDefault() ?? new SessionDto();
+    TreeCanvas? canvas;
+    Dictionary<string, string> sketchMap = new(), snapshotMap = new();
+    Dictionary<int, ApplyOutcome> applicable = new();
+    List<(string Text, int Node, int Index)> facts = new();
+    HashSet<string> openKinds = new() { "Construction", "Elimination", "Theorem" };
+    bool loaded, checking, recording, namingButton;
+    int selRule = -1, checkSerial;
+    string? toast;
+    Menu? menu;
+    RuleDto? draggingRule;
+    string newButtonName = "";
+    List<Recorded> recorded = new();
+    HashSet<string> stepsAtStart = new();
+
+    bool GoalProven => canvas is not null && Active.GoalNode >= 0 && canvas.IsProven(Active.GoalNode);
+    IEnumerable<RuleDto> ApplicableButtons => sys.Rules.Select((r, i) => (r, i)).Where(t => t.r.IsButton && applicable.ContainsKey(t.i)).Select(t => t.r);
+    static string Px(double v) => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || loaded) return;
+        loaded = true;
+        sys = await SystemStore.LoadAsync(JS);
+        Api.SetConstants(sys.Constants.ToArray());
+        Api.SetDiagramSemantics(sys.DiagramSemantics);
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("abEditor.loadItem", StoreKey);
+            if (!string.IsNullOrEmpty(json)) blob = JsonSerializer.Deserialize<AssistantBlob>(json) ?? new();
+        }
+        catch { }
+        if (blob.Sessions.Count == 0) blob.Sessions.Add(new SessionDto { Name = "Session 1" });
+        if (blob.Sessions.All(s => s.Name != blob.Active)) blob.Active = blob.Sessions[0].Name;
+        Register();
+        StateHasChanged();
+        await Task.Yield();
+        await Recheck();
+    }
+
+    async Task Save() { try { await JS.InvokeVoidAsync("abEditor.saveItem", StoreKey, JsonSerializer.Serialize(blob)); } catch { } }
+
+    void Register()
+    {
+        var all = new Dictionary<string, string>();
+        var snaps = new Dictionary<string, string>();
+        foreach (var s in sys.Sketches.Concat(Active.Tree.Sketches)) { all[s.Name] = s.Json; if (!string.IsNullOrEmpty(s.Snapshot)) snaps[s.Name] = s.Snapshot!; }
+        sketchMap = all;
+        snapshotMap = snaps;
+        Api.SetSketches(all.Select(kv => Tuple.Create(kv.Key, kv.Value)).ToArray());
+    }
+
+    async Task OnGridChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var g)) blob.Grid = Math.Clamp(g, 5, 100);
+        await Save();
+    }
+
+    /// <summary>Which rules apply to what the tree has established — every rule, off the UI thread.</summary>
+    async Task Recheck()
+    {
+        if (canvas is null) return;
+        var serial = ++checkSerial;
+        checking = true;
+        facts = canvas.Facts();
+        var steps = facts.Select(f => f.Text).ToArray();
+        var rules = sys.Rules.ToList();
+        var result = await Task.Run(() =>
+        {
+            var map = new Dictionary<int, ApplyOutcome>();
+            for (var i = 0; i < rules.Count; i++)
+            {
+                var r = rules[i];
+                if (r.Premises.Count + r.Conclusions.Count == 0) continue;
+                var o = Api.TryApplyRule(r.Premises.ToArray(), r.Conclusions.ToArray(), steps, r.Kind == "Construction");
+                if (o.Ok && o.NewConclusions.Any(c => !steps.Any(s => Api.SameExpr(s, c)))) map[i] = o;
+            }
+            return map;
+        });
+        if (serial != checkSerial) return;
+        applicable = result;
+        checking = false;
+        StateHasChanged();
+    }
+
+    async Task OnTreeChanged() { await Save(); await Recheck(); }
+
+    async Task OnSessionSelected(ChangeEventArgs e)
+    {
+        blob.Active = e.Value?.ToString() ?? blob.Active;
+        Register();
+        await Save();
+        await Task.Yield();
+        await Recheck();
+    }
+
+    /// <summary>The example's givens and goal become nodes; its proof-in-progress is left behind — that is the user's job.</summary>
+    async Task LoadExample(int idx)
+    {
+        var ex = ExampleTrees.All[idx];
+        var t = ex.Build();
+        var tree = new TreeDto { Name = ex.Name, SystemName = sys.Name, Description = t.Description, Sketches = t.Sketches.Select(k => new SketchDto { Name = k.Name, Json = k.Json, Snapshot = k.Snapshot }).ToList() };
+        foreach (var k in tree.Sketches) if (string.IsNullOrEmpty(k.Snapshot)) k.Snapshot = sys.Sketches.FirstOrDefault(x => x.Name == k.Name)?.Snapshot;
+        var s = new SessionDto { Name = ex.Name, Tree = tree };
+        var x = 40.0;
+        foreach (var n in t.Nodes.Where(n => !n.IsRule && n.Role == "given"))
+        {
+            tree.Nodes.Add(new TreeNodeDto { Id = tree.NextId++, Role = "given", Premises = new() { n.Conclusions[0] }, Conclusions = new() { n.Conclusions[0] }, X = x, Y = 40 });
+            x += 340;
+        }
+        var goal = t.Nodes.FirstOrDefault(n => !n.IsRule && n.Role == "goal");
+        if (goal is not null)
+        {
+            var gid = tree.NextId++;
+            tree.Nodes.Add(new TreeNodeDto { Id = gid, Role = "goal", Premises = new() { goal.Conclusions[0] }, Conclusions = new() { goal.Conclusions[0] }, X = 200, Y = 560 });
+            s.Goal = goal.Conclusions[0];
+            s.GoalNode = gid;
+        }
+        blob.Sessions.RemoveAll(k => k.Name == s.Name);
+        blob.Sessions.Add(s);
+        blob.Active = s.Name;
+        Register();
+        await Save();
+        StateHasChanged();
+        await Task.Yield();
+        await Recheck();
+    }
+
+    async Task ResetSession()
+    {
+        var t = Active.Tree;
+        t.Nodes.RemoveAll(n => n.IsRule || n.Role == "lemma");
+        t.Wires.Clear();
+        CancelRecording();
+        canvas?.Rebuild();
+        await OnTreeChanged();
+    }
+
+    async Task UnloadSession()
+    {
+        Active.Tree = new TreeDto();
+        Active.Goal = "";
+        Active.GoalNode = -1;
+        CancelRecording();
+        await Save();
+    }
+
+    // ---- applying rules ----------------------------------------------------------------
+    async Task OnRuleDropped((double x, double y) at)
+    {
+        var r = draggingRule;
+        draggingRule = null;
+        if (r is null) return;
+        await ApplyRule(r, at);
+    }
+
+    /// <summary>Place the rule (at the drop point, or under its sources) and wire every premise the
+    /// automatic match found; a conclusion matching the goal is wired into it.</summary>
+    async Task ApplyRule(RuleDto r, (double x, double y)? at)
+    {
+        menu = null;
+        if (canvas is null) return;
+        facts = canvas.Facts();
+        var steps = facts.Select(f => f.Text).ToArray();
+        var outc = await Task.Run(() => Api.TryApplyRule(r.Premises.ToArray(), r.Conclusions.ToArray(), steps, r.Kind == "Construction"));
+        double x, y;
+        if (at is not null) { x = at.Value.x; y = at.Value.y; }
+        else
+        {
+            var srcs = outc.Ok ? outc.UsedSteps.Distinct().Where(i => i < facts.Count).Select(i => Active.Tree.Nodes.FirstOrDefault(n => n.Id == facts[i].Node)).Where(n => n is not null).ToList() : new();
+            x = srcs.Count > 0 ? srcs.Average(n => n!.X) : 60;
+            y = srcs.Count > 0 ? srcs.Max(n => n!.Y + canvas.SizeOf(n!.Id).h) + 80 : 220;
+        }
+        var id = await canvas.AddRuleNode(r, x, y);
+        if (id < 0) return;
+        if (!outc.Ok) { toast = $"{r.Name} placed, but nothing here matches its premises yet ({outc.Error}) — wire them by hand."; await OnTreeChanged(); return; }
+        toast = null;
+        // witnesses drawn dashed join the session's pictures
+        foreach (var (name, json) in outc.NewSketches)
+        {
+            var ex = Active.Tree.Sketches.FirstOrDefault(k => k.Name == name);
+            if (ex is null) Active.Tree.Sketches.Add(new SketchDto { Name = name, Json = json }); else ex.Json = json;
+        }
+        Register();
+        // premise i was matched by fact UsedSteps[i] (or a judgment that fact's picture supplies)
+        var used = new List<string>();
+        for (var i = 0; i < r.Premises.Count && i < outc.UsedSteps.Length; i++)
+        {
+            var fi = outc.UsedSteps[i];
+            if (fi < 0 || fi >= facts.Count) continue;
+            var f = facts[fi];
+            used.Add(f.Text);
+            await canvas.Wire(f.Node, f.Index, id, i, silent: true);
+        }
+        // the goal, if a conclusion reaches it
+        var added = new List<string>();
+        for (var c = 0; c < r.Conclusions.Count; c++)
+        {
+            var text = canvas.JudgmentText(id, c, false) ?? "";
+            added.Add(text);
+            if (Active.GoalNode >= 0 && Api.SameExpr(text, Active.Goal)) await canvas.Wire(id, c, Active.GoalNode, 0, silent: true);
+        }
+        if (recording) recorded.Add(new Recorded(r, used.Distinct().ToArray(), added.ToArray()));
+        await OnTreeChanged();
+    }
+
+    // ---- buttons (recorded macros) ------------------------------------------------------
+    void BeginNaming() { namingButton = true; newButtonName = ""; }
+    void OnNameKey(KeyboardEventArgs e) { if (e.Key == "Enter") StartRecording(); }
+
+    void StartRecording()
+    {
+        if (string.IsNullOrWhiteSpace(newButtonName)) return;
+        namingButton = false;
+        recording = true;
+        recorded.Clear();
+        stepsAtStart = (canvas?.Facts() ?? new()).Select(f => f.Text).ToHashSet();
+    }
+
+    void CancelRecording() { recording = false; namingButton = false; recorded.Clear(); }
+
+    async Task EndRecording()
+    {
+        recording = false;
+        if (recorded.Count == 0) { toast = "nothing was recorded"; return; }
+        var derived = recorded.SelectMany(x => x.Added).ToList();
+        var premises = recorded.SelectMany(x => x.Used).Where(u => stepsAtStart.Contains(u) && !derived.Any(d => Api.SameExpr(d, u))).Distinct().ToList();
+        var conclusions = !string.IsNullOrWhiteSpace(Active.Goal) && derived.Any(d => Api.SameExpr(d, Active.Goal)) ? new List<string> { Active.Goal } : recorded[^1].Added.ToList();
+        if (conclusions.Count == 0) { toast = "the recording produced no new step"; return; }
+        var name = newButtonName.Trim();
+        var rule = new RuleDto { Name = name, Kind = "Theorem", IsButton = true, Premises = premises, Conclusions = conclusions, Description = $"Recorded in the proof assistant: {string.Join(" → ", recorded.Select(x => x.Rule.Name))}." };
+        foreach (var text in premises.Concat(conclusions))
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(text, @"\[([^\[\]\s]+)\]"))
+            {
+                var nm = m.Groups[1].Value;
+                if (sys.Sketches.All(k => k.Name != nm) && sketchMap.TryGetValue(nm, out var json))
+                    sys.Sketches.Add(new SketchDto { Name = nm, Json = json, Snapshot = snapshotMap.TryGetValue(nm, out var sn) ? sn : null });
+            }
+        sys.Rules.RemoveAll(x => x.Name == name && x.IsButton);
+        sys.Rules.Add(rule);
+        await SystemStore.SaveAsync(JS, sys);
+        recorded.Clear();
+        Register();
+        await Recheck();
+        toast = null;
+    }
+
+    void OpenMenu(MouseEventArgs e, RuleDto r) => menu = new Menu { X = e.ClientX, Y = e.ClientY, Rule = r };
+    void GoRules() { var r = menu?.Rule; menu = null; if (r is not null) EditRuleInEditor(r.Name); else Nav.NavigateTo("rules"); }
+    void EditRuleInEditor(string name) => Nav.NavigateTo("rules?edit=" + Uri.EscapeDataString(name));
+
+    async Task RemoveButton(RuleDto r)
+    {
+        menu = null;
+        sys.Rules.Remove(r);
+        await SystemStore.SaveAsync(JS, sys);
+        await Recheck();
+    }
+
+    /// <summary>A tree of the rule: premises as givens wired into the rule node, whose conclusion is wired into the goal.</summary>
+    async Task LoadInProofTree(RuleDto r)
+    {
+        menu = null;
+        var t = new TreeDto { Name = r.Name, SystemName = sys.Name, Description = r.Description };
+        int Id() => t.NextId++;
+        var givens = new List<int>();
+        var x = 40.0;
+        foreach (var p in r.Premises) { var id = Id(); givens.Add(id); t.Nodes.Add(new TreeNodeDto { Id = id, Role = "given", Premises = new() { p }, Conclusions = new() { p }, X = x, Y = 40 }); x += 360; }
+        var rid = Id();
+        t.Nodes.Add(new TreeNodeDto { Id = rid, IsRule = true, Role = "rule", RuleName = r.Name, RuleKind = r.Kind, Premises = r.Premises.ToList(), Conclusions = r.Conclusions.ToList(), X = 120, Y = 300 });
+        var gx = 200.0;
+        for (var i = 0; i < r.Conclusions.Count; i++)
+        {
+            var gid = Id();
+            t.Nodes.Add(new TreeNodeDto { Id = gid, Role = "goal", Premises = new() { r.Conclusions[i] }, Conclusions = new() { r.Conclusions[i] }, X = gx, Y = 560 });
+            t.Wires.Add(new TreeWireDto { Id = Id(), Src = rid, SrcIdx = i, Dst = gid, DstIdx = 0 });
+            gx += 360;
+        }
+        for (var i = 0; i < givens.Count; i++) t.Wires.Add(new TreeWireDto { Id = Id(), Src = givens[i], SrcIdx = 0, Dst = rid, DstIdx = i });
+        foreach (var text in r.Premises.Concat(r.Conclusions))
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(text, @"\[([^\[\]\s]+)\]"))
+            {
+                var nm = m.Groups[1].Value;
+                if (t.Sketches.All(k => k.Name != nm) && sketchMap.TryGetValue(nm, out var json))
+                    t.Sketches.Add(new SketchDto { Name = nm, Json = json, Snapshot = snapshotMap.TryGetValue(nm, out var sn) ? sn : null });
+            }
+        TreesBlob trees = new();
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("abEditor.loadItem", "abcatdc-trees");
+            if (!string.IsNullOrEmpty(json)) trees = JsonSerializer.Deserialize<TreesBlob>(json) ?? new();
+        }
+        catch { }
+        trees.Trees.RemoveAll(k => k.Name == t.Name);
+        trees.Trees.Add(t);
+        trees.Active = t.Name;
+        try { await JS.InvokeVoidAsync("abEditor.saveItem", "abcatdc-trees", JsonSerializer.Serialize(trees)); } catch { }
+        Nav.NavigateTo("tree");
+    }
+
+    void ToggleKind(string k) { if (!openKinds.Remove(k)) openKinds.Add(k); }
+
+    // ---- the diagram modal -------------------------------------------------------------
+    string? modalName;
+    bool modalEdit;
+    void OpenSketch(string name) { if (sketchMap.ContainsKey(name)) { modalName = name; modalEdit = false; } }
+    void OpenSketchForSnapshot(string name) { if (sketchMap.ContainsKey(name)) { modalName = name; modalEdit = true; } }
+
+    SketchDto OwnSketch(string name)
+    {
+        var t = Active.Tree;
+        var own = t.Sketches.FirstOrDefault(k => k.Name == name);
+        if (own is not null) return own;
+        var sysSk = sys.Sketches.FirstOrDefault(k => k.Name == name);
+        own = new SketchDto { Name = name, Json = sysSk?.Json ?? "", Snapshot = sysSk?.Snapshot };
+        t.Sketches.Add(own);
+        return own;
+    }
+
+    async Task OnSketchSaved(string json)
+    {
+        if (modalName is null) return;
+        OwnSketch(modalName).Json = json;
+        Register();
+        canvas?.Rebuild();
+        await OnTreeChanged();
+    }
+
+    async Task OnSketchSnapshot(string url)
+    {
+        if (modalName is null) return;
+        OwnSketch(modalName).Snapshot = url;
+        var sysSk = sys.Sketches.FirstOrDefault(k => k.Name == modalName);
+        if (sysSk is not null) { sysSk.Snapshot = url; await SystemStore.SaveAsync(JS, sys); }
+        Register();
+        await Save();
+    }
+}

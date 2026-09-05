@@ -1,0 +1,1340 @@
+@page "/tree"
+@using AbCatDC.Kernel
+@using System.Text.Json
+@inject IJSRuntime JS
+@inject IServiceProvider Services
+@implements IDisposable
+
+<div class="pt-page">
+    @if (topOpen)
+    {
+        <div class="pt-top">
+            <div class="pt-toolbar">
+                <div class="pt-tool-group">
+                    <span class="pt-tool-label"><i class="fa-solid fa-folder-open"></i> Tree</span>
+                    <select class="ab-text-input pt-select" value="@blob.Active" @onchange="OnTreeSelected">
+                        @foreach (var t in blob.Trees)
+                        {
+                            <option value="@t.Name">@t.Name</option>
+                        }
+                    </select>
+                    <button type="button" class="ab-kind-btn" @onclick="NewTree" title="new tree"><i class="fa-solid fa-plus"></i></button>
+                    <button type="button" class="ab-kind-btn" @onclick="() => renaming = !renaming" title="rename"><i class="fa-solid fa-i-cursor"></i></button>
+                    <button type="button" class="ab-kind-btn danger" @onclick="DeleteTree" title="delete tree"><i class="fa-solid fa-trash-can"></i></button>
+                    <button type="button" class="ab-kind-btn danger" disabled="@(Active.Nodes.Count == 0)" @onclick="ClearTree" title="remove every node"><i class="fa-solid fa-eraser"></i></button>
+                </div>
+                <div class="pt-tool-group">
+                    <span class="pt-tool-label"><i class="fa-solid fa-flag-checkered"></i> Example</span>
+                    <select class="ab-text-input pt-select" value="@selExample" @onchange="e => selExample = int.TryParse(e.Value?.ToString(), out var v) ? v : -1">
+                        <option value="-1">— a goal with its proof in progress —</option>
+                        @for (var i = 0; i < ExampleTrees.All.Length; i++)
+                        {
+                            <option value="@i">@ExampleTrees.All[i].Name</option>
+                        }
+                    </select>
+                    <button type="button" class="ab-btn-primary sm" disabled="@(selExample < 0)" @onclick="LoadExample"><i class="fa-solid fa-download"></i> Load</button>
+                </div>
+                <div class="pt-tool-group">
+                    <span class="pt-tool-label"><i class="fa-solid fa-scale-balanced"></i> Rule</span>
+                    <select class="ab-text-input pt-select" value="@selRuleIdx" @onchange="e => selRuleIdx = int.TryParse(e.Value?.ToString(), out var v) ? v : -1">
+                        <option value="-1">— choose a rule —</option>
+                        @foreach (var k in SystemStore.Kinds)
+                        {
+                            var group = sys.Rules.Select((r, i) => (r, i)).Where(t => t.r.Kind == k).ToList();
+                            if (group.Count == 0) { continue; }
+                            <optgroup label="@k">
+                                @foreach (var (r, i) in group)
+                                {
+                                    <option value="@i">@(string.IsNullOrWhiteSpace(r.Name) ? $"({k} rule {i + 1})" : r.Name)</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <button type="button" class="ab-btn-primary sm" disabled="@(selRuleIdx < 0)" @onclick="AddRuleNode"><i class="fa-solid fa-plus"></i> Add rule</button>
+                </div>
+                <div class="pt-tool-group pt-stmt">
+                    <span class="pt-tool-label"><i class="fa-solid fa-quote-left"></i></span>
+                    <select class="ab-text-input pt-select pt-role" value="@stmtRole" @onchange="OnRoleChanged">
+                        <option value="given">given</option>
+                        <option value="goal">goal</option>
+                        <option value="lemma">lemma</option>
+                    </select>
+                    <div class="pt-stmt-editor">
+                        <SymbolEditor Id="tree-stmt" Rows="1" ShowPad="false" SubmitOnEnter="true"
+                                      Placeholder="a statement, e.g. Γ ⊢ f : A → B — Enter adds it"
+                                      Value="@stmtInput" ValueChanged="v => stmtInput = v" OnSubmit="AddStatementNode" />
+                    </div>
+                </div>
+                <div class="pt-tool-group">
+                    <button type="button" class="ab-kind-btn" @onclick="() => SetZoomFromUi(zoom / 1.1)" title="zoom out (Ctrl + wheel)"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <button type="button" class="ab-kind-btn" @onclick="() => SetZoomFromUi(1)" title="reset zoom to 100% (Ctrl + wheel zooms about the cursor)">@((int)Math.Round(zoom * 100))%</button>
+                    <button type="button" class="ab-kind-btn" @onclick="() => SetZoomFromUi(zoom * 1.1)" title="zoom in (Ctrl + wheel)"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button type="button" class="ab-kind-btn" @onclick="AutoLayout" disabled="@(Active.Nodes.Count == 0)" title="lay the tree out in layers"><i class="fa-solid fa-diagram-project"></i> Auto-layout</button>
+                    <button type="button" class="ab-kind-btn" @onclick="() => helpOpen = !helpOpen" title="how to use this page"><i class="fa-solid fa-circle-question"></i></button>
+                </div>
+            </div>
+            @if (renaming)
+            {
+                <div class="pt-toolbar">
+                    <input class="ab-text-input" style="max-width:20rem; margin:0" value="@renameText"
+                           @oninput="e => renameText = e.Value?.ToString() ?? string.Empty" />
+                    <button type="button" class="ab-kind-btn" @onclick="ApplyRename">OK</button>
+                </div>
+            }
+            @if (toast is not null)
+            {
+                <div class="ab-error" style="margin:.4rem 0 0">@toast <button type="button" class="ab-link-btn" @onclick="() => toast = null">dismiss</button></div>
+            }
+            @if (helpOpen)
+            {
+                <p class="ab-muted pt-help">
+                    Bring rules onto the canvas and wire a conclusion into the premise it discharges: press anywhere on a
+                    node to drag it; drag from the <b>dot under a conclusion</b> onto a <b>premise</b> to wire. Every
+                    judgment is coloured by what it is up to substitution — same colour, same statement; a dashed chip
+                    still has unbound metavariables. <b>Givens</b> are established by assumption, a <b>goal</b> is proven
+                    once a wire from an established conclusion reaches it (✓). A proof is a DAG: a cycle is shown in red.
+                    The search in the side panel works backward from open obligations and forward from what is
+                    established; the panels collapse from the handles on their dividers.
+                    @if (!string.IsNullOrEmpty(Active.Description)) { <br /><i>@Active.Description</i> }
+                </p>
+            }
+        </div>
+    }
+    <div class="pt-hdivider" @onclick="() => { topOpen = !topOpen; needMeasure = true; }" title="@(topOpen ? "collapse the toolbar" : "expand the toolbar")">
+        <span class="pt-grip"><i class="fa-solid @(topOpen ? "fa-chevron-up" : "fa-chevron-down")"></i> @(topOpen ? "" : Active.Name)</span>
+    </div>
+
+    <div class="pt-main">
+        <div class="pt-canvas" id="pt-canvas" @onpointermove="OnMove" @onpointerup="OnUp" @onpointercancel="OnUp" @onpointerleave="OnLeave">
+            <div class="pt-surface" id="pt-surface" style="width:@(Px(SurfaceW)); height:@(Px(SurfaceH)); zoom:@(ZoomText)">
+                <svg class="pt-wires" width="@SurfaceW" height="@SurfaceH">
+                    @foreach (var w in Active.Wires)
+                    {
+                        var a = PortPos(w.Src, w.SrcIdx, false);
+                        var b = PortPos(w.Dst, w.DstIdx, true);
+                        if (a is null || b is null) { continue; }
+                        var cls = "pt-wire"
+                            + (report.CycleWires.Contains(w.Id) ? " cycle" : "")
+                            + (badWires.ContainsKey(w.Id) ? " bad" : "")
+                            + (selectedWire == w.Id ? " sel" : "")
+                            + (lastWires.Contains(w.Id) ? " fresh" : "");
+                        <path d="@Bezier(a.Value, b.Value)" class="@cls" @onclick="() => selectedWire = w.Id" @onclick:stopPropagation>
+                            @if (badWires.TryGetValue(w.Id, out var why)) { <title>@why</title> }
+                        </path>
+                        @if (selectedWire == w.Id)
+                        {
+                            var mx = (a.Value.x + b.Value.x) / 2;
+                            var my = (a.Value.y + b.Value.y) / 2;
+                            <g class="pt-wire-del" @onclick="() => RemoveWire(w.Id)" @onclick:stopPropagation>
+                                <circle cx="@mx" cy="@my" r="9" />
+                                <text x="@mx" y="@(my + 4)" text-anchor="middle">×</text>
+                            </g>
+                        }
+                    }
+                    @if (pendingSrc is not null)
+                    {
+                        <path d="@Bezier((pendingStartX, pendingStartY), (pendingX, pendingY))" class="pt-wire pending" />
+                    }
+                </svg>
+                @foreach (var n in Active.Nodes)
+                {
+                    var onCycle = report.CycleNodes.Contains(n.Id);
+                    var proven = provenNodes.Contains(n.Id);
+                    var nodeCls = "pt-node " + (n.IsRule ? "rule" : "stmt " + n.Role)
+                        + (onCycle ? " cycle" : "") + (n.Error is not null ? " broken" : "")
+                        + (proven ? " proven" : "") + (lastNode == n.Id ? " fresh" : "");
+                    <div class="@nodeCls" id="pt-node-@n.Id" data-node="@n.Id" style="left:@(Px(n.X)); top:@(Px(n.Y))" @key="n.Id"
+                         @onpointerdown="e => StartDrag(n, e)" @ondblclick="OnNodeDblClick">
+                        @if (!n.IsRule)
+                        {
+                            var sj = Judgment(n.Id, 0, false);
+                            var sEst = establishedPorts.Contains((n.Id, 0));
+                            var sWired = wiredPremises.Contains((n.Id, 0));
+                            <div class="pt-ports single">
+                                <div class="pt-chip stmtchip @(sEst ? "est" : "") @(sWired ? "wired" : "")" style="@ChipStyle(sj)"
+                                     title="@StmtTitle(n)"
+                                     @onpointerup="() => EndWire(n.Id, 0)" @onpointerup:stopPropagation>
+                                    <span class="pt-dot in" data-port="@($"{n.Id}:p:0")"></span>
+                                    @if (sEst) { <i class="fa-solid fa-check pt-est-mark"></i> }
+                                    <InlineExpr Text="@(sj?.Text ?? n.Conclusions[0])" Sketches="sketchMap" Snapshots="snapshotMap" Height="56" OnOpen="OpenSketchModal" OnSnapshot="OpenSketchForSnapshot" />
+                                    <span class="pt-dot out" data-port="@($"{n.Id}:c:0")" title="drag onto a premise to wire"
+                                          @onpointerdown="e => StartWire(n.Id, 0, e)" @onpointerdown:stopPropagation @onpointerdown:preventDefault></span>
+                                </div>
+                            </div>
+                        }
+                        <div class="pt-ports top @(n.IsRule ? "" : "none")">
+                            @for (var i = 0; n.IsRule && i < n.Premises.Count; i++)
+                            {
+                                var idx = i;
+                                var j = Judgment(n.Id, idx, true);
+                                var discharged = wiredPremises.Contains((n.Id, idx));
+                                <div class="pt-chip prem @(j is { Ground: false } ? "open" : "") @(discharged ? "wired" : "")" style="@ChipStyle(j)"
+                                     data-port="@($"{n.Id}:p:{idx}")" title="@PremTitle(n, idx)"
+                                     @onpointerup="() => EndWire(n.Id, idx)" @onpointerup:stopPropagation>
+                                    <span class="pt-dot in"></span><InlineExpr Text="@(j?.Text ?? n.Premises[idx])" Sketches="sketchMap" Snapshots="snapshotMap" Height="56" OnOpen="OpenSketchModal" OnSnapshot="OpenSketchForSnapshot" />
+                                </div>
+                            }
+                            @if (n.IsRule && n.Premises.Count == 0)
+                            {
+                                <span class="pt-nopremise">(no premises)</span>
+                            }
+                        </div>
+                        <div class="pt-bar">
+                            <span class="pt-id">#@n.Id</span>
+                            @if (n.IsRule)
+                            {
+                                <span class="pt-name">@n.RuleName</span>
+                                <span class="pt-kind">@n.RuleKind</span>
+                            }
+                            else
+                            {
+                                <button type="button" class="pt-role-btn @n.Role" title="click to change the role: given → goal → lemma"
+                                        @onclick="() => CycleRole(n)" @onpointerdown:stopPropagation>
+                                    <i class="fa-solid @RoleIcon(n.Role)"></i> @n.Role
+                                </button>
+                                @if (proven) { <span class="pt-proven-badge" title="established"><i class="fa-solid fa-check"></i></span> }
+                            }
+                            <button type="button" class="pt-x" title="remove" @onclick="() => RemoveNode(n.Id)" @onpointerdown:stopPropagation>×</button>
+                        </div>
+                        @if (n.Error is not null)
+                        {
+                            <div class="pt-broken">@n.Error</div>
+                        }
+                        <div class="pt-ports bottom @(n.IsRule ? "" : "none")">
+                            @for (var i = 0; n.IsRule && i < n.Conclusions.Count; i++)
+                            {
+                                var idx = i;
+                                var j = Judgment(n.Id, idx, false);
+                                var est = establishedPorts.Contains((n.Id, idx));
+                                <div class="pt-chip concl @(j is { Ground: false } ? "open" : "") @(est ? "est" : "")" style="@ChipStyle(j)"
+                                     data-port="@($"{n.Id}:c:{idx}")" title="@ConclTitle(est, idx)">
+                                    @if (est) { <i class="fa-solid fa-check pt-est-mark"></i> }
+                                    <InlineExpr Text="@(j?.Text ?? n.Conclusions[idx])" Sketches="sketchMap" Snapshots="snapshotMap" Height="56" OnOpen="OpenSketchModal" OnSnapshot="OpenSketchForSnapshot" /><span class="pt-dot out" title="drag onto a premise to wire"
+                                         @onpointerdown="e => StartWire(n.Id, idx, e)" @onpointerdown:stopPropagation @onpointerdown:preventDefault></span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="pt-vdivider" id="pt-vdiv" title="drag to resize, click to collapse the panel"
+             @onpointerdown="StartResize" @onpointermove="OnResizeMove" @onpointerup="EndResize" @onpointercancel="EndResize">
+            <span class="pt-grip"><i class="fa-solid @(rightOpen ? "fa-chevron-right" : "fa-chevron-left")"></i></span>
+        </div>
+
+        @if (rightOpen)
+        {
+            <aside class="pt-context" style="width:@(Px(rightWidth))">
+                @if (AllGoalsProven)
+                {
+                    <div class="pt-ctx-ok"><i class="fa-solid fa-circle-check"></i> Every goal is established.</div>
+                }
+                @if (report.CycleNodes.Length > 0)
+                {
+                    <div class="pt-ctx-error">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        A proof must be a DAG — nodes @string.Join(", ", report.CycleNodes.Select(i => "#" + i)) form a cycle. Remove one of the red wires.
+                    </div>
+                }
+                @foreach (var b in report.BadWires)
+                {
+                    <div class="pt-ctx-error"><i class="fa-solid fa-triangle-exclamation"></i> wire: @b.Message</div>
+                }
+                @if (selectedWire is int sw && Active.Wires.Any(w => w.Id == sw))
+                {
+                    <button type="button" class="ab-kind-btn danger" style="margin-bottom:.5rem" @onclick="() => RemoveWire(sw)">
+                        <i class="fa-solid fa-scissors"></i> Delete selected wire
+                    </button>
+                }
+
+                <div class="pt-ctx-sec pt-search">
+                    <div class="pt-ctx-title"><i class="fa-solid fa-magnifying-glass"></i> Automated search</div>
+                    <div class="pt-search-row">
+                        @if (!searching)
+                        {
+                            <button type="button" class="ab-btn-primary sm" disabled="@(sys.Rules.Count == 0 || Active.Nodes.Count == 0)" @onclick="StartSearch">
+                                <i class="fa-solid fa-play"></i> Search
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="ab-kind-btn" @onclick="() => paused = !paused">
+                                <i class="fa-solid @(paused ? "fa-play" : "fa-pause")"></i> @(paused ? "Resume" : "Pause")
+                            </button>
+                            <button type="button" class="ab-kind-btn danger" @onclick="StopSearch"><i class="fa-solid fa-stop"></i> Stop</button>
+                        }
+                    </div>
+                    <label class="pt-check"><input type="checkbox" checked="@visualize" @onchange="e => visualize = e.Value is bool b && b" /> Visualize the search</label>
+                    <label class="pt-slider @(visualize ? "" : "off")">
+                        <span>Playback speed</span>
+                        <input type="range" min="1" max="10" value="@speed" disabled="@(!visualize)" @oninput="e => speed = int.TryParse(e.Value?.ToString(), out var v) ? v : speed" />
+                        <span class="pt-speed">@(visualize ? speed.ToString() : "full")</span>
+                    </label>
+                    <div class="ab-muted pt-status">@searchStatus</div>
+                    @if (!string.IsNullOrEmpty(lastNote))
+                    {
+                        <div class="pt-note">@lastNote</div>
+                    }
+                </div>
+
+                <div class="pt-ctx-sec">
+                    <div class="pt-ctx-title">Obligations <span class="ab-muted">— premises nothing discharges</span></div>
+                    @if (report.Open.Length == 0) { <div class="ab-muted">none</div> }
+                    @foreach (var p in report.Open)
+                    {
+                        <div class="pt-ctx-row"><span class="pt-ctx-node">#@p.Node</span><span>@p.Text</span></div>
+                    }
+                </div>
+
+                <div class="pt-ctx-sec">
+                    <div class="pt-ctx-title">Established <span class="ab-muted">— @report.Established.Length conclusion@(report.Established.Length == 1 ? "" : "s")</span></div>
+                    @foreach (var p in report.Proven)
+                    {
+                        <div class="pt-ctx-row"><span class="pt-ctx-node">#@p.Node ✓</span><span>@p.Text</span></div>
+                    }
+                </div>
+
+                <div class="pt-ctx-sec">
+                    <div class="pt-ctx-title">Bindings <span class="ab-muted">— what the wiring determined</span></div>
+                    @if (report.Bindings.Length == 0)
+                    {
+                        <div class="ab-muted">nothing bound yet</div>
+                    }
+                    @foreach (var g in report.Bindings.GroupBy(b => b.Node))
+                    {
+                        <div class="pt-ctx-row">
+                            <span class="pt-ctx-node">#@g.Key @NodeName(g.Key)</span>
+                            <span>@string.Join(",  ", g.Select(b => $"{b.Meta} ≔ {b.Value}"))</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="pt-ctx-sec">
+                    <div class="pt-ctx-title">Colours</div>
+                    <div class="ab-muted">@report.ClassCount distinct judgment@(report.ClassCount == 1 ? "" : "s") up to substitution.</div>
+                    <div class="pt-legend">
+                        @for (var c = 0; c < Math.Min(report.ClassCount, 24); c++)
+                        {
+                            <span class="pt-swatch" style="@SwatchStyle(c)" title="class @(c + 1)"></span>
+                        }
+                    </div>
+                </div>
+            </aside>
+        }
+    </div>
+</div>
+
+@if (modalSketch is not null)
+{
+    <div class="ab-sketch-overlay pt-modal">
+        <div class="pt-modal-head">
+            <span class="pt-modal-label"><i class="fa-solid fa-compass-drafting"></i> Diagram</span>
+            @if (renamingSketch)
+            {
+                <input class="ab-text-input pt-xedit-input" value="@sketchNameEdit" autofocus
+                       @oninput="e => sketchNameEdit = e.Value?.ToString() ?? string.Empty"
+                       @onkeydown="OnRenameKey" />
+                <button type="button" class="ab-kind-btn" @onclick="CommitRename">OK</button>
+                <button type="button" class="ab-kind-btn" @onclick="() => renamingSketch = false">Cancel</button>
+                @if (renameError is not null) { <span class="ab-error" style="margin:0 .5rem">@renameError</span> }
+            }
+            else
+            {
+                <button type="button" class="pt-xedit" title="click to rename the diagram" @onclick="() => { renamingSketch = true; sketchNameEdit = modalSketch; renameError = null; }">
+                    [@modalSketch] <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+            }
+            @if (modalEditing)
+            {
+                <span class="ab-muted">Draw, press quiver's <strong>Save</strong> (Ctrl+S), then the check to bring it back.</span>
+                @if (SnapshotSvc is not null)
+                {
+                    <button type="button" id="pt-snap-btn" class="ab-kind-btn ab-snap-btn" @onclick="TakeTreeSnapshot" disabled="@snapBusy"
+                            title="Store a picture of the diagram as drawn; previews then show it instead of a live quiver frame">
+                        <i class="fa-solid fa-camera"></i> @(snapBusy ? "…" : "Snapshot")
+                    </button>
+                    @if (snapNote is not null) { <span class="ab-snap-note">@snapNote</span> }
+                }
+            }
+            else
+            {
+                <span class="ab-muted">hover the picture for the pencil; the check closes</span>
+            }
+        </div>
+        @if (modalEditing)
+        {
+            <iframe id="pt-sketch-frame" class="ab-sketch-frame pt-modal-frame" src="@modalSrc" title="quiver editor"></iframe>
+        }
+        else
+        {
+            <div class="pt-modal-view">
+                @if (snapshotMap.TryGetValue(modalSketch, out var snapUrl))
+                {
+                    <img class="pt-modal-snap" src="@snapUrl" alt="[@modalSketch]" />
+                }
+                else
+                {
+                    <div class="pt-modal-nosnap">
+                        <i class="fa-solid fa-camera"></i>
+                        <div>No snapshot yet for <b>[@modalSketch]</b>. Press the pencil to open the editor, position the diagram, and take one.</div>
+                    </div>
+                }
+                <button type="button" class="pt-modal-pencil" title="edit this diagram" @onclick="StartModalEdit">
+                    <i class="fa-solid fa-pencil"></i>
+                </button>
+            </div>
+        }
+        <button type="button" class="ab-sketch-done" title="@(modalEditing ? "Done — import the diagram and close" : "Done")" @onclick="ModalDone">
+            <svg viewBox="0 0 24 24" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 12.5 L9.5 18 L20 6.5" fill="none" stroke="currentColor" stroke-width="3"
+                      stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </button>
+    </div>
+}
+
+@if (snapToast is not null)
+{
+    <div class="ab-snap-toast"><img src="@snapToast" alt="snapshot" /><span><i class="fa-solid fa-check"></i> snapshot stored</span></div>
+}
+
+@code {
+    class PortMeasure
+    {
+        public string Key { get; set; } = "";
+        public double X { get; set; }
+        public double Top { get; set; }
+        public double Bottom { get; set; }
+    }
+
+    class NodeRect
+    {
+        public int Id { get; set; }
+        public double W { get; set; }
+        public double H { get; set; }
+    }
+
+    const string StoreKey = "abcatdc-trees";
+
+    // helpers installed once into the page: port positions and node sizes relative to the surface, pointer capture
+    const string TreeJs = @"window.abTree = { measure: function (id, k) {
+        var s = document.getElementById(id); if (!s) return [];
+        k = k || 1;
+        var r = s.getBoundingClientRect(); var out = [];
+        s.querySelectorAll('[data-port]').forEach(function (el) {
+            var b = el.getBoundingClientRect();
+            out.push({ key: el.getAttribute('data-port'), x: (b.left + b.width / 2 - r.left) / k, top: (b.top - r.top) / k, bottom: (b.bottom - r.top) / k });
+        });
+        return out; },
+      nodes: function (id, k) {
+        var s = document.getElementById(id); if (!s) return [];
+        k = k || 1;
+        var out = [];
+        s.querySelectorAll('[data-node]').forEach(function (el) {
+            var b = el.getBoundingClientRect();
+            out.push({ id: parseInt(el.getAttribute('data-node')), w: b.width / k, h: b.height / k });
+        });
+        return out; },
+      wheelZoom: function (canvasId, surfaceId, ref) {
+        var c = document.getElementById(canvasId); if (!c || c.__abZoom) return; c.__abZoom = true;
+        c.addEventListener('wheel', function (e) {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            var s = document.getElementById(surfaceId); if (!s) return;
+            var k = parseFloat(s.style.zoom || '1') || 1;
+            var k2 = Math.min(3, Math.max(0.25, k * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+            var cr = c.getBoundingClientRect();
+            var px = (c.scrollLeft + e.clientX - cr.left) / k;
+            var py = (c.scrollTop + e.clientY - cr.top) / k;
+            s.style.zoom = k2;
+            c.scrollLeft = px * k2 - (e.clientX - cr.left);
+            c.scrollTop = py * k2 - (e.clientY - cr.top);
+            ref.invokeMethodAsync('SetZoom', k2);
+        }, { passive: false }); },
+      setZoom: function (canvasId, surfaceId, k2) {
+        var c = document.getElementById(canvasId); var s = document.getElementById(surfaceId); if (!c || !s) return;
+        var k = parseFloat(s.style.zoom || '1') || 1;
+        var cr = c.getBoundingClientRect();
+        var px = (c.scrollLeft + cr.width / 2) / k, py = (c.scrollTop + cr.height / 2) / k;
+        s.style.zoom = k2;
+        c.scrollLeft = px * k2 - cr.width / 2; c.scrollTop = py * k2 - cr.height / 2; },
+      sketchAt: function (x, y) {
+        var el = document.elementFromPoint(x, y);
+        var w = el && el.closest ? el.closest('[data-sketch]') : null;
+        return w ? w.getAttribute('data-sketch') : ''; },
+      capture: function (id, pid) {
+        var el = document.getElementById(id);
+        if (el && el.setPointerCapture) { try { el.setPointerCapture(pid); } catch (e) { } } } };";
+
+    // ------------------------------------------------------------ state
+    SystemDto sys = new();
+    TreesBlob blob = new();
+    TreeDto Active => blob.Trees.FirstOrDefault(t => t.Name == blob.Active) ?? blob.Trees.FirstOrDefault() ?? new TreeDto();
+    ProofTree tree = new();
+    TreeReport report = Empty();
+    Dictionary<(int, int, bool), TreeJudgment> jmap = new();
+    Dictionary<int, string> badWires = new();
+    HashSet<(int, int)> establishedPorts = new();
+    HashSet<(int, int)> wiredPremises = new();
+    HashSet<int> provenNodes = new();
+    readonly Dictionary<string, PortMeasure> ports = new();
+    readonly Dictionary<int, NodeRect> rects = new();
+    bool loaded, needMeasure, renaming, helpOpen;
+    bool topOpen = true, rightOpen = true;
+    // canvas zoom (CSS zoom on the surface): pointer deltas and measurements are divided by it
+    double zoom = 1;
+    string ZoomText => zoom.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    DotNetObjectReference<ProofTreePage>? selfRef;
+
+    [JSInvokable]
+    public void SetZoom(double k)
+    {
+        zoom = Math.Clamp(k, 0.25, 3);
+        needMeasure = true;
+        StateHasChanged();
+    }
+
+    async Task SetZoomFromUi(double k)
+    {
+        zoom = Math.Clamp(k, 0.25, 3);
+        try { await JS.InvokeVoidAsync("abTree.setZoom", "pt-canvas", "pt-surface", zoom); } catch { }
+        needMeasure = true;
+    }
+    double rightWidth = 300;
+    string renameText = "";
+    string stmtInput = "";
+    string stmtRole = "lemma";
+    string? toast;
+    int selRuleIdx = -1, selExample = -1;
+    int? selectedWire;
+    // the search's latest move, highlighted
+    int lastNode = -1;
+    HashSet<int> lastWires = new();
+
+    // dragging a node: the pointer is captured only once it has MOVED — capturing
+    // on the press would retarget the release to the node, and the browser then
+    // fires click/dblclick on the node instead of on the picture pressed
+    TreeNodeDto? dragNode;
+    bool dragCaptured;
+    double lastX, lastY, pressX, pressY;
+    int pressSerial;
+
+    async Task OnNodeDblClick(MouseEventArgs e)
+    {
+        // the browser may have retargeted the double-click to the node; find the picture under the pointer
+        string name = "";
+        try { name = await JS.InvokeAsync<string>("abTree.sketchAt", e.ClientX, e.ClientY); } catch { }
+        if (!string.IsNullOrEmpty(name) && modalSketch is null) OpenSketchModal(name);
+    }
+    // dragging a new wire from a conclusion port
+    (int node, int idx)? pendingSrc;
+    double pendingStartX, pendingStartY, pendingX, pendingY, pendingClientX, pendingClientY;
+    // resizing the side panel
+    bool resizing;
+    double resizeStartX, resizeStartWidth, resizeMoved;
+
+    // automated search
+    bool searching, paused, visualize = true;
+    int speed = 5;
+    string searchStatus = "";
+    string lastNote = "";
+    CancellationTokenSource? cts;
+
+    static TreeReport Empty() =>
+        new(Array.Empty<TreeJudgment>(), Array.Empty<TreeBinding>(), Array.Empty<TreePort>(), Array.Empty<TreePort>(),
+            Array.Empty<TreePort>(), Array.Empty<TreePort>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<TreeWireIssue>(), 0);
+
+    double SurfaceW => Math.Max(1600, Active.Nodes.Count == 0 ? 0 : Active.Nodes.Max(n => n.X) + 700);
+    double SurfaceH => Math.Max(900, Active.Nodes.Count == 0 ? 0 : Active.Nodes.Max(n => n.Y) + 400);
+    int DelayMs => (11 - Math.Clamp(speed, 1, 10)) * 110;
+    bool AllGoalsProven => Active.Nodes.Any(n => n.IsGoal) && Active.Nodes.Where(n => n.IsGoal).All(n => provenNodes.Contains(n.Id));
+
+    static string Px(double v) => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "px";
+
+    // ------------------------------------------------------------ lifecycle
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { await JS.InvokeVoidAsync("eval", TreeJs); } catch { }
+            selfRef = DotNetObjectReference.Create(this);
+            try { await JS.InvokeVoidAsync("abTree.wheelZoom", "pt-canvas", "pt-surface", selfRef); } catch { }
+            await LoadAll();
+            loaded = true;
+            needMeasure = true;
+            StateHasChanged();
+            return;
+        }
+        if (teachPending)
+        {
+            teachPending = false;
+            try { await JS.InvokeVoidAsync("abEditor.teach", "pt-snap-btn", "Position the diagram so it is fully in view, press quiver's Save (Ctrl+S), then take the Snapshot — it becomes the picture shown everywhere.", 20000); } catch { }
+        }
+        if (!needMeasure) return;
+        needMeasure = false;
+        PortMeasure[] measured;
+        NodeRect[] sizes;
+        try
+        {
+            measured = await JS.InvokeAsync<PortMeasure[]>("abTree.measure", "pt-surface", zoom);
+            sizes = await JS.InvokeAsync<NodeRect[]>("abTree.nodes", "pt-surface", zoom);
+        }
+        catch { return; }
+        var changed = false;
+        foreach (var m in measured)
+        {
+            if (!ports.TryGetValue(m.Key, out var old) || Math.Abs(old.X - m.X) > 0.5 || Math.Abs(old.Top - m.Top) > 0.5 || Math.Abs(old.Bottom - m.Bottom) > 0.5)
+            {
+                ports[m.Key] = m;
+                changed = true;
+            }
+        }
+        foreach (var s in sizes) rects[s.Id] = s;
+        if (changed) StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        try { cts?.Cancel(); } catch { }
+        selfRef?.Dispose();
+    }
+
+    async Task LoadAll()
+    {
+        sys = await SystemStore.LoadAsync(JS);
+        Api.SetConstants(sys.Constants.ToArray());
+        Api.SetDiagramSemantics(sys.DiagramSemantics);
+        try
+        {
+            var json = await JS.InvokeAsync<string?>("abEditor.loadItem", StoreKey);
+            if (!string.IsNullOrEmpty(json))
+                blob = JsonSerializer.Deserialize<TreesBlob>(json) ?? new TreesBlob();
+        }
+        catch { }
+        if (blob.Trees.Count == 0)
+            blob.Trees.Add(new TreeDto { Name = "Tree 1", SystemName = sys.Name });
+        if (blob.Trees.All(t => t.Name != blob.Active))
+            blob.Active = blob.Trees[0].Name;
+        Rebuild();
+    }
+
+    async Task Save()
+    {
+        try { await JS.InvokeVoidAsync("abEditor.saveItem", StoreKey, JsonSerializer.Serialize(blob)); }
+        catch { }
+    }
+
+    // cached: InlineExpr takes the dictionaries by reference, a fresh one each render would re-embed every picture
+    Dictionary<string, string> sketchMap = new();
+    Dictionary<string, string> snapshotMap = new();
+
+    void RegisterSketches()
+    {
+        var all = new Dictionary<string, string>();
+        foreach (var s in sys.Sketches) all[s.Name] = s.Json;
+        foreach (var s in Active.Sketches) all[s.Name] = s.Json;
+        sketchMap = all;
+        var snaps = new Dictionary<string, string>();
+        foreach (var s in sys.Sketches.Concat(Active.Sketches)) if (!string.IsNullOrEmpty(s.Snapshot)) snaps[s.Name] = s.Snapshot!;
+        snapshotMap = snaps;
+        Api.SetSketches(all.Select(kv => Tuple.Create(kv.Key, kv.Value)).ToArray());
+    }
+
+    /// <summary>Replay the stored tree into a fresh kernel model.</summary>
+    void Rebuild()
+    {
+        RegisterSketches();
+        tree = new ProofTree();
+        var t = Active;
+        foreach (var n in t.Nodes)
+        {
+            n.Error = null;
+            var e = n.IsRule
+                ? tree.AddRule(n.Id, n.Premises.ToArray(), n.Conclusions.ToArray())
+                : tree.AddStatement(n.Id, n.Conclusions.FirstOrDefault() ?? "", n.IsGiven);
+            if (e.Length > 0) n.Error = e;
+        }
+        foreach (var w in t.Wires.OrderBy(w => w.Id))
+            tree.Connect(w.Id, w.Src, w.SrcIdx, w.Dst, w.DstIdx);
+        Refresh();
+    }
+
+    void Refresh()
+    {
+        report = tree.Report();
+        jmap = report.Judgments.ToDictionary(j => (j.Node, j.Index, j.IsPremise), j => j);
+        badWires = report.BadWires.GroupBy(b => b.Wire).ToDictionary(g => g.Key, g => g.First().Message);
+        establishedPorts = report.Established.Select(p => (p.Node, p.Index)).ToHashSet();
+        provenNodes = report.Proven.Select(p => p.Node).ToHashSet();
+        wiredPremises = Active.Wires.Select(w => (w.Dst, w.DstIdx)).ToHashSet();
+        needMeasure = true;
+    }
+
+    // ------------------------------------------------------------ trees & examples
+    async Task OnTreeSelected(ChangeEventArgs e)
+    {
+        StopSearch();
+        blob.Active = e.Value?.ToString() ?? blob.Active;
+        selectedWire = null;
+        Rebuild();
+        await Save();
+    }
+
+    async Task NewTree()
+    {
+        var k = blob.Trees.Count + 1;
+        var name = $"Tree {k}";
+        while (blob.Trees.Any(t => t.Name == name)) name = $"Tree {++k}";
+        blob.Trees.Add(new TreeDto { Name = name, SystemName = sys.Name });
+        blob.Active = name;
+        Rebuild();
+        await Save();
+    }
+
+    async Task ApplyRename()
+    {
+        var nm = renameText.Trim();
+        renaming = false;
+        if (nm.Length == 0 || blob.Trees.Any(t => t.Name == nm)) return;
+        Active.Name = nm;
+        blob.Active = nm;
+        await Save();
+    }
+
+    async Task DeleteTree()
+    {
+        StopSearch();
+        blob.Trees.Remove(Active);
+        if (blob.Trees.Count == 0) blob.Trees.Add(new TreeDto { Name = "Tree 1", SystemName = sys.Name });
+        blob.Active = blob.Trees[0].Name;
+        selectedWire = null;
+        Rebuild();
+        await Save();
+    }
+
+    async Task ClearTree()
+    {
+        StopSearch();
+        Active.Nodes.Clear();
+        Active.Wires.Clear();
+        Active.NextId = 1;
+        selectedWire = null;
+        searchStatus = "";
+        lastNote = "";
+        Rebuild();
+        await Save();
+    }
+
+    /// <summary>Load an example: its goal, givens and proof in progress become a tree of that name (replacing an earlier load).</summary>
+    async Task LoadExample()
+    {
+        if (selExample < 0 || selExample >= ExampleTrees.All.Length) return;
+        StopSearch();
+        var ex = ExampleTrees.All[selExample];
+        var t = ex.Build();
+        t.Description = ex.Description;
+        blob.Trees.RemoveAll(x => x.Name == t.Name);
+        blob.Trees.Add(t);
+        blob.Active = t.Name;
+        selectedWire = null;
+        searchStatus = "";
+        lastNote = "";
+        helpOpen = true;
+        toast = sys.Rules.Any(r => r.Name == "snake-connect")
+            ? null
+            : "This example is written for the “Chases in left R-modules” palette — load it on the Rules page for the search to find its rules.";
+        Rebuild();
+        await Save();
+    }
+
+    // ------------------------------------------------------------ nodes
+    (double x, double y) NextSpot()
+    {
+        var k = Active.Nodes.Count;
+        return (40 + 36 * (k % 8), 40 + 36 * (k % 8) + 120 * (k / 8));
+    }
+
+    async Task AddRuleNode()
+    {
+        if (selRuleIdx < 0 || selRuleIdx >= sys.Rules.Count) return;
+        var r = sys.Rules[selRuleIdx];
+        var (x, y) = NextSpot();
+        var n = new TreeNodeDto
+        {
+            Id = Active.NextId++, IsRule = true, Role = "rule",
+            RuleName = string.IsNullOrWhiteSpace(r.Name) ? $"{r.Kind} rule" : r.Name, RuleKind = r.Kind,
+            Premises = r.Premises.ToList(), Conclusions = r.Conclusions.ToList(), X = x, Y = y
+        };
+        var e = tree.AddRule(n.Id, n.Premises.ToArray(), n.Conclusions.ToArray());
+        if (e.Length > 0) { toast = $"{n.RuleName}: {e}"; return; }
+        Active.Nodes.Add(n);
+        toast = null;
+        Refresh();
+        await Save();
+    }
+
+    async Task AddStatementNode(string text)
+    {
+        var line = (text ?? "").Trim();
+        if (line.Length == 0) return;
+        var (x, y) = NextSpot();
+        var id = Active.NextId;
+        var e = tree.AddStatement(id, line, stmtRole == "given");
+        if (e.Length > 0) { toast = e; return; }
+        Active.NextId++;
+        Active.Nodes.Add(new TreeNodeDto { Id = id, IsRule = false, Role = stmtRole, Premises = new() { line }, Conclusions = new() { line }, X = x, Y = y });
+        stmtInput = "";
+        toast = null;
+        Refresh();
+        await Save();
+    }
+
+    async Task RemoveNode(int id)
+    {
+        tree.Remove(id);
+        Active.Nodes.RemoveAll(n => n.Id == id);
+        Active.Wires.RemoveAll(w => w.Src == id || w.Dst == id);
+        if (selectedWire is int s && Active.Wires.All(w => w.Id != s)) selectedWire = null;
+        Refresh();
+        await Save();
+    }
+
+    async Task CycleRole(TreeNodeDto n)
+    {
+        n.Role = n.Role switch { "given" => "goal", "goal" => "lemma", _ => "given" };
+        Rebuild();
+        await Save();
+    }
+
+    void OnRoleChanged(ChangeEventArgs e) => stmtRole = e.Value?.ToString() ?? "lemma";
+
+    static string RoleIcon(string role) => role switch { "given" => "fa-hand-holding", "goal" => "fa-flag-checkered", _ => "fa-bookmark" };
+
+    string NodeName(int id)
+    {
+        var n = Active.Nodes.FirstOrDefault(n => n.Id == id);
+        return n is null ? "" : (n.IsRule ? n.RuleName : n.Role);
+    }
+
+    static string PremTitle(TreeNodeDto n, int idx) =>
+        n.IsRule ? $"premise {idx + 1} — drop a conclusion here" : "what establishes this statement — drop a conclusion here";
+
+    static string ConclTitle(bool est, int idx) =>
+        (est ? "established — " : "") + $"conclusion {idx + 1}";
+
+    // ------------------------------------------------------------ wires
+    void StartWire(int node, int idx, PointerEventArgs e)
+    {
+        dragNode = null;
+        var p = PortPos(node, idx, false);
+        if (p is null) return;
+        pendingSrc = (node, idx);
+        pendingStartX = pendingX = p.Value.x;
+        pendingStartY = pendingY = p.Value.y;
+        pendingClientX = e.ClientX;
+        pendingClientY = e.ClientY;
+    }
+
+    async Task EndWire(int node, int idx)
+    {
+        if (pendingSrc is null)
+        {
+            await OnUp();
+            return;
+        }
+        var src = pendingSrc.Value;
+        pendingSrc = null;
+        var id = Active.NextId;
+        var msg = tree.Connect(id, src.node, src.idx, node, idx);
+        if (msg.Length > 0)
+        {
+            toast = $"cannot wire: {msg}";
+            Rebuild();
+            return;
+        }
+        Active.NextId++;
+        Active.Wires.RemoveAll(w => w.Dst == node && w.DstIdx == idx);
+        Active.Wires.Add(new TreeWireDto { Id = id, Src = src.node, SrcIdx = src.idx, Dst = node, DstIdx = idx });
+        toast = null;
+        selectedWire = null;
+        Refresh();
+        await Save();
+    }
+
+    async Task RemoveWire(int id)
+    {
+        tree.Disconnect(id);
+        Active.Wires.RemoveAll(w => w.Id == id);
+        if (selectedWire == id) selectedWire = null;
+        Refresh();
+        await Save();
+    }
+
+    // ------------------------------------------------------------ pointer
+    void StartDrag(TreeNodeDto n, PointerEventArgs e)
+    {
+        if (pendingSrc is not null) return;
+        dragNode = n;
+        dragCaptured = false;
+        pressSerial++;
+        pressX = lastX = e.ClientX;
+        pressY = lastY = e.ClientY;
+    }
+
+    void OnLeave()
+    {
+        if (dragNode is null) pendingSrc = null;
+    }
+
+    async Task OnMove(PointerEventArgs e)
+    {
+        if (dragNode is not null)
+        {
+            var dx = (e.ClientX - lastX) / zoom;
+            var dy = (e.ClientY - lastY) / zoom;
+            // displacement from the PRESS point, well above the OS double-click rectangle:
+            // a wobbly second click must never turn into a drag
+            if (!dragCaptured && Math.Max(Math.Abs(e.ClientX - pressX), Math.Abs(e.ClientY - pressY)) < 6) return;
+            if (!dragCaptured)
+            {
+                dragCaptured = true;
+                var serial = pressSerial;
+                var id = dragNode.Id;
+                try { await JS.InvokeVoidAsync("abTree.capture", $"pt-node-{id}", e.PointerId); } catch { }
+                if (serial != pressSerial || dragNode is null) return;   // a later press happened meanwhile
+            }
+            dragNode.X = Math.Max(0, dragNode.X + dx);
+            dragNode.Y = Math.Max(0, dragNode.Y + dy);
+            lastX = e.ClientX;
+            lastY = e.ClientY;
+            needMeasure = true;
+        }
+        else if (pendingSrc is not null)
+        {
+            pendingX = pendingStartX + (e.ClientX - pendingClientX) / zoom;
+            pendingY = pendingStartY + (e.ClientY - pendingClientY) / zoom;
+        }
+    }
+
+    async Task OnUp()
+    {
+        var moved = dragNode is not null && dragCaptured;
+        dragNode = null;
+        dragCaptured = false;
+        pendingSrc = null;
+        if (moved) await Save();
+    }
+
+    async Task StartResize(PointerEventArgs e)
+    {
+        resizing = true;
+        resizeMoved = 0;
+        resizeStartX = e.ClientX;
+        resizeStartWidth = rightOpen ? rightWidth : 0;
+        try { await JS.InvokeVoidAsync("abTree.capture", "pt-vdiv", e.PointerId); } catch { }
+    }
+
+    void OnResizeMove(PointerEventArgs e)
+    {
+        if (!resizing) return;
+        var dx = resizeStartX - e.ClientX;
+        resizeMoved = Math.Max(resizeMoved, Math.Abs(dx));
+        if (resizeMoved > 4)
+        {
+            var w = resizeStartWidth + dx;
+            rightOpen = w > 60;
+            rightWidth = Math.Clamp(w, 200, 720);
+            needMeasure = true;
+        }
+    }
+
+    void EndResize()
+    {
+        if (!resizing) return;
+        resizing = false;
+        if (resizeMoved <= 4) rightOpen = !rightOpen;   // a click toggles
+        needMeasure = true;
+    }
+
+    // ------------------------------------------------------------ automated search
+    Task StartSearch()
+    {
+        if (searching) return Task.CompletedTask;
+        searching = true;
+        paused = false;
+        searchStatus = "searching…";
+        lastNote = "";
+        cts = new CancellationTokenSource();
+        var token = cts.Token;
+        var engineTree = tree.Clone();
+        var rules = sys.Rules
+            .Where(r => r.Premises.Count + r.Conclusions.Count > 0)
+            .Select(r => new SearchRule(string.IsNullOrWhiteSpace(r.Name) ? $"{r.Kind} rule" : r.Name, r.Kind, r.Premises.ToArray(), r.Conclusions.ToArray()))
+            .ToArray();
+        var engine = new ProofSearch(engineTree, rules, Active.NextId, 160, 7);
+        var target = Active;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    while (paused && !token.IsCancellationRequested) await Task.Delay(80, token);
+                    if (token.IsCancellationRequested) break;
+                    var mv = engine.Step();
+                    if (mv is null) break;
+                    var move = mv.Value;
+                    await InvokeAsync(() =>
+                    {
+                        ApplyMove(target, move);
+                        if (visualize)
+                        {
+                            Refresh();
+                            var st = engine.Status;
+                            searchStatus = $"step {st.Steps}: {move.Kind}";
+                            lastNote = move.Note;
+                            StateHasChanged();
+                        }
+                    });
+                    if (visualize) await Task.Delay(DelayMs, token);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                await InvokeAsync(() => { toast = "search failed: " + ex.Message; });
+            }
+            await InvokeAsync(async () =>
+            {
+                var st = engine.Status;
+                target.NextId = Math.Max(target.NextId, engine.NextId);
+                searchStatus = token.IsCancellationRequested
+                    ? $"stopped after {st.Steps} step{(st.Steps == 1 ? "" : "s")}"
+                    : st.Solved ? $"solved in {st.Steps} step{(st.Steps == 1 ? "" : "s")}"
+                    : st.Exhausted ? $"no applicable move left after {st.Steps} step{(st.Steps == 1 ? "" : "s")}"
+                    : st.Note;
+                searching = false;
+                lastNode = -1;
+                lastWires.Clear();
+                Refresh();
+                StateHasChanged();
+                await Save();
+            });
+        });
+        return Task.CompletedTask;
+    }
+
+    void StopSearch()
+    {
+        try { cts?.Cancel(); } catch { }
+    }
+
+    /// <summary>Mirror one move of the search onto the canvas and the page's own tree.</summary>
+    void ApplyMove(TreeDto t, SearchMove mv)
+    {
+        lastWires.Clear();
+        if (mv.NewNode >= 0)
+        {
+            var (x, y) = PlaceNew(mv.Anchor, mv.Above, mv.Wires.Length);
+            var n = new TreeNodeDto
+            {
+                Id = mv.NewNode, IsRule = true, Role = "rule", RuleName = mv.RuleName, RuleKind = mv.RuleKind,
+                Premises = mv.Premises.ToList(), Conclusions = mv.Conclusions.ToList(), X = x, Y = y
+            };
+            var e = tree.AddRule(n.Id, n.Premises.ToArray(), n.Conclusions.ToArray());
+            if (e.Length > 0) n.Error = e;
+            t.Nodes.Add(n);
+            lastNode = n.Id;
+        }
+        foreach (var w in mv.Wires)
+        {
+            tree.Connect(w.Wire, w.Src, w.SrcIdx, w.Dst, w.DstIdx);
+            t.Wires.RemoveAll(x => x.Dst == w.Dst && x.DstIdx == w.DstIdx);
+            t.Wires.Add(new TreeWireDto { Id = w.Wire, Src = w.Src, SrcIdx = w.SrcIdx, Dst = w.Dst, DstIdx = w.DstIdx });
+            lastWires.Add(w.Wire);
+        }
+        var maxId = Math.Max(t.Nodes.Count == 0 ? 0 : t.Nodes.Max(n => n.Id), t.Wires.Count == 0 ? 0 : t.Wires.Max(w => w.Id));
+        t.NextId = Math.Max(t.NextId, maxId + 1);
+    }
+
+    // ------------------------------------------------------------ diagram modal
+    string? modalSketch;
+    bool modalEditing, renamingSketch, snapBusy, teachPending;
+    string? snapToast;
+    int snapToastSerial;
+    string modalSrc = "";
+    string sketchNameEdit = "";
+    string? renameError, snapNote;
+
+    AbCatDC.RazorLib.Services.ISnapshotService? SnapshotSvc =>
+        (AbCatDC.RazorLib.Services.ISnapshotService?)Services.GetService(typeof(AbCatDC.RazorLib.Services.ISnapshotService));
+
+    static string QuiverSrc(string json, bool embed)
+    {
+        var t = (json ?? "").Trim();
+        var b64 = t.StartsWith("[") ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)) : t;
+        return "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64 + (embed ? "&embed" : "");
+    }
+
+    static string StmtTitle(TreeNodeDto n) =>
+        n.Role == "given" ? "a given — established by assumption" : "drop a conclusion on the top dot to establish this; drag the bottom dot to use it";
+
+    /// <summary>The tree's own copy of a diagram (a system diagram is copied on first edit, so the system stays as it was).</summary>
+    SketchDto OwnSketch(string name)
+    {
+        var own = Active.Sketches.FirstOrDefault(s => s.Name == name);
+        if (own is not null) return own;
+        var sysSk = sys.Sketches.FirstOrDefault(s => s.Name == name);
+        own = new SketchDto { Name = name, Json = sysSk?.Json ?? "", Snapshot = sysSk?.Snapshot };
+        Active.Sketches.Add(own);
+        return own;
+    }
+
+    void OpenSketchModal(string name)
+    {
+        if (!sketchMap.TryGetValue(name, out var json)) return;
+        modalSketch = name;
+        modalEditing = false;
+        renamingSketch = false;
+        snapNote = null;
+        modalSrc = QuiverSrc(json, true);
+    }
+
+    void StartModalEdit()
+    {
+        if (modalSketch is null || !sketchMap.TryGetValue(modalSketch, out var json)) return;
+        modalEditing = true;
+        modalSrc = QuiverSrc(json, false);
+        teachPending = SnapshotSvc is not null;
+    }
+
+    /// <summary>The camera on a flagged preview: straight into the editor for that sketch.</summary>
+    void OpenSketchForSnapshot(string name)
+    {
+        if (!sketchMap.TryGetValue(name, out var json)) return;
+        modalSketch = name;
+        renamingSketch = false;
+        snapNote = null;
+        modalEditing = true;
+        modalSrc = QuiverSrc(json, false);
+        teachPending = SnapshotSvc is not null;
+    }
+
+    async Task ShowSnapToast(string url)
+    {
+        snapToast = url;
+        var serial = ++snapToastSerial;
+        StateHasChanged();
+        await Task.Delay(4200);
+        if (serial == snapToastSerial) { snapToast = null; StateHasChanged(); }
+    }
+
+    async Task ModalDone()
+    {
+        if (modalSketch is null) return;
+        try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
+        if (modalEditing)
+        {
+            var b64 = "";
+            try { b64 = await JS.InvokeAsync<string>("abEditor.readQuiverFrame", "pt-sketch-frame"); } catch { }
+            if (!string.IsNullOrEmpty(b64))
+            {
+                var own = OwnSketch(modalSketch);
+                own.Json = QuiverImport.NormalizePositions(b64);
+                Rebuild();
+                await Save();
+            }
+        }
+        modalSketch = null;
+        modalEditing = false;
+        renamingSketch = false;
+    }
+
+    async Task TakeTreeSnapshot()
+    {
+        var svc = SnapshotSvc;
+        if (svc is null || snapBusy || modalSketch is null) return;
+        snapBusy = true;
+        snapNote = null;
+        try
+        {
+            var b64 = await svc.CapturePngBase64Async();
+            var url = string.IsNullOrEmpty(b64) ? "" : await JS.InvokeAsync<string>("abEditor.cropSnapshot", b64, "pt-sketch-frame", 900);
+            if (string.IsNullOrEmpty(url)) snapNote = "could not capture";
+            else
+            {
+                OwnSketch(modalSketch).Snapshot = url;
+                RegisterSketches();
+                await Save();
+                snapNote = "stored";
+                try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
+                _ = ShowSnapToast(url);
+            }
+        }
+        catch (Exception ex) { snapNote = "capture failed: " + ex.Message; }
+        snapBusy = false;
+    }
+
+    async Task OnRenameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CommitRename();
+        else if (e.Key == "Escape") renamingSketch = false;
+    }
+
+    /// <summary>Rename a diagram throughout the tree: its sketch entry and every [old] reference in the nodes.</summary>
+    async Task CommitRename()
+    {
+        if (modalSketch is null) return;
+        var nm = sketchNameEdit.Trim();
+        var valid = nm.Length > 0 && char.IsLetter(nm[0]) && nm.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' || "₀₁₂₃₄₅₆₇₈₉".Contains(c)) && nm[^1] != '-';
+        if (!valid) { renameError = "letters/digits/underscore/hyphen, starting with a letter"; return; }
+        if (nm != modalSketch && sketchMap.ContainsKey(nm)) { renameError = "that name is taken"; return; }
+        if (nm != modalSketch)
+        {
+            var own = OwnSketch(modalSketch);
+            own.Name = nm;
+            foreach (var n in Active.Nodes)
+            {
+                for (var i = 0; i < n.Premises.Count; i++) n.Premises[i] = n.Premises[i].Replace("[" + modalSketch + "]", "[" + nm + "]");
+                for (var i = 0; i < n.Conclusions.Count; i++) n.Conclusions[i] = n.Conclusions[i].Replace("[" + modalSketch + "]", "[" + nm + "]");
+            }
+            modalSketch = nm;
+            Rebuild();
+            await Save();
+            if (sketchMap.TryGetValue(nm, out var json)) modalSrc = QuiverSrc(json, modalEditing ? false : true);
+        }
+        renamingSketch = false;
+        renameError = null;
+    }
+
+    // ------------------------------------------------------------ layout
+    (double w, double h) SizeOf(int id) =>
+        rects.TryGetValue(id, out var r) && r.W > 0 ? (r.W, r.H) : (280, 96);
+
+    bool Overlaps(TreeNodeDto n, double x, double y, double w, double h)
+    {
+        var (nw, nh) = SizeOf(n.Id);
+        const double m = 18;
+        return !(x + w + m <= n.X || n.X + nw + m <= x || y + h + m <= n.Y || n.Y + nh + m <= y);
+    }
+
+    /// <summary>A spot for a new node next to its anchor — above it for a backward step, below for a forward one —
+    /// slid sideways until it overlaps nothing already on the canvas.</summary>
+    (double x, double y) PlaceNew(int anchorId, bool above, int slot)
+    {
+        var a = Active.Nodes.FirstOrDefault(n => n.Id == anchorId);
+        var ax = a?.X ?? 40;
+        var ay = a?.Y ?? 40;
+        var (aw, ah) = a is null ? (280.0, 96.0) : SizeOf(a.Id);
+        const double w = 280, h = 96, gap = 44;
+        var y = above ? ay - h - gap : ay + ah + gap;
+        var x = ax + 40 * Math.Max(0, slot - 1);
+        if (y < 0)
+        {
+            var dy = -y + 40;
+            foreach (var n in Active.Nodes) n.Y += dy;
+            y = 40;
+        }
+        for (var guard = 0; guard < 60; guard++)
+        {
+            var hit = Active.Nodes.FirstOrDefault(n => Overlaps(n, x, y, w, h));
+            if (hit is null) break;
+            x = hit.X + SizeOf(hit.Id).w + gap;
+        }
+        return (x, y);
+    }
+
+    /// <summary>Layered layout: sinks (goals) at the bottom, each node one layer above the nodes it feeds; within a
+    /// layer nodes are ordered by the mean position of what they feed.</summary>
+    async Task AutoLayout()
+    {
+        var nodes = Active.Nodes;
+        if (nodes.Count == 0) return;
+        var ids = nodes.Select(n => n.Id).ToHashSet();
+        var wires = Active.Wires.Where(w => ids.Contains(w.Src) && ids.Contains(w.Dst) && !badWires.ContainsKey(w.Id)).ToList();
+        var outOf = nodes.ToDictionary(n => n.Id, n => wires.Where(w => w.Src == n.Id).Select(w => w.Dst).Distinct().ToList());
+        var layer = new Dictionary<int, int>();
+        int LayerOf(int id, HashSet<int> visiting)
+        {
+            if (layer.TryGetValue(id, out var l)) return l;
+            if (!visiting.Add(id)) return 0;
+            var below = outOf[id];
+            var v = below.Count == 0 ? 0 : 1 + below.Max(d => LayerOf(d, visiting));
+            visiting.Remove(id);
+            layer[id] = v;
+            return v;
+        }
+        foreach (var n in nodes) LayerOf(n.Id, new HashSet<int>());
+        var layers = nodes.GroupBy(n => layer[n.Id]).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.ToList());
+        var order = nodes.ToDictionary(n => n.Id, n => n.X);
+        for (var sweep = 0; sweep < 3; sweep++)
+            foreach (var kv in layers.OrderBy(kv => kv.Key))
+            {
+                if (kv.Key == 0) continue;
+                foreach (var n in kv.Value)
+                {
+                    var below = outOf[n.Id];
+                    if (below.Count > 0) order[n.Id] = below.Average(d => order[d]);
+                }
+            }
+        const double gapX = 48, gapY = 70;
+        var rowHeights = layers.ToDictionary(kv => kv.Key, kv => kv.Value.Max(n => SizeOf(n.Id).h));
+        var maxL = layers.Keys.Max();
+        var y = 40.0;
+        var yOf = new Dictionary<int, double>();
+        for (var l = maxL; l >= 0; l--)
+        {
+            yOf[l] = y;
+            if (layers.ContainsKey(l)) y += rowHeights[l] + gapY;
+        }
+        var widths = layers.ToDictionary(kv => kv.Key, kv => kv.Value.Sum(n => SizeOf(n.Id).w) + gapX * (kv.Value.Count - 1));
+        var maxW = widths.Values.Max();
+        foreach (var kv in layers)
+        {
+            var x = 40 + (maxW - widths[kv.Key]) / 2;
+            foreach (var n in kv.Value.OrderBy(n => order[n.Id]).ThenBy(n => n.Id))
+            {
+                n.X = x;
+                n.Y = yOf[kv.Key];
+                x += SizeOf(n.Id).w + gapX;
+            }
+        }
+        needMeasure = true;
+        await Save();
+    }
+
+    // ------------------------------------------------------------ geometry & colour
+    (double x, double y)? PortPos(int node, int idx, bool premise)
+    {
+        return ports.TryGetValue($"{node}:{(premise ? "p" : "c")}:{idx}", out var m)
+            ? (m.X, premise ? m.Top : m.Bottom)
+            : null;
+    }
+
+    static string Bezier((double x, double y) a, (double x, double y) b)
+    {
+        var d = Math.Clamp(Math.Abs(b.y - a.y) / 2, 40, 160);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        return string.Format(inv, "M {0:0.#} {1:0.#} C {0:0.#} {2:0.#}, {3:0.#} {4:0.#}, {3:0.#} {5:0.#}", a.x, a.y, a.y + d, b.x, b.y - d, b.y);
+    }
+
+    TreeJudgment? Judgment(int node, int idx, bool premise) =>
+        jmap.TryGetValue((node, idx, premise), out var j) ? j : null;
+
+    static double Hue(int c) => (c * 137.508) % 360;
+
+    static string ChipStyle(TreeJudgment? j)
+    {
+        if (j is null) return "";
+        var h = Hue(j.Class).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return $"background: hsl({h} 70% 88%); border-color: hsl({h} 55% 45%); color: #1c1e26";
+    }
+
+    static string SwatchStyle(int c)
+    {
+        var h = Hue(c).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return $"background: hsl({h} 70% 80%); border-color: hsl({h} 55% 45%)";
+    }
+}

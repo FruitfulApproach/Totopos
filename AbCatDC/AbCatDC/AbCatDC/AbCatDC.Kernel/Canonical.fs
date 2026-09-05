@@ -33,6 +33,7 @@ let private alphaRename (ty: Ty) : Ty * (Name * Name) list =
         | Ty.Var a -> (match Map.tryFind a env with Some b -> Ty.Var b | None -> ty)
         | Ty.Power (b, n) -> Ty.Power (go env depth b, n)
         | Ty.Commutes b -> Ty.Commutes (go env depth b)
+        | Ty.Exact (b, ax) -> Ty.Exact (go env depth b, ax)
         | Ty.InCategory (d, c) -> Ty.InCategory (go env depth d, go env depth c)
         | Ty.HasType (subj, t) -> Ty.HasType (go env depth subj, go env depth t)
         | Ty.Eq (a, b) -> Ty.Eq (go env depth a, go env depth b)
@@ -86,6 +87,7 @@ let rec private mapVars (f: Name -> Name) ty =
     | Ty.Var a -> Ty.Var (f a)
     | Ty.Power (b, n) -> Ty.Power (mapVars f b, n)
     | Ty.Commutes b -> Ty.Commutes (mapVars f b)
+    | Ty.Exact (b, ax) -> Ty.Exact (mapVars f b, ax)
     | Ty.InCategory (d, c) -> Ty.InCategory (mapVars f d, mapVars f c)
     | Ty.HasType (subj, t) -> Ty.HasType (mapVars f subj, mapVars f t)
     | Ty.Eq (a, b) -> Ty.Eq (mapVars f a, mapVars f b)
@@ -122,7 +124,7 @@ let private freeVarsInOrder (ty: Ty) : Name list =
         match ty with
         | Ty.Var a when not (isBoundName a) -> if not (acc.Contains a) then acc.Add a
         | Ty.Var _ | Ty.Atom _ | Ty.Lit _ | Ty.Sketch _ -> ()
-        | Ty.Power (b, _) | Ty.Commutes b -> go b
+        | Ty.Power (b, _) | Ty.Commutes b | Ty.Exact (b, _) -> go b
         | Ty.InCategory (a, b) -> go a; go b
         | Ty.HasType (subj, t) -> go subj; go t
         | Ty.Eq (a, b) -> go a; go b
@@ -176,6 +178,7 @@ let rec private variants (ty: Ty) : Ty list =
     | Ty.Atom _ | Ty.Var _ | Ty.Lit _ | Ty.Sketch _ -> [ ty ]
     | Ty.Power (b, n) -> via (fun l -> Ty.Power (l.[0], n)) [ b ]
     | Ty.Commutes b -> via (fun l -> Ty.Commutes l.[0]) [ b ]
+    | Ty.Exact (b, ax) -> via (fun l -> Ty.Exact (l.[0], ax)) [ b ]
     | Ty.InCategory (d, c) -> via (fun l -> Ty.InCategory (l.[0], l.[1])) [ d; c ]
     | Ty.HasType (subj, t) -> via (fun l -> Ty.HasType (l.[0], l.[1])) [ subj; t ]
     | Ty.Eq (a, b) ->

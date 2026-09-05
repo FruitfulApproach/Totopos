@@ -1151,6 +1151,52 @@ div.page main .top-row.ab-top-row {
     opacity: 1;
 }
 
+/* ---------- premise / conclusion rows ---------- */
+
+.ab-tabs-group {
+    margin: .5rem 0 .2rem;
+}
+
+.ab-tabs-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .4rem;
+    padding: .3rem .1rem;
+    min-height: 2.4rem;
+    border-radius: 8px;
+    transition: background .15s ease;
+}
+
+.ab-tabs-label {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ab-muted);
+    min-width: 5.6rem;
+    user-select: none;
+}
+
+/* the inference line itself, doubling as the premise/conclusion divider */
+.ab-tabs-rule {
+    height: 2px;
+    background: var(--ab-text);
+    border-radius: 1px;
+    opacity: .8;
+    margin: .1rem 0;
+}
+
+.ab-tabs-hint {
+    margin-bottom: 0;
+    font-style: italic;
+}
+
+/* the whole row lights up as a drop target while a pill is in flight */
+.ab-tabs-row.ab-drop-open {
+    background: var(--ab-accent-soft);
+}
+
 /* ---------- tab drag-to-reorder ---------- */
 
 .ab-tab[draggable="true"] {
@@ -1190,6 +1236,1008 @@ div.page main .top-row.ab-top-row {
     .ab-order-warn .ab-kind-btn {
         margin-left: auto;
     }
+
+/* ---------- diagram semantics ---------- */
+
+.ab-sem-toggle {
+    align-self: end;
+}
+
+    .ab-sem-toggle input {
+        margin-right: .4rem;
+    }
+
+/* what a diagram step contributes, collapsed under the step */
+.ab-step-derived {
+    display: block;
+    margin-top: .25rem;
+}
+
+.ab-link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--ab-muted);
+    font-size: .8rem;
+    cursor: pointer;
+}
+
+    .ab-link-btn:hover {
+        color: var(--ab-accent);
+    }
+
+.ab-derived-list {
+    margin: .25rem 0 0 1rem;
+    padding: 0;
+    font-size: .85rem;
+    color: var(--ab-muted);
+    list-style: none;
+}
+
+.ab-engine-via {
+    display: block;
+    margin-top: .2rem;
+    font-size: .82rem;
+    color: var(--ab-muted);
+}
+
+.ab-meaning {
+    white-space: pre-wrap;
+}
+
+.ab-sketch-warn {
+    margin-top: .3rem;
+    font-size: .82rem;
+}
+
+    .ab-sketch-warn i {
+        color: var(--ab-warn, #d08a00);
+        margin-right: .3rem;
+    }
+
+/* ---------- proof tree ---------- */
+
+.pt-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: .5rem;
+    margin-top: .6rem;
+}
+
+    .pt-toolbar .pt-stmt {
+        flex: 1 1 22rem;
+        min-width: 16rem;
+    }
+
+.pt-help {
+    margin: .5rem 0 0;
+    font-size: .85rem;
+}
+
+.pt-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .pt-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.pt-canvas {
+    position: relative;
+    overflow: auto;
+    touch-action: none;
+    height: 72vh;
+    min-height: 480px;
+    background: var(--ab-card);
+    border: 1px solid var(--ab-border);
+    border-radius: 12px;
+    box-shadow: var(--ab-shadow);
+    background-image: radial-gradient(var(--ab-border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    user-select: none;
+}
+
+.pt-surface {
+    position: relative;
+}
+
+.pt-wires {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.pt-wire {
+    fill: none;
+    stroke: var(--ab-accent);
+    stroke-width: 2.25;
+    pointer-events: visibleStroke;
+    cursor: pointer;
+    opacity: .9;
+}
+
+    .pt-wire:hover {
+        stroke-width: 3.5;
+    }
+
+    .pt-wire.sel {
+        stroke: var(--ab-accent-2);
+        stroke-width: 3.5;
+    }
+
+    .pt-wire.bad {
+        stroke: var(--ab-bad);
+        stroke-dasharray: 6 4;
+    }
+
+    .pt-wire.cycle {
+        stroke: var(--ab-bad);
+        stroke-width: 3.5;
+    }
+
+    .pt-wire.pending {
+        stroke: var(--ab-muted);
+        stroke-dasharray: 5 4;
+        pointer-events: none;
+    }
+
+.pt-wire-del {
+    pointer-events: all;
+    cursor: pointer;
+}
+
+    .pt-wire-del circle {
+        fill: var(--ab-card);
+        stroke: var(--ab-bad);
+        stroke-width: 1.5;
+    }
+
+    .pt-wire-del text {
+        fill: var(--ab-bad);
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+.pt-node {
+    position: absolute;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--ab-card);
+    border: 1px solid var(--ab-border);
+    border-radius: 10px;
+    box-shadow: var(--ab-shadow);
+    padding: .35rem .5rem;
+    min-width: 8rem;
+    z-index: 1;
+    cursor: grab;
+    touch-action: none;
+}
+
+    .pt-node:active {
+        cursor: grabbing;
+    }
+
+    .pt-node.cycle {
+        border-color: var(--ab-bad);
+        box-shadow: 0 0 0 3px var(--ab-bad-soft), var(--ab-shadow);
+    }
+
+    .pt-node.broken {
+        border-style: dashed;
+    }
+
+    .pt-node.stmt {
+        border-radius: 999px;
+        min-width: 0;
+    }
+
+.pt-ports {
+    display: flex;
+    gap: .5rem;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+}
+
+    .pt-ports.top {
+        padding-bottom: .3rem;
+    }
+
+    .pt-ports.bottom {
+        padding-top: .3rem;
+        align-items: flex-start;
+    }
+
+.pt-nopremise {
+    font-size: .75rem;
+    color: var(--ab-muted);
+    font-style: italic;
+}
+
+.pt-chip {
+    position: relative;
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    padding: .3rem .6rem;
+    font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif;
+    font-size: .92rem;
+    white-space: nowrap;
+    cursor: inherit;
+}
+
+    .pt-chip.open {
+        border-style: dashed;
+    }
+
+    .pt-chip .pt-dot {
+        position: absolute;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        margin-left: -7px;
+        border-radius: 50%;
+        background: var(--ab-accent);
+        border: 2px solid var(--ab-card);
+        box-shadow: 0 0 0 1px var(--ab-accent);
+        transition: transform .1s ease;
+    }
+
+    .pt-chip .pt-dot.in {
+        top: -8px;
+        pointer-events: none;
+    }
+
+    .pt-chip .pt-dot.out {
+        bottom: -8px;
+        cursor: crosshair;
+    }
+
+        .pt-chip .pt-dot.out:hover {
+            transform: scale(1.35);
+        }
+
+.pt-bar {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    border-top: 2px solid var(--ab-text);
+    padding: .2rem .25rem 0;
+    font-size: .8rem;
+}
+
+.pt-node.stmt .pt-bar {
+    border-top: 1px dashed var(--ab-border);
+}
+
+.pt-id {
+    color: var(--ab-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-name {
+    font-weight: 600;
+    color: var(--ab-text);
+}
+
+.pt-kind {
+    color: var(--ab-muted);
+    font-size: .72rem;
+    text-transform: lowercase;
+}
+
+.pt-x {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--ab-muted);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 .2rem;
+}
+
+    .pt-x:hover {
+        color: var(--ab-bad);
+    }
+
+.pt-broken {
+    color: var(--ab-bad);
+    font-size: .75rem;
+    max-width: 22rem;
+    white-space: normal;
+}
+
+.pt-context {
+    background: var(--ab-card);
+    border: 1px solid var(--ab-border);
+    border-radius: 12px;
+    box-shadow: var(--ab-shadow);
+    padding: .8rem .9rem;
+    overflow: auto;
+    height: 72vh;
+    min-height: 480px;
+    font-size: .88rem;
+}
+
+    .pt-context h6 {
+        margin: 0 0 .6rem;
+        color: var(--ab-text);
+    }
+
+.pt-ctx-sec {
+    margin-top: .8rem;
+}
+
+.pt-ctx-title {
+    font-weight: 600;
+    margin-bottom: .3rem;
+}
+
+.pt-ctx-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: .5rem;
+    padding: .15rem 0;
+    border-bottom: 1px dashed var(--ab-border);
+    font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif;
+}
+
+.pt-ctx-node {
+    color: var(--ab-muted);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: .78rem;
+    white-space: nowrap;
+}
+
+.pt-ctx-error {
+    background: var(--ab-bad-soft);
+    color: var(--ab-bad);
+    border-radius: 8px;
+    padding: .4rem .6rem;
+    margin-bottom: .4rem;
+}
+
+.pt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-top: .35rem;
+}
+
+.pt-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1.5px solid transparent;
+}
+
+/* ---------- proof tree: full-height page with collapsible panels ---------- */
+
+.pt-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 3.5rem - 3.1rem);
+    min-height: 480px;
+    margin: -0.2rem 0 0;
+}
+
+.pt-top {
+    flex: 0 0 auto;
+    background: var(--ab-card);
+    border: 1px solid var(--ab-border);
+    border-radius: 12px;
+    box-shadow: var(--ab-shadow);
+    padding: .5rem .7rem;
+}
+
+    .pt-top .pt-toolbar {
+        margin-top: 0;
+        align-items: center;
+    }
+
+.pt-tool-group {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+}
+
+.pt-tool-label {
+    color: var(--ab-muted);
+    font-size: .8rem;
+    white-space: nowrap;
+}
+
+    .pt-tool-label i {
+        color: var(--ab-accent);
+    }
+
+.pt-select {
+    margin: 0;
+    max-width: 16rem;
+    padding: .3rem .5rem;
+    font-size: .88rem;
+}
+
+.pt-role {
+    max-width: 6rem;
+}
+
+.pt-stmt-editor {
+    min-width: 16rem;
+    flex: 1 1 18rem;
+}
+
+    .pt-stmt-editor .ab-se {
+        margin-bottom: 0;
+    }
+
+.pt-hdivider,
+.pt-vdivider {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ab-bg);
+    color: var(--ab-muted);
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+}
+
+.pt-hdivider {
+    height: 14px;
+    margin: .2rem 0;
+    border-radius: 7px;
+}
+
+.pt-vdivider {
+    width: 14px;
+    margin: 0 .2rem;
+    border-radius: 7px;
+    cursor: col-resize;
+}
+
+    .pt-hdivider:hover,
+    .pt-vdivider:hover {
+        background: var(--ab-accent-soft);
+        color: var(--ab-accent);
+    }
+
+.pt-grip {
+    font-size: .68rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.pt-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+}
+
+    .pt-main .pt-canvas {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: auto;
+        min-height: 0;
+    }
+
+    .pt-main .pt-context {
+        flex: 0 0 auto;
+        height: auto;
+        min-height: 0;
+    }
+
+/* statement roles */
+.pt-node.stmt.given {
+    border-left: 4px solid var(--ab-ok);
+}
+
+.pt-node.stmt.goal {
+    border-left: 4px solid var(--ab-accent);
+}
+
+.pt-node.stmt.lemma {
+    border-left: 4px solid var(--ab-muted);
+}
+
+.pt-node.proven {
+    box-shadow: 0 0 0 3px var(--ab-ok-soft), var(--ab-shadow);
+}
+
+.pt-node.fresh {
+    box-shadow: 0 0 0 3px var(--ab-accent-soft), var(--ab-shadow);
+}
+
+.pt-role-btn {
+    background: none;
+    border: 1px solid var(--ab-border);
+    border-radius: 999px;
+    padding: 0 .45rem;
+    font-size: .72rem;
+    color: var(--ab-muted);
+    cursor: pointer;
+}
+
+    .pt-role-btn.given {
+        color: var(--ab-ok);
+        border-color: var(--ab-ok);
+    }
+
+    .pt-role-btn.goal {
+        color: var(--ab-accent);
+        border-color: var(--ab-accent);
+    }
+
+.pt-proven-badge {
+    color: var(--ab-ok);
+    font-size: .8rem;
+}
+
+.pt-chip.est {
+    box-shadow: inset 0 0 0 1px var(--ab-ok);
+}
+
+.pt-est-mark {
+    color: var(--ab-ok);
+    font-size: .7rem;
+    margin-right: .3rem;
+}
+
+.pt-chip.prem.wired .pt-dot.in {
+    background: var(--ab-ok);
+}
+
+.pt-wire.fresh {
+    stroke: var(--ab-accent-2);
+    stroke-width: 3.5;
+}
+
+/* search controls */
+.pt-search-row {
+    display: flex;
+    gap: .4rem;
+    margin-bottom: .4rem;
+}
+
+.pt-check {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .85rem;
+}
+
+.pt-slider {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    margin-top: .3rem;
+}
+
+    .pt-slider.off {
+        color: var(--ab-muted);
+    }
+
+    .pt-slider input[type=range] {
+        width: 100%;
+        accent-color: var(--ab-accent);
+    }
+
+.pt-speed {
+    font-variant-numeric: tabular-nums;
+    min-width: 2rem;
+    text-align: right;
+}
+
+.pt-status {
+    margin: .4rem 0 0;
+}
+
+.pt-note {
+    font-size: .8rem;
+    color: var(--ab-text);
+    font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif;
+    border-left: 2px solid var(--ab-accent);
+    padding-left: .4rem;
+    margin-top: .3rem;
+}
+
+.pt-ctx-ok {
+    background: var(--ab-ok-soft);
+    color: var(--ab-ok);
+    border-radius: 8px;
+    padding: .4rem .6rem;
+    margin-bottom: .4rem;
+    font-weight: 600;
+}
+
+/* pictures inside proof-tree chips: the live frame is inert to the pointer so a
+   press drags the node — the wrapper stays live, it owns the double-click */
+.pt-chip iframe {
+    pointer-events: none;
+}
+
+.pt-chip .ab-inline-sketch-wrap {
+    cursor: zoom-in;
+}
+
+.pt-chip .ab-inline-sketch-wrap {
+    vertical-align: middle;
+    margin: 0 .2rem;
+}
+
+/* a stored picture standing in for a live quiver frame */
+.ab-inline-snap {
+    display: inline-block;
+    vertical-align: middle;
+    border: 1px solid var(--ab-border);
+    border-radius: 6px;
+    background: #fff;
+    max-width: 100%;
+}
+
+.ab-snap-btn {
+    margin-left: .6rem;
+}
+
+.ab-snap-note {
+    margin-left: .5rem;
+    color: var(--ab-muted);
+    font-size: .85rem;
+}
+
+/* a statement is ONE chip with a port on each side */
+.pt-ports.none {
+    display: none;
+}
+
+.pt-ports.single {
+    padding: .5rem 0;
+}
+
+.pt-chip.stmtchip {
+    cursor: inherit;
+}
+
+    .pt-chip.stmtchip .pt-dot.in {
+        pointer-events: auto;
+    }
+
+/* the proof tree's diagram modal: view, then edit in place */
+.pt-modal {
+    display: flex;
+    flex-direction: column;
+}
+
+.pt-modal-head {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .4rem .8rem;
+    background: var(--ab-card);
+    border-bottom: 1px solid var(--ab-border);
+    color: var(--ab-text);
+    font-size: .9rem;
+}
+
+.pt-modal-label i {
+    color: var(--ab-accent);
+}
+
+.pt-xedit {
+    background: none;
+    border: 1px dashed transparent;
+    border-radius: 6px;
+    padding: .1rem .4rem;
+    font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif;
+    font-size: 1.05rem;
+    color: var(--ab-text);
+    cursor: text;
+}
+
+    .pt-xedit i {
+        font-size: .75rem;
+        color: var(--ab-muted);
+        opacity: 0;
+    }
+
+    .pt-xedit:hover {
+        border-color: var(--ab-accent);
+    }
+
+        .pt-xedit:hover i {
+            opacity: 1;
+        }
+
+.pt-xedit-input {
+    max-width: 14rem;
+    margin: 0;
+}
+
+.pt-modal-view {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.pt-modal-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.pt-modal-pencil {
+    position: absolute;
+    top: 1rem;
+    right: 5rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    border: none;
+    background: var(--ab-accent);
+    color: #fff;
+    font-size: 1.2rem;
+    box-shadow: var(--ab-shadow);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.pt-modal-view:hover .pt-modal-pencil,
+.pt-modal-pencil:focus {
+    opacity: 1;
+}
+
+/* a sketch without its (required) snapshot: flagged, with a camera to go take one */
+.ab-inline-sketch-wrap.ab-needs-snap {
+    position: relative;
+    display: inline-block;
+    border: 2px solid var(--ab-bad);
+    border-radius: 8px;
+    padding: 2px;
+}
+
+.ab-snap-cta {
+    position: absolute;
+    right: -10px;
+    top: -10px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--ab-card);
+    background: var(--ab-bad);
+    color: #fff;
+    font-size: .75rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: var(--ab-shadow);
+    padding: 0;
+    z-index: 2;
+}
+
+    .ab-snap-cta:hover {
+        transform: scale(1.12);
+    }
+
+/* the placeholder a preview shows until the sketch has a snapshot */
+.ab-snap-missing {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+    padding: 0 .6rem;
+    color: var(--ab-bad);
+    font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif;
+    font-size: .9rem;
+    background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ab-bad) 10%, transparent) 6px 12px);
+    border-radius: 6px;
+    vertical-align: middle;
+}
+
+.ab-snap-card {
+    display: block;
+    max-width: 100%;
+    max-height: 170px;
+    border: 1px solid var(--ab-border);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.ab-snap-missing-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    width: 100%;
+    min-height: 90px;
+    border: 2px dashed var(--ab-bad);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ab-bad);
+    cursor: pointer;
+    font-size: .9rem;
+}
+
+.pt-modal-snap {
+    display: block;
+    max-width: calc(100% - 2rem);
+    max-height: calc(100% - 2rem);
+    margin: 1rem auto;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: var(--ab-shadow);
+}
+
+.pt-modal-nosnap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .8rem;
+    height: 100%;
+    color: var(--ab-bad);
+    font-size: 1.05rem;
+    text-align: center;
+    padding: 2rem;
+}
+
+    .pt-modal-nosnap i {
+        font-size: 3rem;
+    }
+
+/* the snapshot just taken, shown bottom-right for a moment */
+.ab-snap-toast {
+    position: fixed;
+    right: 1.2rem;
+    bottom: 1.2rem;
+    z-index: 3000;
+    background: var(--ab-card);
+    border: 1px solid var(--ab-border);
+    border-radius: 12px;
+    box-shadow: var(--ab-shadow);
+    padding: .5rem .6rem .4rem;
+    max-width: 22rem;
+    animation: ab-snap-toast 4s ease-in forwards;
+    pointer-events: none;
+}
+
+    .ab-snap-toast img {
+        display: block;
+        max-width: 20rem;
+        max-height: 12rem;
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .ab-snap-toast span {
+        display: block;
+        font-size: .78rem;
+        color: var(--ab-ok);
+        margin-top: .3rem;
+    }
+
+@keyframes ab-snap-toast {
+    0% { opacity: 0; transform: translateY(12px) scale(.96); }
+    8% { opacity: 1; transform: translateY(0) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(6px); }
+}
+
+/* the teach-me arrow pointing at the snapshot button */
+.ab-teach {
+    position: fixed;
+    z-index: 3001;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    transform: translate(-100%, -50%);
+    pointer-events: none;
+    padding-right: .5rem;
+}
+
+.ab-teach-arrow {
+    font-size: 2rem;
+    color: var(--ab-bad);
+    animation: ab-teach-bounce .8s ease-in-out infinite;
+    line-height: 1;
+}
+
+.ab-teach-note {
+    background: var(--ab-bad);
+    color: #fff;
+    border-radius: 10px;
+    padding: .45rem .7rem;
+    font-size: .85rem;
+    max-width: 22rem;
+    box-shadow: var(--ab-shadow);
+}
+
+@keyframes ab-teach-bounce {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+}
+
+/* ---------- tree canvas component (assistant) ---------- */
+.tc-root { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tc-canvas { position: relative; flex: 1; min-height: 0; height: auto; border: none; border-radius: 0; box-shadow: none; }
+.tc-grid { background-image: linear-gradient(to right, color-mix(in srgb, var(--ab-border) 70%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--ab-border) 70%, transparent) 1px, transparent 1px); background-size: var(--tc-grid, 20px) var(--tc-grid, 20px); }
+.tc-zoom { position: absolute; top: .4rem; right: 1.2rem; display: flex; gap: .2rem; z-index: 5; background: color-mix(in srgb, var(--ab-card) 85%, transparent); border-radius: 8px; padding: .2rem; }
+.tc-pencil { margin-left: .2rem; font-size: .75rem; }
+.tc-unfold { margin-left: .35rem; border: 1px solid var(--ab-accent); background: var(--ab-card); color: var(--ab-accent); border-radius: 6px; width: 1.5rem; height: 1.5rem; font-size: .72rem; cursor: pointer; vertical-align: middle; }
+    .tc-unfold:hover { background: var(--ab-accent); color: #fff; }
+.tc-unfold-panel { margin-top: .4rem; border-top: 1px dashed var(--ab-border); padding-top: .4rem; max-width: 30rem; font-size: .85rem; }
+.tc-unfold-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .3rem; color: var(--ab-muted); }
+    .tc-unfold-head .pt-x { margin-left: auto; }
+.tc-unfold-list { max-height: 14rem; overflow: auto; margin-bottom: .4rem; }
+.tc-unfold-item { display: flex; gap: .4rem; align-items: center; padding: .1rem 0; font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif; white-space: nowrap; cursor: pointer; }
+.pa-dragrule { cursor: grab; }
+.pa-canvas-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--ab-border); border-radius: 12px; overflow: hidden; background: var(--ab-card); }
+.pa-settings { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--ab-muted); margin-left: auto; }
+    .pa-settings input[type=number] { width: 4rem; margin: 0; padding: .15rem .3rem; }
+
+/* ---------- proof assistant ---------- */
+.pa-page { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: 1rem; height: calc(100vh - 3.5rem - 3.1rem); min-height: 480px; }
+.pa-left { display: flex; flex-direction: column; min-height: 0; gap: .6rem; }
+.pa-head { display: flex; align-items: center; gap: .5rem; }
+    .pa-head h5 { margin: 0 .4rem 0 0; }
+    .pa-head h5 i { color: var(--ab-accent); }
+.pa-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; }
+.pa-load-main { font-size: 1.15rem; padding: .8rem 1.4rem; }
+.pa-goal { display: flex; align-items: center; gap: .7rem; background: var(--ab-card); border: 1px solid var(--ab-border); border-radius: 12px; padding: .5rem .8rem; }
+    .pa-goal.proven { border-color: var(--ab-ok); background: var(--ab-ok-soft); }
+.pa-label { color: var(--ab-muted); font-size: .8rem; white-space: nowrap; }
+    .pa-label i { color: var(--ab-accent); }
+.pa-steps { flex: 1; min-height: 0; overflow: auto; background: var(--ab-card); border: 1px solid var(--ab-border); border-radius: 12px; padding: .4rem .6rem; }
+.pa-step { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .5rem; padding: .3rem 0; border-bottom: 1px dashed var(--ab-border); }
+    .pa-step.given { background: color-mix(in srgb, var(--ab-ok) 6%, transparent); }
+    .pa-step.last { background: var(--ab-accent-soft); }
+.pa-num { color: var(--ab-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.pa-expr { font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif; font-size: 1rem; }
+.pa-just { color: var(--ab-muted); font-size: .78rem; white-space: nowrap; }
+.pa-step { grid-template-columns: 2rem minmax(0, 1fr) auto auto; }
+.pa-pencil { opacity: 0; border: none; background: var(--ab-accent-soft); color: var(--ab-accent); border-radius: 50%; width: 1.8rem; height: 1.8rem; cursor: pointer; transition: opacity .15s ease; }
+    .pa-step:hover .pa-pencil, .pa-pencil:focus-visible { opacity: 1; }
+    .pa-pencil:hover { background: var(--ab-accent); color: #fff; }
+.pa-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: 2.4rem; }
+.pa-macro { border: 1px solid var(--ab-accent); background: var(--ab-accent-soft); color: var(--ab-accent); border-radius: 999px; padding: .35rem .8rem; cursor: pointer; font-weight: 600; }
+    .pa-macro:hover { background: var(--ab-accent); color: #fff; }
+.pa-naming { display: inline-flex; gap: .3rem; align-items: center; }
+    .pa-naming .ab-text-input { margin: 0; max-width: 12rem; }
+.pa-rules { background: var(--ab-card); border: 1px solid var(--ab-border); border-radius: 12px; padding: .6rem .7rem; overflow: auto; min-height: 0; font-size: .88rem; }
+.pa-rules-head { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: .4rem; }
+    .pa-rules-head i { color: var(--ab-accent); }
+.pa-kind-head { cursor: pointer; font-weight: 600; padding: .25rem 0; user-select: none; }
+    .pa-kind-head i { width: 1rem; color: var(--ab-muted); font-size: .75rem; }
+.pa-rule { display: flex; align-items: center; gap: .4rem; padding: .2rem .4rem; border-radius: 6px; cursor: pointer; color: var(--ab-muted); }
+    .pa-rule.ok { color: var(--ab-ok); background: var(--ab-ok-soft); font-weight: 600; }
+    .pa-rule.sel { outline: 1px solid var(--ab-accent); }
+    .pa-rule:hover { background: var(--ab-accent-soft); }
+.pa-rule-name { flex: 1; }
+.pa-rule-btn { color: var(--ab-accent); font-size: .75rem; }
+.pa-apply { border: none; background: var(--ab-ok); color: #fff; border-radius: 999px; padding: 0 .5rem; font-size: .72rem; cursor: pointer; }
+.pa-rule-detail { margin-top: .6rem; border-top: 1px solid var(--ab-border); padding-top: .5rem; }
+.pa-rule-line { font-family: "Cambria Math", "STIX Two Math", "Segoe UI", serif; padding: .1rem 0; }
+.pa-rule-bar { border-top: 2px solid var(--ab-text); margin: .2rem 0; }
+.pa-rule-would { font-size: .8rem; color: var(--ab-ok); margin-top: .3rem; }
+.pa-menu { position: fixed; z-index: 3000; background: var(--ab-card); border: 1px solid var(--ab-border); border-radius: 10px; box-shadow: var(--ab-shadow); padding: .3rem; display: flex; flex-direction: column; min-width: 12rem; }
+    .pa-menu button { background: none; border: none; text-align: left; padding: .4rem .6rem; border-radius: 6px; color: var(--ab-text); cursor: pointer; }
+        .pa-menu button:hover { background: var(--ab-accent-soft); }
+        .pa-menu button.danger { color: var(--ab-bad); }
 
 /* an expression that no longer parses (e.g. after a rigid-constants change) */
 .ab-bad-expr {
@@ -1469,6 +2517,15 @@ div.page main .top-row.ab-top-row {
     .ab-rule.editing {
         outline: 2px solid var(--ab-accent);
     }
+
+    .ab-rule.highlight {
+        animation: ab-rule-pulse 1.2s ease-in-out 4;
+    }
+
+@keyframes ab-rule-pulse {
+    0%, 100% { box-shadow: var(--ab-shadow); }
+    50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ab-accent) 55%, transparent), var(--ab-shadow); }
+}
 
     .ab-rule.k-introduction { border-left-color: var(--ab-accent); }
     .ab-rule.k-elimination { border-left-color: var(--ab-ok); }

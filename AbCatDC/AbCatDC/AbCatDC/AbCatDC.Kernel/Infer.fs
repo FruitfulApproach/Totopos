@@ -14,6 +14,8 @@ let private atomDescriptions =
            "ℚ", "the rationals"
            "ℝ", "the reals"
            "ℂ", "the complex numbers"
+           "Type", "the universe of types — the sort a formation rule concludes into (A → B : Type)"
+           "Prop", "the sort of propositions — what an equation or a commutation claim inhabits"
            "Mono", "the class of monomorphisms — m : Mono is the judgment 'm is monic'"
            "Epi", "the class of epimorphisms — e : Epi is the judgment 'e is epic'"
            "Ker", "kernel marker — k : Ker f is the judgment 'k is a kernel of f'"
@@ -116,6 +118,10 @@ let infer (ty: Ty) : Judgment list =
                 else defaultVar v
         | Ty.Sketch n ->
             add $"[{n}]" "Diagram" "a named quiver sketch — its identity is the diagram's canonical form"
+        | Ty.Exact (b, ax) ->
+            go env b
+            add (Ty.format (Ty.Exact (b, ax))) "Prop"
+                "exactness assertion: every row (column) of the drawn diagram is an exact sequence — exact(f, g) at each interior object"
         | Ty.Commutes b ->
             go env b
             add (Ty.format (Ty.Commutes b)) "Prop"

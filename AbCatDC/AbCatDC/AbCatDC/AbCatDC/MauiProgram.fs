@@ -9,6 +9,7 @@ open CommunityToolkit.Maui.Markup
 open Microsoft.Maui.Foldable
 open AbCatDC.Extensions
 open AbCatDC.RazorLib.Data
+open AbCatDC.RazorLib.Services
 
 type MauiProgram =
     static member CreateMauiApp() =
@@ -27,6 +28,7 @@ type MauiProgram =
             .ConfigureServices(fun services ->
                 services
                     .AddSingleton<WeatherForecastService>()
+                    .AddSingleton<ISnapshotService, SnapshotService>()
                     .AddScoped<AbCatDC.RazorLib.Services.AppSettingsService>()
 #if DEBUG
                     .AddBlazorWebViewDeveloperTools()

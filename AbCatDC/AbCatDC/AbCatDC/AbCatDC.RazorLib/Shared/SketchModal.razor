@@ -1,0 +1,149 @@
+@using AbCatDC.Kernel
+@inject IJSRuntime JS
+@inject IServiceProvider Services
+
+@* Full-screen diagram modal: shows the snapshot (or a "take one" panel), a
+   pencil on hover swaps in the quiver editor with a Snapshot button, the check
+   closes (importing the drawing when the editor was open). *@
+<div class="ab-sketch-overlay pt-modal">
+    <div class="pt-modal-head">
+        <span class="pt-modal-label"><i class="fa-solid fa-compass-drafting"></i> Diagram <b>[@Name]</b></span>
+        @if (editing)
+        {
+            <span class="ab-muted">Draw, press quiver's <strong>Save</strong> (Ctrl+S), then the check to bring it back.</span>
+            @if (SnapshotSvc is not null)
+            {
+                <button type="button" id="sm-snap-btn" class="ab-kind-btn ab-snap-btn" @onclick="TakeSnapshot" disabled="@snapBusy"
+                        title="Store a picture of the diagram as drawn; previews show it everywhere">
+                    <i class="fa-solid fa-camera"></i> @(snapBusy ? "…" : "Snapshot")
+                </button>
+                @if (snapNote is not null) { <span class="ab-snap-note">@snapNote</span> }
+            }
+        }
+        else
+        {
+            <span class="ab-muted">hover the picture for the pencil; the check closes</span>
+        }
+    </div>
+    @if (editing)
+    {
+        <iframe id="sm-frame" class="ab-sketch-frame pt-modal-frame" src="@EditSrc" title="quiver editor"></iframe>
+    }
+    else
+    {
+        <div class="pt-modal-view">
+            @if (!string.IsNullOrEmpty(Snapshot))
+            {
+                <img class="pt-modal-snap" src="@Snapshot" alt="[@Name]" />
+            }
+            else
+            {
+                <div class="pt-modal-nosnap">
+                    <i class="fa-solid fa-camera"></i>
+                    <div>No snapshot yet for <b>[@Name]</b>. Press the pencil to open the editor, position the diagram, and take one.</div>
+                </div>
+            }
+            <button type="button" class="pt-modal-pencil" title="edit this diagram" @onclick="StartEdit">
+                <i class="fa-solid fa-pencil"></i>
+            </button>
+        </div>
+    }
+    <button type="button" class="ab-sketch-done" title="@(editing ? "Done — import the diagram and close" : "Done")" @onclick="Done">
+        <svg viewBox="0 0 24 24" width="26" height="26" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 12.5 L9.5 18 L20 6.5" fill="none" stroke="currentColor" stroke-width="3"
+                  stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    </button>
+</div>
+@if (snapToast is not null)
+{
+    <div class="ab-snap-toast"><img src="@snapToast" alt="snapshot" /><span><i class="fa-solid fa-check"></i> snapshot stored</span></div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter, EditorRequired] public string Json { get; set; } = "";
+    [Parameter] public string? Snapshot { get; set; }
+    /// <summary>open straight in the editor</summary>
+    [Parameter] public bool StartEditing { get; set; }
+    /// <summary>the drawing brought back from the editor (normalized quiver JSON)</summary>
+    [Parameter] public EventCallback<string> OnSaved { get; set; }
+    /// <summary>a snapshot taken (PNG data URL)</summary>
+    [Parameter] public EventCallback<string> OnSnapshot { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    bool editing, teachPending, snapBusy, started;
+    string? snapNote, snapToast;
+    int toastSerial;
+
+    AbCatDC.RazorLib.Services.ISnapshotService? SnapshotSvc =>
+        (AbCatDC.RazorLib.Services.ISnapshotService?)Services.GetService(typeof(AbCatDC.RazorLib.Services.ISnapshotService));
+
+    string EditSrc
+    {
+        get
+        {
+            var t = (Json ?? "").Trim();
+            var b64 = t.StartsWith("[") ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(t)) : t;
+            return "_content/AbCatDC.RazorLib/quiver/index.html#q=" + b64;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!started) { started = true; if (StartEditing) { editing = true; teachPending = SnapshotSvc is not null; } }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (teachPending && editing)
+        {
+            teachPending = false;
+            try { await JS.InvokeVoidAsync("abEditor.teach", "sm-snap-btn", "Position the diagram so it is fully in view, press quiver's Save (Ctrl+S), then take the Snapshot — it becomes the picture shown everywhere.", 20000); } catch { }
+        }
+    }
+
+    void StartEdit()
+    {
+        editing = true;
+        teachPending = SnapshotSvc is not null;
+    }
+
+    async Task TakeSnapshot()
+    {
+        var svc = SnapshotSvc;
+        if (svc is null || snapBusy) return;
+        snapBusy = true;
+        snapNote = null;
+        try
+        {
+            var b64 = await svc.CapturePngBase64Async();
+            var url = string.IsNullOrEmpty(b64) ? "" : await JS.InvokeAsync<string>("abEditor.cropSnapshot", b64, "sm-frame", 900);
+            if (string.IsNullOrEmpty(url)) snapNote = "could not capture";
+            else
+            {
+                Snapshot = url;
+                snapNote = "stored";
+                try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
+                await OnSnapshot.InvokeAsync(url);
+                snapToast = url;
+                var serial = ++toastSerial;
+                _ = Task.Run(async () => { await Task.Delay(4200); if (serial == toastSerial) { snapToast = null; await InvokeAsync(StateHasChanged); } });
+            }
+        }
+        catch (Exception ex) { snapNote = "capture failed: " + ex.Message; }
+        snapBusy = false;
+    }
+
+    async Task Done()
+    {
+        try { await JS.InvokeVoidAsync("abEditor.teachOff"); } catch { }
+        if (editing)
+        {
+            var b64 = "";
+            try { b64 = await JS.InvokeAsync<string>("abEditor.readQuiverFrame", "sm-frame"); } catch { }
+            if (!string.IsNullOrEmpty(b64)) await OnSaved.InvokeAsync(QuiverImport.NormalizePositions(b64));
+        }
+        await OnClosed.InvokeAsync();
+    }
+}
