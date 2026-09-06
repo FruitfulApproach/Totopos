@@ -2,6 +2,9 @@
 
 #include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsSceneContextMenuEvent>
+#include <QPointer>
+#include "TutorSession.h"   // QPointer needs the complete type
 #include "Object.h"
 #include "Category.h"
 
@@ -18,6 +21,10 @@ public:
 
 	Category* ambientCategory() const { return m_ambientCategory; }
 
+	// one guided interaction at a time: a new one cancels the running one
+	void beginSession(TutorSession* session);
+	TutorSession* session() const { return m_session; }
+
 public slots:
 	// switch the ambient category by name (BigCat, Ab, R-Mod, ...); the
 	// objects already placed move over to the new one
@@ -28,11 +35,15 @@ signals:
 
 protected:
 	void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
+	// a right-click on the background is a right-click on the ambient category
+	void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
-	// true when a double-click at this item should create an object: on the
-	// background, or on the ambient category itself (its frame or label)
-	bool isCanvas(QGraphicsItem* item) const;
+	// the category a double-click at this item places into: the category
+	// hit (its frame or label), the ambient one for the background, none
+	// when some other node was hit
+	Category* categoryAt(QGraphicsItem* item) const;
 
 	Category* m_ambientCategory = nullptr;
+	QPointer<TutorSession> m_session;
 };

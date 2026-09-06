@@ -1,4 +1,6 @@
 ﻿#include "DiagramScene.h"
+#include "categories/BuiltInCategories.h"
+#include "TutorSession.h"
 
 DiagramScene::DiagramScene(QObject* parent)
 	: QGraphicsScene(parent)
@@ -19,7 +21,11 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	if (m_ambientCategory != nullptr && m_ambientCategory->id() == name)
 		return;
 
-	auto* fresh = new Category(name);
+	// a built-in is its own subclass (it knows what it is made of); anything
+	// else is a plain category the user defined
+	Category* fresh = Category::createBuiltIn(name);
+	if (fresh == nullptr)
+		fresh = new Category(name);
 	fresh->setPos(0, 0);
 	// the ambient category IS the canvas: it neither moves nor gets selected,
 	// so a press on it starts a rubber band, not a drag of everything
@@ -47,14 +53,35 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	emit ambientCategoryChanged(fresh);
 }
 
-bool DiagramScene::isCanvas(QGraphicsItem* item) const
+Category* DiagramScene::categoryAt(QGraphicsItem* item) const
 {
 	if (item == nullptr)
-		return true;
-	if (item == m_ambientCategory)
-		return true;
-	// the category's label is a plain text item parented to it
-	return item->parentItem() == m_ambientCategory && dynamic_cast<Node*>(item) == nullptr;
+		return m_ambientCategory;
+	if (auto* category = dynamic_cast<Category*>(item))
+		return category;
+	// a label is a plain text item parented to its node
+	if (dynamic_cast<Node*>(item) == nullptr)
+		return dynamic_cast<Category*>(item->parentItem());
+	return nullptr;   // some other node: its own business
+}
+
+void DiagramScene::beginSession(TutorSession* session)
+{
+	if (!m_session.isNull() && m_session != session)
+		m_session->cancel();
+	m_session = session;
+}
+
+void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+	QGraphicsScene::contextMenuEvent(event);   // an item under the cursor takes it
+	if (event->isAccepted())
+		return;
+	if (m_ambientCategory != nullptr)
+	{
+		m_ambientCategory->popupContextMenu(event->screenPos());
+		event->accept();
+	}
 }
 
 void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
@@ -63,11 +90,11 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	// label being edited, say); a double-click on the canvas creates an object
 	QGraphicsScene::mouseDoubleClickEvent(event);
 
-	if (!isCanvas(itemAt(event->scenePos(), QTransform())))
+	Category* category = categoryAt(itemAt(event->scenePos(), QTransform()));
+	if (category == nullptr)
 		return;
 
-	if (m_ambientCategory == nullptr)
-		setAmbientCategory("BigCat");
-	m_ambientCategory->createCanvasObject(event->scenePos());
+	// the category decides what it is made of: a category in BigCat, a set in Set, ...
+	category->createCanvasObject(event->scenePos());
 	event->accept();
 }

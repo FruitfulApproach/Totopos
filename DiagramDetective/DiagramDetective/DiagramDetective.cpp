@@ -15,6 +15,11 @@ DiagramDetective::DiagramDetective(QWidget *parent)
 
     // the panel's Category dropdown drives the scene's ambient category
     connect(ui->graphicsView, &SketchView::categoryChanged, diagram, &DiagramScene::setAmbientCategory);
+    connect(ui->graphicsView, &SketchView::categoryDefined, diagram, [diagram](const QString& name, const QStringList& props) {
+        diagram->setAmbientCategory(name);
+        if (diagram->ambientCategory() != nullptr)
+            diagram->ambientCategory()->setProperties(props);
+    });
     diagram->setAmbientCategory(ui->graphicsView->category());
 }
 

@@ -9,6 +9,22 @@
 #include <QColorDialog>
 #include <QStyleOptionGraphicsItem>
 
+qreal Node::s_snapUnit = 25.0;
+bool Node::s_snapEnabled = true;
+
+QPointF Node::snapped(const QPointF& parentPos) const
+{
+	if (!s_snapEnabled || s_snapUnit <= 0)
+		return parentPos;
+	// snap in scene coordinates: the parent's transform (its position,
+	// nesting depth) must not shift the grid
+	const QGraphicsItem* parent = parentItem();
+	const QPointF scenePt = parent != nullptr ? parent->mapToScene(parentPos) : parentPos;
+	const QPointF onGrid(qRound(scenePt.x() / s_snapUnit) * s_snapUnit,
+	                     qRound(scenePt.y() / s_snapUnit) * s_snapUnit);
+	return parent != nullptr ? parent->mapFromScene(onGrid) : onGrid;
+}
+
 Node::Node(const QString& id, QGraphicsItem *parent)
 	: QGraphicsObject(parent)
 {
@@ -38,8 +54,10 @@ void Node::setId(const QString& id) {
 		if (m_idText->toPlainText() != id)
 		{
 			prepareGeometryChange();
+			ancestorsPrepareGeometryChange();
 			m_idText->setPlainText(id);
 			centreLabel();
+			ancestorsUpdate();
 			emit idChanged(this, id);
 		}
 	}
@@ -47,8 +65,10 @@ void Node::setId(const QString& id) {
 		if (id.isEmpty())
 			return;
 		prepareGeometryChange();
+		ancestorsPrepareGeometryChange();
 		m_idText = new QGraphicsTextItem(id, this);
 		centreLabel();
+		ancestorsUpdate();
 		emit idChanged(this, id);
 	}
 }
@@ -65,9 +85,47 @@ void Node::setBorder(const QPen& border)
 {
 	if (m_border == border) return;
 	prepareGeometryChange();   // a wider pen paints outside the old rect
+	ancestorsPrepareGeometryChange();
 	m_border = border;
 	update();
+	ancestorsUpdate();
 	emit styleChanged(this);
+}
+
+int Node::containedCount(const QGraphicsItem* except) const
+{
+	int n = 0;
+	for (QGraphicsItem* c : childItems())
+		if (c != except && dynamic_cast<Node*>(c) != nullptr)   // nodes only: never our own label
+			++n;
+	return n;
+}
+
+void Node::refreshLabelWeight(int contained)
+{
+	QFont f = labelFont();
+	const bool bold = contained > 0;
+	if (f.bold() == bold)
+		return;
+	f.setBold(bold);
+	setLabelFont(f);
+}
+
+QFont Node::labelFont() const
+{
+	return m_idText != nullptr ? m_idText->font() : QFont();
+}
+
+void Node::setLabelFont(const QFont& font)
+{
+	if (m_idText == nullptr || m_idText->font() == font)
+		return;
+	prepareGeometryChange();
+	ancestorsPrepareGeometryChange();
+	m_idText->setFont(font);
+	centreLabel();
+	update();
+	ancestorsUpdate();
 }
 
 void Node::centreLabel()
@@ -80,13 +138,51 @@ void Node::centreLabel()
 
 QVariant Node::itemChange(GraphicsItemChange change, const QVariant& value)
 {
-	if (change == ItemPositionHasChanged)
+	switch (change)
 	{
+	case ItemPositionChange:
+		// about to move: every ancestor's frame is about to change shape
+		ancestorsPrepareGeometryChange();
+		// the position Qt will apply is the one we return: put it on the grid
+		return QGraphicsObject::itemChange(change, snapped(value.toPointF()));
+	case ItemPositionHasChanged:
+	{
+		ancestorsUpdate();
 		const QPointF p = value.toPointF();
 		emit moved(this, p - m_lastPos);
 		m_lastPos = p;
+		break;
+	}
+	case ItemChildAddedChange:
+	case ItemChildRemovedChange:
+	{
+		// our own frame follows our children
+		prepareGeometryChange();
+		ancestorsPrepareGeometryChange();
+		// whether the child is already in / still in childItems() here depends on
+		// Qt's ordering, so count without it and add it back by hand
+		auto* child = qvariant_cast<QGraphicsItem*>(value);
+		const bool counts = dynamic_cast<Node*>(child) != nullptr;
+		refreshLabelWeight(containedCount(child) + (change == ItemChildAddedChange && counts ? 1 : 0));
+		break;
+	}
+	default:
+		break;
 	}
 	return QGraphicsObject::itemChange(change, value);
+}
+
+void Node::ancestorsPrepareGeometryChange()
+{
+	for (QGraphicsItem* p = parentItem(); p != nullptr; p = p->parentItem())
+		if (auto* node = dynamic_cast<Node*>(p))
+			node->prepareGeometryChange();
+}
+
+void Node::ancestorsUpdate()
+{
+	for (QGraphicsItem* p = parentItem(); p != nullptr; p = p->parentItem())
+		p->update();
 }
 
 namespace
@@ -157,13 +253,24 @@ Category* Node::category() const
 		if (node != nullptr)
 			return node->category();
 	}
-	else
-		return nullptr;
+	return nullptr;
 }
 
 void Node::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
+	popupContextMenu(event->screenPos());
+	event->accept();
+}
+
+void Node::popupContextMenu(const QPoint& screenPos)
+{
 	QMenu menu;
+	populateContextMenu(menu);
+	menu.exec(screenPos);
+}
+
+void Node::populateContextMenu(QMenu& menu)
+{
 	menu.addAction(id().isEmpty() ? "node" : id())->setEnabled(false);
 	menu.addSeparator();
 
@@ -176,9 +283,6 @@ void Node::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 		p.setColor(c);
 		setBorder(p);
 	});
-
-	menu.exec(event->screenPos());
-	event->accept();
 }
 
 

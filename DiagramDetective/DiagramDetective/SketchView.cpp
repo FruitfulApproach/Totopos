@@ -1,4 +1,4 @@
-#include "SketchView.h"
+﻿#include "SketchView.h"
 
 #include <QToolButton>
 #include <QFrame>
@@ -9,6 +9,17 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include <QResizeEvent>
+#include <QWheelEvent>
+#include <QtMath>
+#include "CategoryDialog.h"
+#include "Category.h"
+#include "Tutor.h"
+#include <QCheckBox>
+
+namespace
+{
+	const QString kCustom = QStringLiteral("Custom...");
+}
 
 namespace
 {
@@ -21,6 +32,9 @@ SketchView::SketchView(QWidget* parent)
 {
 	setRenderHint(QPainter::Antialiasing, true);
 	setDragMode(QGraphicsView::RubberBandDrag);
+	// zoom about the point under the cursor, not the view's centre
+	setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+	setResizeAnchor(QGraphicsView::AnchorViewCenter);
 	buildOverlay();
 }
 
@@ -30,8 +44,8 @@ SketchView::~SketchView()
 
 QStringList SketchView::builtInCategories()
 {
-	// BigCat first: the default, the category of (possibly large) categories
-	return { "BigCat", "Cat", "Set", "Ab", "R-Mod", "Mod-R", "Grp", "Ring", "Top", "Vect" };
+	// the registry lives with the Category subclasses; the combo only lists it
+	return Category::builtInNames();
 }
 
 QString SketchView::category() const
@@ -41,13 +55,16 @@ QString SketchView::category() const
 
 void SketchView::setCategory(const QString& name)
 {
+	// Selects an entry of the combo: a built-in, or a custom category defined
+	// earlier. The combo is only a selector; what a category IS lives in the
+	// Category subclasses (see Category::createBuiltIn).
 	if (m_category == nullptr)
 		return;
 	int i = m_category->findText(name);
 	if (i < 0)
 	{
-		m_category->addItem(name);
-		i = m_category->count() - 1;
+		i = m_category->count() - 1;   // an unknown name is a custom one: before Custom...
+		m_category->insertItem(i, name);
 	}
 	m_category->setCurrentIndex(i);
 }
@@ -76,6 +93,7 @@ void SketchView::buildOverlay()
 	m_panel->setStyleSheet(
 		"QFrame#sketchPanel { background: rgba(30, 32, 44, 210); border: 1px solid rgba(255,255,255,60); border-radius: 10px; }"
 		"QLabel { color: white; background: transparent; }"
+		"QCheckBox { color: white; background: transparent; }"
 		"QComboBox { min-width: 8em; }");
 	auto* layout = new QVBoxLayout(m_panel);
 	layout->setContentsMargins(10, 8, 10, 8);
@@ -86,12 +104,21 @@ void SketchView::buildOverlay()
 	row->addWidget(new QLabel("Category:", m_panel));
 	m_category = new QComboBox(m_panel);
 	m_category->addItems(builtInCategories());
+	m_category->addItem(kCustom);   // last: defines a new one through the dialog
 	m_category->setCurrentIndex(0);
 	row->addWidget(m_category);
 	layout->addLayout(row);
+
+	// tutor mode: guided interactions coach with remarks and an arrow; off,
+	// they run quietly. Always here, so it can be switched back on.
+	m_tutor = new QCheckBox("Tutor mode", m_panel);
+	m_tutor->setToolTip("Guided actions (Define a product...) explain each step with remarks and an arrow. Untick to run them quietly.");
+	m_tutor->setChecked(Tutor::isEnabled());
+	connect(m_tutor, &QCheckBox::toggled, this, [](bool on) { Tutor::setEnabled(on); });
+	layout->addWidget(m_tutor);
 	// more controls go here, one row each
 
-	connect(m_category, &QComboBox::currentTextChanged, this, &SketchView::categoryChanged);
+	connect(m_category, &QComboBox::currentIndexChanged, this, &SketchView::onCategoryPicked);
 
 	m_panel->adjustSize();
 	m_panel->setMaximumHeight(0);
@@ -100,6 +127,10 @@ void SketchView::buildOverlay()
 	m_anim = new QPropertyAnimation(m_panel, "maximumHeight", this);
 	m_anim->setDuration(kAnimMs);
 	m_anim->setEasingCurve(QEasingCurve::OutCubic);
+	// a maximum height only CAPS the widget; the panel must be resized to follow it
+	connect(m_anim, &QPropertyAnimation::valueChanged, this, [this](const QVariant& v) {
+		m_panel->resize(m_panel->sizeHint().width(), v.toInt());
+	});
 	connect(m_anim, &QPropertyAnimation::finished, this, [this] {
 		if (!m_open)
 			m_panel->hide();
@@ -139,12 +170,69 @@ void SketchView::placeOverlay()
 	const int right = width() - kMargin;
 	m_toggle->move(right - m_toggle->width(), kMargin);
 	const QSize hint = m_panel->sizeHint();
-	m_panel->resize(hint.width(), m_panel->maximumHeight() > 0 ? qMin(hint.height(), m_panel->maximumHeight()) : hint.height());
+	m_panel->resize(hint.width(), m_open ? hint.height() : m_panel->height());
 	m_panel->move(right - m_panel->width(), kMargin + m_toggle->height() + 4);
+}
+
+void SketchView::onCategoryPicked(int index)
+{
+	if (index < 0)
+		return;
+	if (m_category->itemText(index) == kCustom)
+	{
+		defineCustomCategory();
+		return;
+	}
+	m_lastCategoryIndex = index;
+	emit categoryChanged(m_category->itemText(index));
+}
+
+void SketchView::defineCustomCategory()
+{
+	CategoryDialog dialog(window());
+	if (dialog.exec() != QDialog::Accepted || dialog.name().isEmpty())
+	{
+		// back to what was selected, quietly
+		const QSignalBlocker block(m_category);
+		m_category->setCurrentIndex(m_lastCategoryIndex);
+		return;
+	}
+	const QString name = dialog.name();
+	int i = m_category->findText(name);
+	if (i < 0)
+	{
+		i = m_category->count() - 1;   // before Custom...
+		m_category->insertItem(i, name);
+	}
+	emit categoryDefined(name, dialog.properties());
+	m_category->setCurrentIndex(i);   // -> onCategoryPicked -> categoryChanged
 }
 
 void SketchView::resizeEvent(QResizeEvent* event)
 {
 	QGraphicsView::resizeEvent(event);
 	placeOverlay();
+}
+
+void SketchView::setZoom(qreal factor)
+{
+	factor = qBound(0.1, factor, 8.0);
+	if (qFuzzyCompare(factor, m_zoom))
+		return;
+	// scale RELATIVE to the current transform so the anchor (cursor) holds still
+	scale(factor / m_zoom, factor / m_zoom);
+	m_zoom = factor;
+}
+
+void SketchView::wheelEvent(QWheelEvent* event)
+{
+	// one notch = 120 units; trackpads deliver finer steps, so scale by the amount
+	const qreal notches = event->angleDelta().y() / 120.0;
+	if (qFuzzyIsNull(notches))
+	{
+		QGraphicsView::wheelEvent(event);
+		return;
+	}
+	setZoom(m_zoom * qPow(1.15, notches));
+	event->accept();
 }

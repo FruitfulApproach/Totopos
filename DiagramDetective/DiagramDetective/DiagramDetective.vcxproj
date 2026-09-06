@@ -99,6 +99,25 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Arrow.cpp" />
+    <ClCompile Include="Tutor.cpp" />
+    <ClCompile Include="TutorSession.cpp" />
+    <ClCompile Include="props\HasProducts.cpp" />
+    <ClCompile Include="props\Prop.cpp" />
+    <ClCompile Include="props\CategoryProp.cpp" />
+    <ClCompile Include="props\CategoryProps.cpp" />
+    <ClCompile Include="props\SketchProp.cpp" />
+    <ClCompile Include="categories\BigCat.cpp" />
+    <ClCompile Include="categories\Cat.cpp" />
+    <ClCompile Include="categories\Set.cpp" />
+    <ClCompile Include="categories\Ab.cpp" />
+    <ClCompile Include="categories\RMod.cpp" />
+    <ClCompile Include="categories\ModR.cpp" />
+    <ClCompile Include="categories\Grp.cpp" />
+    <ClCompile Include="categories\Ring.cpp" />
+    <ClCompile Include="categories\Top.cpp" />
+    <ClCompile Include="categories\Vect.cpp" />
+    <ClCompile Include="categories\BuiltInCategories.cpp" />
+    <ClCompile Include="CategoryDialog.cpp" />
     <ClCompile Include="Functor.cpp" />
     <ClCompile Include="SketchView.cpp" />
     <ClCompile Include="Category.cpp" />
@@ -108,6 +127,7 @@
     <ClCompile Include="Object.cpp" />
     <QtRcc Include="DiagramDetective.qrc" />
     <QtUic Include="DiagramDetective.ui" />
+    <QtUic Include="CategoryDialog.ui" />
     <QtMoc Include="DiagramDetective.h" />
     <ClCompile Include="DiagramDetective.cpp" />
     <ClCompile Include="main.cpp" />
@@ -122,6 +142,23 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Arrow.h" />
+    <QtMoc Include="TutorSession.h" />
+    <QtMoc Include="props\HasProducts.h" />
+    <QtMoc Include="props\Prop.h" />
+    <QtMoc Include="props\CategoryProp.h" />
+    <QtMoc Include="props\CategoryProps.h" />
+    <QtMoc Include="props\SketchProp.h" />
+    <QtMoc Include="categories\BigCat.h" />
+    <QtMoc Include="categories\Cat.h" />
+    <QtMoc Include="categories\Set.h" />
+    <QtMoc Include="categories\Ab.h" />
+    <QtMoc Include="categories\RMod.h" />
+    <QtMoc Include="categories\ModR.h" />
+    <QtMoc Include="categories\Grp.h" />
+    <QtMoc Include="categories\Ring.h" />
+    <QtMoc Include="categories\Top.h" />
+    <QtMoc Include="categories\Vect.h" />
+    <QtMoc Include="CategoryDialog.h" />
     <QtMoc Include="SketchView.h" />
     <QtMoc Include="Category.h" />
     <QtMoc Include="SketchWithinCategory.h" />
