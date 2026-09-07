@@ -14,6 +14,7 @@
 #include <QVBoxLayout>
 #include <QPainter>
 #include <QtMath>
+#include "AppSettings.h"
 
 namespace
 {
@@ -81,6 +82,18 @@ TutorSession::TutorSession(Tutor* tutor, DiagramScene* scene)
 {
 	m_timer.setInterval(33);
 	connect(&m_timer, &QTimer::timeout, this, &TutorSession::tick);
+
+	// ~QGraphicsScene deletes every item (clear()) BEFORE ~QObject deletes its
+	// QObject children - this session among them. Forget the pointer and the
+	// badges while destroyed() still runs ahead of that, or finish() would
+	// removeItem() and delete them a second time.
+	connect(scene, &QObject::destroyed, this, [this] {
+		m_timer.stop();
+		m_scene = nullptr;
+		m_pointer = nullptr;
+		m_target = nullptr;
+		m_badges.clear();
+	});
 }
 
 TutorSession::~TutorSession()
@@ -115,10 +128,27 @@ void TutorSession::start()
 		m_text->setVisible(Tutor::isEnabled());   // tutor off: the strip is just title + buttons
 		layout->addWidget(m_text);
 		auto* buttons = new QHBoxLayout();
+		// tips can be switched off from here, and back on from the sketch panel
+		// or Tools > Settings > Tutor
+		auto* tipsBtn = new QPushButton("Turn tips off", m_bubble);
+		tipsBtn->setObjectName("cancel");
+		tipsBtn->setToolTip("Stop explaining each step. Switch tips back on in the sketch panel (Tutor mode) or Tools > Settings > Tutor.");
+		tipsBtn->setVisible(Tutor::isEnabled());
+		buttons->addWidget(tipsBtn);
+		connect(tipsBtn, &QPushButton::clicked, this, [this, tipsBtn] {
+			AppSettings::instance().setValue(AppSettings::TutorEnabled, false);
+			AppSettings::instance().apply();
+			tipsBtn->hide();
+			if (m_text != nullptr)
+				m_text->hide();
+			if (m_pointer != nullptr)
+				m_pointer->hide();
+			placeBubble();
+		});
 		buttons->addStretch();
 		auto* cancelBtn = new QPushButton("Cancel", m_bubble);
 		cancelBtn->setObjectName("cancel");
-		auto* doneBtn = new QPushButton("Done", m_bubble);
+		auto* doneBtn = new QPushButton(m_tutor->doneLabel(), m_bubble);
 		buttons->addWidget(cancelBtn);
 		buttons->addWidget(doneBtn);
 		layout->addLayout(buttons);
@@ -192,6 +222,19 @@ bool TutorSession::eventFilter(QObject* watched, QEvent* event)
 	if (watched != m_scene || m_finished)
 		return QObject::eventFilter(watched, event);
 
+	if (!m_captures)
+	{
+		// an advisory session: it explains, it does not take the clicks, so
+		// the user can draw while it is up
+		if (event->type() == QEvent::KeyPress
+		 && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape)
+		{
+			cancel();
+			return true;
+		}
+		return QObject::eventFilter(watched, event);
+	}
+
 	switch (event->type())
 	{
 	case QEvent::GraphicsSceneMousePress:
@@ -200,7 +243,7 @@ bool TutorSession::eventFilter(QObject* watched, QEvent* event)
 		if (me->button() != Qt::LeftButton)
 			return true;
 		// the node under the cursor: a label hit counts for its node
-		QGraphicsItem* item = m_scene->itemAt(me->scenePos(), QTransform());
+		QGraphicsItem* item = m_scene->hitItem(me->scenePos());
 		while (item != nullptr && dynamic_cast<Node*>(item) == nullptr)
 			item = item->parentItem();
 		if (auto* node = dynamic_cast<Node*>(item))

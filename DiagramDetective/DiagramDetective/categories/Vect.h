@@ -9,6 +9,10 @@ class Vect : public Category
 public:
 	explicit Vect(QGraphicsItem* parent = nullptr);
 
+public:
+	QString objectName() const override { return QStringLiteral("vector space"); }
+	QString morphismName() const override { return QStringLiteral("linear map"); }
+
 protected:
 	QChar firstLetter() const override { return QChar('V'); }
 };

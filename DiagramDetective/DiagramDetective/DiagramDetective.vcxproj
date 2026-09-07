@@ -69,6 +69,9 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <!-- Sources are UTF-8. Without /utf-8 MSVC encodes narrow literals in the system ANSI codepage,
+           and every character outside it (the bullets and arrows in the tutor text) becomes '?'. -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <!-- SDL promotes C4996 to an error; Qt 6.11 deprecates QCoreApplication::compressEvent in its own
            headers. Ask Qt not to emit deprecation attributes rather than weaken SDL. -->
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -84,6 +87,9 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <!-- Sources are UTF-8. Without /utf-8 MSVC encodes narrow literals in the system ANSI codepage,
+           and every character outside it (the bullets and arrows in the tutor text) becomes '?'. -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <!-- SDL promotes C4996 to an error; Qt 6.11 deprecates QCoreApplication::compressEvent in its own
            headers. Ask Qt not to emit deprecation attributes rather than weaken SDL. -->
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -99,9 +105,28 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Arrow.cpp" />
+    <ClCompile Include="NodeHandles.cpp" />
+    <ClCompile Include="NodeLabel.cpp" />
+    <ClCompile Include="Notation.cpp" />
+    <ClCompile Include="ToggleSwitch.cpp" />
+    <ClCompile Include="Emoji.cpp" />
+    <ClCompile Include="PropertiesDock.cpp" />
+    <ClCompile Include="LibraryDock.cpp" />
+    <ClCompile Include="ProofTutor.cpp" />
+    <ClCompile Include="library\Library.cpp" />
+    <ClCompile Include="CommutativeEquationsDock.cpp" />
+    <ClCompile Include="SetupTutor.cpp" />
+    <ClCompile Include="history\Mementos.cpp" />
+    <ClCompile Include="history\SceneHistory.cpp" />
+    <ClCompile Include="io\SceneFile.cpp" />
+    <ClCompile Include="ArrowTutor.cpp" />
+    <ClCompile Include="props\ArrowProp.cpp" />
+    <ClCompile Include="props\MapsElements.cpp" />
+    <ClCompile Include="AppSettings.cpp" />
+    <ClCompile Include="SettingsDialog.cpp" />
     <ClCompile Include="Tutor.cpp" />
     <ClCompile Include="TutorSession.cpp" />
-    <ClCompile Include="props\HasProducts.cpp" />
+    <ClCompile Include="props\Constructions.cpp" />
     <ClCompile Include="props\Prop.cpp" />
     <ClCompile Include="props\CategoryProp.cpp" />
     <ClCompile Include="props\CategoryProps.cpp" />
@@ -142,8 +167,21 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Arrow.h" />
+    <QtMoc Include="NodeHandles.h" />
+    <QtMoc Include="ToggleSwitch.h" />
+    <QtMoc Include="PropertiesDock.h" />
+    <QtMoc Include="LibraryDock.h" />
+    <QtMoc Include="ProofTutor.h" />
+    <QtMoc Include="CommutativeEquationsDock.h" />
+    <QtMoc Include="SetupTutor.h" />
+    <QtMoc Include="history\SceneHistory.h" />
+    <QtMoc Include="ArrowTutor.h" />
+    <QtMoc Include="props\ArrowProp.h" />
+    <QtMoc Include="props\MapsElements.h" />
+    <QtMoc Include="AppSettings.h" />
+    <QtMoc Include="SettingsDialog.h" />
     <QtMoc Include="TutorSession.h" />
-    <QtMoc Include="props\HasProducts.h" />
+    <QtMoc Include="props\Constructions.h" />
     <QtMoc Include="props\Prop.h" />
     <QtMoc Include="props\CategoryProp.h" />
     <QtMoc Include="props\CategoryProps.h" />

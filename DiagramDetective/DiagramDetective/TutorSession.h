@@ -34,6 +34,10 @@ public:
 
 	void start();
 
+	// false: the session explains but leaves every click to the scene
+	void setCapturesClicks(bool captures) { m_captures = captures; }
+	bool capturesClicks() const { return m_captures; }
+
 public slots:
 	void done();
 	void cancel();
@@ -61,4 +65,5 @@ private:
 	QTimer m_timer;
 	qreal m_phase = 0;
 	bool m_finished = false;
+	bool m_captures = true;
 };

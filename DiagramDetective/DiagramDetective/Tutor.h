@@ -18,6 +18,12 @@ public:
 	// start a session on the scene (any other session is cancelled)
 	TutorSession* teach(DiagramScene* scene);
 	virtual QString tutorTitle() const = 0;
+	// what the button that ends it says
+	virtual QString doneLabel() const { return QStringLiteral("Done"); }
+	// Whether this tutor TAKES the clicks. A tutor that walks the user
+	// through picking things does; one that only explains what to draw must
+	// not, or the user could not draw anything.
+	virtual bool capturesClicks() const { return true; }
 
 	// Tutor mode, app-wide and remembered between runs. Off, a session still
 	// runs (picks, Done / Cancel) but keeps quiet: no remarks, no arrow.

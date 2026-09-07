@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <QStringList>
+#include <functional>
 #include "Prop.h"
 
 class Category;
@@ -21,6 +22,13 @@ public:
 	// menu (the canvas, for the ambient category): add a section with actions,
 	// or nothing. Called by Category::populateContextMenu.
 	virtual void categoryContextMenu(QMenu& menu, Category* category) { Q_UNUSED(menu); Q_UNUSED(category); }
+
+	// The actions that BUILD something. They go under Construct, in a named
+	// group: `group("Limits")` finds or makes that submenu, and group("")
+	// is Construct itself. A property that constructs nothing does nothing.
+	using MenuGroup = std::function<QMenu*(const QString&)>;
+	virtual void addConstructions(Category* category, const MenuGroup& group)
+	{ Q_UNUSED(category); Q_UNUSED(group); }
 
 	// the registry of built-in category properties (CategoryProps.cpp)
 	static QStringList keys();

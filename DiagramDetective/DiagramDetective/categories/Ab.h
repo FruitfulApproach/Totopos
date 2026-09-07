@@ -9,6 +9,10 @@ class Ab : public Category
 public:
 	explicit Ab(QGraphicsItem* parent = nullptr);
 
+public:
+	QString objectName() const override { return QStringLiteral("abelian group"); }
+	QString morphismName() const override { return QStringLiteral("homomorphism"); }
+
 protected:
 	QChar firstLetter() const override { return QChar('A'); }
 };

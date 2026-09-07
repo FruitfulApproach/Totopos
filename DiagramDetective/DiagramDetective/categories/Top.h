@@ -9,6 +9,10 @@ class Top : public Category
 public:
 	explicit Top(QGraphicsItem* parent = nullptr);
 
+public:
+	QString objectName() const override { return QStringLiteral("space"); }
+	QString morphismName() const override { return QStringLiteral("continuous map"); }
+
 protected:
 	QChar firstLetter() const override { return QChar('X'); }
 };

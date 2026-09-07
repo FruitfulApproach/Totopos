@@ -9,6 +9,10 @@ class ModR : public Category
 public:
 	explicit ModR(QGraphicsItem* parent = nullptr);
 
+public:
+	QString objectName() const override { return QStringLiteral("R-module"); }
+	QString morphismName() const override { return QStringLiteral("R-linear map"); }
+
 protected:
 	QChar firstLetter() const override { return QChar('M'); }
 };

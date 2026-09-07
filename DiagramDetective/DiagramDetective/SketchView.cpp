@@ -8,13 +8,20 @@
 #include <QVBoxLayout>
 #include <QPropertyAnimation>
 #include <QEasingCurve>
+#include <QAbstractAnimation>
 #include <QResizeEvent>
 #include <QWheelEvent>
 #include <QtMath>
 #include "CategoryDialog.h"
 #include "Category.h"
+#include "DiagramScene.h"
 #include "Tutor.h"
+#include "AppSettings.h"
 #include <QCheckBox>
+#include <QLineEdit>
+#include <QPushButton>
+#include "DiagramScene.h"
+#include "ToggleSwitch.h"
 
 namespace
 {
@@ -94,7 +101,10 @@ void SketchView::buildOverlay()
 		"QFrame#sketchPanel { background: rgba(30, 32, 44, 210); border: 1px solid rgba(255,255,255,60); border-radius: 10px; }"
 		"QLabel { color: white; background: transparent; }"
 		"QCheckBox { color: white; background: transparent; }"
-		"QComboBox { min-width: 8em; }");
+		"QComboBox { min-width: 8em; }"
+		"QPushButton { color: white; background: rgba(99, 102, 241, 235); border: none; border-radius: 8px; padding: 5px 10px; }"
+		"QPushButton:hover { background: rgba(79, 70, 229, 245); }"
+		"QPushButton:disabled { background: rgba(255,255,255,45); color: rgba(255,255,255,150); }");
 	auto* layout = new QVBoxLayout(m_panel);
 	layout->setContentsMargins(10, 8, 10, 8);
 	layout->setSpacing(6);
@@ -114,8 +124,68 @@ void SketchView::buildOverlay()
 	m_tutor = new QCheckBox("Tutor mode", m_panel);
 	m_tutor->setToolTip("Guided actions (Define a product...) explain each step with remarks and an arrow. Untick to run them quietly.");
 	m_tutor->setChecked(Tutor::isEnabled());
-	connect(m_tutor, &QCheckBox::toggled, this, [](bool on) { Tutor::setEnabled(on); });
+	connect(m_tutor, &QCheckBox::toggled, this, [](bool on) {
+		AppSettings::instance().setValue(AppSettings::TutorEnabled, on);
+		AppSettings::instance().apply();
+	});
+	// the same setting from Tools > Settings: keep the box in step
+	connect(&AppSettings::instance(), &AppSettings::changed, this, [this] {
+		const QSignalBlocker block(m_tutor);
+		m_tutor->setChecked(Tutor::isEnabled());
+	});
 	layout->addWidget(m_tutor);
+
+	// does this diagram commute, or is nothing being claimed either way?
+	auto* commutesRow = new QHBoxLayout();
+	commutesRow->setSpacing(8);
+	m_commutesLabel = new QLabel(m_panel);
+	commutesRow->addWidget(m_commutesLabel);
+	commutesRow->addStretch();
+	m_commutes = new ToggleSwitch(m_panel);
+	commutesRow->addWidget(m_commutes);
+	layout->addLayout(commutesRow);
+	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
+		refreshCommutesLabel(on);
+		emit commutesChanged(on);
+	});
+	refreshCommutesLabel(false);
+
+	// what this picture is being put forward as
+	auto* kindRow = new QHBoxLayout();
+	kindRow->setSpacing(6);
+	kindRow->addWidget(new QLabel("This is:", m_panel));
+	m_kind = new QComboBox(m_panel);
+	m_kind->addItems(DiagramScene::kindNames());
+	m_kind->setToolTip("The picture says the same thing either way; what changes is what saying it amounts "
+	                   "to. An axiom is granted, a definition names something, a conjecture is neither, and "
+	                   "a theorem owes a proof.");
+	kindRow->addWidget(m_kind, 1);
+	layout->addLayout(kindRow);
+	connect(m_kind, &QComboBox::currentIndexChanged, this, &SketchView::statementKindPicked);
+
+	m_statementName = new QLineEdit(m_panel);
+	m_statementName->setPlaceholderText("Additive identity exists");
+	m_statementName->setToolTip("What to call it, so it can be referred to from elsewhere.");
+	layout->addWidget(m_statementName);
+	connect(m_statementName, &QLineEdit::editingFinished, this, [this] {
+		emit statementNamed(m_statementName->text().trimmed());
+	});
+
+	// which mode the diagram is in: a let, or a chase
+	auto* modeRow = new QHBoxLayout();
+	modeRow->setSpacing(8);
+	modeRow->addWidget(new QLabel("Mode:", m_panel));
+	m_mode = new QLabel("Let", m_panel);
+	QFont modeFont = m_mode->font();
+	modeFont.setBold(true);
+	m_mode->setFont(modeFont);
+	modeRow->addWidget(m_mode);
+	modeRow->addStretch();
+	layout->addLayout(modeRow);
+
+	m_chase = new QPushButton("Start diagram chase", m_panel);
+	layout->addWidget(m_chase);
+	connect(m_chase, &QPushButton::clicked, this, &SketchView::chaseRequested);
 	// more controls go here, one row each
 
 	connect(m_category, &QComboBox::currentIndexChanged, this, &SketchView::onCategoryPicked);
@@ -136,9 +206,42 @@ void SketchView::buildOverlay()
 			m_panel->hide();
 	});
 
+	// the sentence the diagram makes, along the foot of the view
+	m_statement = new QLabel(this);
+	m_statement->setObjectName("statementBar");
+	m_statement->setStyleSheet(
+		"QLabel#statementBar { background: rgba(30, 32, 44, 212); color: white;"
+		" border: 1px solid rgba(255,255,255,55); border-radius: 10px; padding: 7px 12px; font-size: 12px; }");
+	m_statement->setWordWrap(true);
+	m_statement->setTextInteractionFlags(Qt::TextSelectableByMouse);
+	m_statement->hide();
+
 	placeOverlay();
 	m_toggle->raise();
 	m_panel->raise();
+}
+
+void SketchView::setStatement(const QString& statement)
+{
+	if (m_statement == nullptr)
+		return;
+	m_statement->setText(statement);
+	m_statement->setVisible(!statement.isEmpty());
+	placeOverlay();
+}
+
+void SketchView::setChasing(bool chasing)
+{
+	if (m_mode != nullptr)
+		m_mode->setText(chasing ? "Chasing" : "Let");
+	if (m_chase == nullptr)
+		return;
+	// never a dead button: it is what starts the chase and what ends it
+	m_chase->setText(chasing ? "End the chase" : "Start diagram chase");
+	m_chase->setToolTip(chasing
+		? "Go back to a let: the diagram is what you are given again, and adding to it assumes nothing."
+		: "Start the diagram chase (Ctrl+Shift+Enter): from then on anything you draw is forced into "
+		  "the hypotheses of the statement.");
 }
 
 void SketchView::toggleMenu()
@@ -172,6 +275,14 @@ void SketchView::placeOverlay()
 	const QSize hint = m_panel->sizeHint();
 	m_panel->resize(hint.width(), m_open ? hint.height() : m_panel->height());
 	m_panel->move(right - m_panel->width(), kMargin + m_toggle->height() + 4);
+
+	if (m_statement != nullptr && !m_statement->text().isEmpty())
+	{
+		m_statement->setFixedWidth(qMax(160, width() - 2 * kMargin));
+		m_statement->adjustSize();
+		m_statement->move(kMargin, height() - m_statement->height() - kMargin);
+		m_statement->raise();
+	}
 }
 
 void SketchView::onCategoryPicked(int index)
@@ -235,4 +346,129 @@ void SketchView::wheelEvent(QWheelEvent* event)
 	}
 	setZoom(m_zoom * qPow(1.15, notches));
 	event->accept();
+}
+
+QRectF SketchView::contentsRect() const
+{
+	// the ambient category holds everything drawn; asking the scene would also
+	// take in the handle bar and the arrow preview, which are not the diagram
+	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
+		if (Category* ambient = diagram->ambientCategory())
+			return ambient->sceneBoundingRect();
+	return scene() != nullptr ? scene()->itemsBoundingRect() : QRectF();
+}
+
+void SketchView::centreOnContents()
+{
+	const QRectF rect = contentsRect();
+	centerOn(rect.isEmpty() ? QPointF(0, 0) : rect.center());
+}
+
+void SketchView::fitContents()
+{
+	QRectF rect = contentsRect();
+	if (rect.isEmpty())
+	{
+		resetZoom();
+		centerOn(0, 0);
+		return;
+	}
+	rect.adjust(-40, -40, 40, 40);   // a little air around it
+	fitInView(rect, Qt::KeepAspectRatio);
+
+	// fitInView sets the transform behind our back: read the zoom back out of
+	// it, and hold it to the range the wheel uses
+	qreal factor = transform().m11();
+	const qreal clamped = qBound(qreal(0.1), factor, qreal(8.0));
+	if (!qFuzzyCompare(factor, clamped))
+	{
+		scale(clamped / factor, clamped / factor);
+		factor = clamped;
+	}
+	m_zoom = factor;
+}
+
+void SketchView::refreshCommutesLabel(bool commutes)
+{
+	if (m_commutesLabel == nullptr)
+		return;
+
+	// The off state is NOT the claim that the diagram fails to commute. It is
+	// the absence of a claim: the paths may or may not agree, and the diagram
+	// says nothing about it either way.
+	const QString name = commutes ? QStringLiteral("Commutative") : QStringLiteral("Non-commutative");
+	const QString tip = commutes
+		? QStringLiteral("Commutative: every pair of paths with the same two ends is asserted to be the "
+		                 "same arrow. The statement then reads \"... such that the diagram commutes\", the "
+		                 "Equations dock lists what that says, and a cycle becomes an error - a ring gives "
+		                 "endlessly many paths, which cannot be read this way.")
+		: QStringLiteral("Non-commutative means NOT NECESSARILY COMMUTATIVE. It is not the claim that the "
+		                 "diagram fails to commute: it is the absence of any claim. Two paths with the same "
+		                 "ends may or may not be the same arrow, nothing is asserted either way, and cycles "
+		                 "are perfectly all right.");
+
+	m_commutesLabel->setText(name);
+	m_commutesLabel->setToolTip(tip);
+	if (m_commutes != nullptr)
+		m_commutes->setToolTip(tip);
+}
+
+void SketchView::setCommutes(bool commutes)
+{
+	if (m_commutes == nullptr)
+		return;
+	const QSignalBlocker block(m_commutes);   // following, not deciding
+	m_commutes->setChecked(commutes);
+	refreshCommutesLabel(commutes);
+}
+
+void SketchView::setStatementKind(int kind, const QString& name)
+{
+	if (m_kind != nullptr)
+	{
+		const QSignalBlocker block(m_kind);   // following, not deciding
+		m_kind->setCurrentIndex(kind);
+	}
+	if (m_statementName != nullptr && m_statementName->text() != name)
+	{
+		const QSignalBlocker block(m_statementName);
+		m_statementName->setText(name);
+	}
+}
+
+void SketchView::fitTo(const QRectF& sceneRect)
+{
+	if (sceneRect.isEmpty())
+		return;
+	const QRectF room = sceneRect.adjusted(-60, -60, 60, 60);
+
+	// the zoom that would fit it, kept inside what the wheel allows
+	const qreal wide = viewport()->width() / qMax(1.0, room.width());
+	const qreal tall = viewport()->height() / qMax(1.0, room.height());
+	const qreal target = qBound(0.1, qMin(wide, tall), 8.0);
+
+	// scale about the view's middle rather than under the mouse, then walk the
+	// centre over: the eye follows a move it can see
+	const QGraphicsView::ViewportAnchor anchor = transformationAnchor();
+	setTransformationAnchor(QGraphicsView::AnchorViewCenter);
+	scale(target / m_zoom, target / m_zoom);
+	m_zoom = target;
+	setTransformationAnchor(anchor);
+
+	auto* slide = new QPropertyAnimation(this, "sceneCentre", this);
+	slide->setDuration(220);
+	slide->setEasingCurve(QEasingCurve::OutCubic);
+	slide->setStartValue(mapToScene(viewport()->rect().center()));
+	slide->setEndValue(room.center());
+	slide->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+QPointF SketchView::sceneCentre() const
+{
+	return mapToScene(viewport()->rect().center());
+}
+
+void SketchView::setSceneCentre(const QPointF& centre)
+{
+	centerOn(centre);
 }

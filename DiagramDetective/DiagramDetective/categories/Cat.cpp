@@ -12,3 +12,19 @@ Object* Cat::makeObject(const QString& name)
 	small->setProperties({ "isLocallySmall" });
 	return small;
 }
+
+Arrow* Cat::createArrow(const QString& name, Node* from, Node* to)
+{
+	// between two categories: a functor, which knows how to map their contents
+	auto* dom = dynamic_cast<Category*>(from);
+	auto* cod = dynamic_cast<Category*>(to);
+	if (dom != nullptr && cod != nullptr)
+	{
+		auto* functor = new Functor(name, dom, cod, this);
+		functor->setZValue(2);
+		functor->refreshDepthAppearance();
+		functor->refreshFrame();
+		return functor;
+	}
+	return Category::createArrow(name, from, to);
+}

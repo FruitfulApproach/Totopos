@@ -27,6 +27,7 @@ TutorSession* Tutor::teach(DiagramScene* scene)
 	if (scene == nullptr)
 		return nullptr;
 	auto* session = new TutorSession(this, scene);
+	session->setCapturesClicks(capturesClicks());
 	scene->beginSession(session);   // cancels a session already running
 	session->start();
 	return session;

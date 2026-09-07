@@ -9,6 +9,10 @@ class Grp : public Category
 public:
 	explicit Grp(QGraphicsItem* parent = nullptr);
 
+public:
+	QString objectName() const override { return QStringLiteral("group"); }
+	QString morphismName() const override { return QStringLiteral("homomorphism"); }
+
 protected:
 	QChar firstLetter() const override { return QChar('G'); }
 };

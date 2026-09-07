@@ -5,6 +5,7 @@
 #include "Object.h"
 
 class CategoryProp;
+class Arrow;
 class QMenu;
 
 // A category drawn as an object; the objects placed "in" it are its child
@@ -38,9 +39,39 @@ public:
 	// that build objects (products, ...) go through here, never `new Object`.
 	Object* createObject(const QString& name, const QPointF& scenePos);
 
+	// An arrow of this category, between two of its objects. What kind of
+	// arrow that is, is the category's business: BigCat makes functors.
+	virtual Arrow* createArrow(const QString& name, Node* from, Node* to);
+	// the same, named for you: f, g, h, ... (F, G, H in BigCat)
+	Arrow* createCanvasArrow(Node* from, Node* to);
+	QString nextArrowName() const { return letterName(m_nextArrowIndex, firstArrowLetter()); }
+
+	// Is that label already taken anywhere in the diagram? A name means one
+	// thing here, so a fresh one steps over what is already spoken for -
+	// otherwise a category C would call its first object C too.
+	bool nameInUse(const QString& name) const;
+
 	// the name the next createCanvasObject will use
 	QString nextObjectName() const { return letterName(m_nextIndex, firstLetter()); }
+	// how far the naming has got, so a diagram read from a file carries on
+	// where it left off instead of making a second C
+	int nextObjectIndex() const { return m_nextIndex; }
+	void setNextObjectIndex(int index) { m_nextIndex = index; }
+	int nextArrowIndex() const { return m_nextArrowIndex; }
+	void setNextArrowIndex(int index) { m_nextArrowIndex = index; }
 	static QString letterName(int index, QChar first = QChar('C'));
+
+	// Exactness of the diagram DRAWN IN HERE, asserted the way commuting is:
+	// at every object along a row, the image of the arrow coming in is the
+	// kernel of the arrow going out. Rows and columns are asserted separately
+	// - a diagram may have exact rows and say nothing about its columns.
+	bool rowsExact() const { return m_rowsExact; }
+	bool columnsExact() const { return m_columnsExact; }
+	void setRowsExact(bool exact);
+	void setColumnsExact(bool exact);
+	// the same, and put it in the scene's history
+	void setRowsExactRecorded(bool exact);
+	void setColumnsExactRecorded(bool exact);
 
 	// The structure the category is known to have, as CategoryProp objects it
 	// owns (props/CategoryProps.h: HasProducts, IsAbelian, ...).
@@ -53,18 +84,39 @@ public:
 	template <typename P> bool has() const { return has(P::Key()); }
 
 	// a category frames its objects with more room than a plain object gives its label
-	QRectF boundingRect() const override { return childrenBoundingRect().adjusted(-18, -18, 18, 18); }
+	QRectF boundingRect() const override { return childFrame().adjusted(-9, -9, 9, 9); }
 
 protected:
-	// the node's own menu, then a section from every property that has one
-	void populateContextMenu(QMenu& menu) override;
+	// what this category lets you build, grouped under Construct
+	void populateActions(QMenu& menu) override;
+
+	// the next letter nothing has taken yet, advancing the counter past it
+	QString freshName(int& counter, QChar first) const;
 
 	// the kind of object this category is made of; the default is a plain object
 	virtual Object* makeObject(const QString& name);
 	// where the object names start
 	virtual QChar firstLetter() const { return QChar('C'); }
+	// where the arrow names start (lower case stays lower case)
+	virtual QChar firstArrowLetter() const { return QChar('f'); }
+
+public:
+	// What an arrow of this category is called: a functor in BigCat, an
+	// R-linear map in Mod-R, a homomorphism in Grp. Used where the program
+	// talks about one.
+	virtual QString morphismName() const { return QStringLiteral("arrow"); }
+	// and what an OBJECT of it is called: an R-module, a set, a category
+	virtual QString objectName() const { return QStringLiteral("object"); }
+
+protected:
+
+	// nested categories fade, so the yellow does not pile up level on level
+	void applyDepthAppearance(int depth) override;
 
 private:
+	bool m_rowsExact = false;
+	bool m_columnsExact = false;
 	int m_nextIndex = 0;
+	int m_nextArrowIndex = 0;
 	QList<CategoryProp*> m_props;
 };
