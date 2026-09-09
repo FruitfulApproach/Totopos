@@ -11,11 +11,14 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	: Node(id, parent)
 {
 	// flags belong here, not in paint(): paint() runs every frame and must not mutate state
-	// NOT ItemIsMovable: dragging an object draws an arrow from it, and moving
-	// it is a press and hold. Qt's own dragging would take the first of those
-	// away, so the scene does both by hand.
+	// NOT ItemIsMovable: dragging an object by its body draws an arrow from
+	// it, and dragging it by its LABEL moves it. Qt's own dragging would take
+	// the first of those away, so the scene does both by hand.
 	setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsFocusable
 	         | QGraphicsItem::ItemSendsGeometryChanges);
+	// the label is the handle you move it by, and says so
+	if (NodeLabel* text = labelItem())
+		text->setCursor(Qt::SizeAllCursor);
 }
 
 void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -97,7 +100,7 @@ void Object::mousePressEvent(QGraphicsSceneMouseEvent* event)
 			// Taken here so this object becomes the one the mouse is on, and
 			// the scene keeps getting the moves. Which gesture it turns into -
 			// an arrow, or carrying it about - is decided by what happens next.
-			diagram->beginPress(this, event->scenePos());
+			diagram->beginPress(this, event->scenePos(), DiagramScene::Gesture::Arrow);
 			if (!isSelected())
 			{
 				scene()->clearSelection();

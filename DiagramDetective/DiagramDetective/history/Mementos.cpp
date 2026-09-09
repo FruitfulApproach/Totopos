@@ -110,7 +110,7 @@ NodesCreated::NodesCreated(const QString& description, const QList<Node*>& nodes
 			continue;
 		Held held;
 		held.node = node;
-		held.parent = node->parentItem();
+		held.parent = dynamic_cast<QGraphicsObject*>(node->parentItem());
 		held.scene = node->scene();
 		held.pos = node->pos();
 		m_held.append(held);
@@ -133,7 +133,7 @@ void NodesCreated::detachAll()
 		Held& held = m_held[i];
 		if (held.node.isNull() || held.owned)
 			continue;
-		held.parent = held.node->parentItem();
+		held.parent = dynamic_cast<QGraphicsObject*>(held.node->parentItem());
 		held.scene = held.node->scene();
 		held.pos = held.node->pos();
 		held.node->setParentItem(nullptr);
@@ -150,8 +150,10 @@ void NodesCreated::attachAll()
 	{
 		if (held.node.isNull() || !held.owned)
 			continue;
-		if (held.parent != nullptr)
-			held.node->setParentItem(held.parent);   // this puts it back in the scene too
+		if (!held.parent.isNull())
+			held.node->setParentItem(held.parent.data());   // this puts it back in the scene too
+		else if (auto* diagram = dynamic_cast<DiagramScene*>(held.scene); diagram != nullptr && diagram->ambientCategory() != nullptr)
+			held.node->setParentItem(diagram->ambientCategory());   // its old home is gone: the canvas will do
 		else if (held.scene != nullptr)
 			held.scene->addItem(held.node.data());
 		held.node->setPos(held.pos);

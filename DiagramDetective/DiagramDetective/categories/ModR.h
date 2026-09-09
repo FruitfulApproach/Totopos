@@ -11,6 +11,7 @@ public:
 
 public:
 	QString objectName() const override { return QStringLiteral("R-module"); }
+	QString implicitArrowName() const override { return QStringLiteral("0"); }   // the zero map
 	QString morphismName() const override { return QStringLiteral("R-linear map"); }
 
 protected:

@@ -5,6 +5,7 @@
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QGraphicsSceneMouseEvent>
+#include "DiagramScene.h"
 
 NodeLabel::NodeLabel(const QString& text, Node* node)
 	: QGraphicsTextItem(text, node)
@@ -28,6 +29,23 @@ QVariant NodeLabel::itemChange(GraphicsItemChange change, const QVariant& value)
 
 void NodeLabel::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
+	// An OBJECT'S label is the handle its object is moved by: a press here,
+	// outside the editor, hands the object to the scene as a move. An arrow's
+	// label is movable on its own, and keeps its own drag.
+	if (event->button() == Qt::LeftButton && !m_editing && m_node != nullptr && !m_node->labelIsMovable())
+	{
+		if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
+		{
+			diagram->beginPress(m_node, event->scenePos(), DiagramScene::Gesture::Move);
+			if (!m_node->isSelected())
+			{
+				scene()->clearSelection();
+				m_node->setSelected(true);
+			}
+			event->accept();
+			return;
+		}
+	}
 	m_dragFrom = pos();
 	m_dragging = (flags() & ItemIsMovable) != 0 && event->button() == Qt::LeftButton;
 	QGraphicsTextItem::mousePressEvent(event);
@@ -72,6 +90,7 @@ void NodeLabel::commitEdit()
 		return;
 	m_editing = false;
 	disconnect(m_live);
+	dropSelection();
 	setTextInteractionFlags(Qt::NoTextInteraction);
 	setFlag(ItemIsMovable, m_wasMovable);
 	clearFocus();
@@ -86,11 +105,23 @@ void NodeLabel::cancelEdit()
 	m_editing = false;
 	disconnect(m_live);
 	setPlainText(m_before);   // as it was before the editor opened
+	dropSelection();
 	setTextInteractionFlags(Qt::NoTextInteraction);
 	setFlag(ItemIsMovable, m_wasMovable);
 	clearFocus();
 	if (m_node != nullptr)
 		m_node->finishLabelEdit(m_before, m_before);
+}
+
+void NodeLabel::dropSelection()
+{
+	// The whole label was selected when the editor opened, so that typing
+	// replaced it. A QGraphicsTextItem goes on painting a selection after the
+	// editor is closed, so it has to be let go of by hand.
+	QTextCursor cursor = textCursor();
+	cursor.clearSelection();
+	cursor.movePosition(QTextCursor::End);
+	setTextCursor(cursor);
 }
 
 void NodeLabel::keyPressEvent(QKeyEvent* event)

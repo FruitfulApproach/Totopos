@@ -56,7 +56,7 @@ public:
 		setAcceptedMouseButtons(Qt::NoButton);
 		setZValue(kOverlayZ);
 	}
-	Node* node() const { return m_node; }
+	Node* node() const { return m_node.data(); }
 	QRectF boundingRect() const override { return QRectF(-11, -11, 22, 22); }
 	void paint(QPainter* p, const QStyleOptionGraphicsItem*, QWidget*) override
 	{
@@ -71,7 +71,7 @@ public:
 		p->drawText(QRectF(-10, -10, 20, 20), Qt::AlignCenter, QString::number(m_number));
 	}
 private:
-	Node* m_node;
+	QPointer<Node> m_node;
 	int m_number;
 };
 
@@ -176,9 +176,11 @@ void TutorSession::say(const QString& remark, QGraphicsItem* pointAt)
 		m_text->setText(remark);
 		m_text->setVisible(coaching);
 	}
-	m_target = coaching ? pointAt : nullptr;
+	// everything drawn here is a QGraphicsObject, which is what lets a
+	// QPointer watch it; anything else is not followed
+	m_target = coaching ? dynamic_cast<QGraphicsObject*>(pointAt) : nullptr;
 	if (m_pointer != nullptr)
-		m_pointer->setVisible(m_target != nullptr);
+		m_pointer->setVisible(!m_target.isNull());
 	placeBubble();
 }
 
@@ -196,14 +198,24 @@ void TutorSession::tick()
 {
 	// the arrow bounces above its target and follows it; badges follow their nodes
 	m_phase += 0.25;
-	if (m_pointer != nullptr && m_target != nullptr)
+	if (m_pointer != nullptr)
 	{
-		const QRectF r = m_target->sceneBoundingRect();
-		m_pointer->setPos(r.center().x(), r.top() - 6 - 6 * qAbs(qSin(m_phase)));
+		if (m_target.isNull())
+			m_pointer->hide();   // whatever it pointed at has gone
+		else
+		{
+			const QRectF r = m_target->sceneBoundingRect();
+			m_pointer->setPos(r.center().x(), r.top() - 6 - 6 * qAbs(qSin(m_phase)));
+		}
 	}
 	for (QGraphicsItem* b : m_badges)
 	{
 		auto* badge = static_cast<TutorBadge*>(b);
+		if (badge->node() == nullptr)
+		{
+			badge->hide();       // its node has gone; the badge stays put, unseen
+			continue;
+		}
 		const QRectF r = badge->node()->sceneBoundingRect();
 		badge->setPos(r.right(), r.top());
 	}

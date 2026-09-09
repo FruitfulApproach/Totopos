@@ -156,6 +156,28 @@ void PropertiesDock::build()
 	objectForm->addRow("Corner rounding", m_radius);
 	layout->addWidget(m_objectBox);
 
+	// ---- the diagram drawn inside the selected node. Exactness is a claim
+	// about a diagram, so it belongs to whatever HOLDS one: not to an object
+	// with nothing in it, but to any node with a diagram drawn inside.
+	m_insideBox = new QGroupBox("Inside", body);
+	auto* insideForm = new QFormLayout(m_insideBox);
+	m_rowsExact = new ToggleSwitch(m_insideBox);
+	m_rowsExact->setToolTip("Every row of the diagram drawn in here is an exact sequence: at each object "
+	                        "along it, the image of the arrow coming in is the kernel of the arrow going out.");
+	connect(m_rowsExact, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Category* home = soleDiagramHome()) home->setRowsExactRecorded(on);
+	});
+	insideForm->addRow("Rows exact", m_rowsExact);
+	m_columnsExact = new ToggleSwitch(m_insideBox);
+	m_columnsExact->setToolTip("The same, down each column. Rows and columns are claimed separately.");
+	connect(m_columnsExact, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Category* home = soleDiagramHome()) home->setColumnsExactRecorded(on);
+	});
+	insideForm->addRow("Columns exact", m_columnsExact);
+	layout->addWidget(m_insideBox);
+
 	// ---- the pieces the diagram falls into
 	m_componentBox = new QGroupBox("Components", body);
 	auto* componentLayout = new QVBoxLayout(m_componentBox);
@@ -283,6 +305,16 @@ QList<Node*> PropertiesDock::selection() const
 	return nodes;
 }
 
+Category* PropertiesDock::soleDiagramHome() const
+{
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return nullptr;
+	auto* category = dynamic_cast<Category*>(nodes.first());
+	// only when there IS a diagram in it: an empty object is not a diagram
+	return category != nullptr && category->holdsAnything() ? category : nullptr;
+}
+
 MapsElements* PropertiesDock::soleMapping() const
 {
 	const QList<Node*> nodes = selection();
@@ -321,6 +353,7 @@ void PropertiesDock::refresh()
 		m_nodeBox->hide();
 		m_objectBox->hide();
 		m_mappingBox->hide();
+		m_insideBox->hide();
 
 		refreshComponents();
 		m_updating = false;
@@ -333,6 +366,7 @@ void PropertiesDock::refresh()
 		m_nodeBox->hide();
 		m_objectBox->hide();
 		m_mappingBox->hide();
+		m_insideBox->hide();
 		m_componentBox->hide();
 		m_updating = false;
 		return;
@@ -366,6 +400,15 @@ void PropertiesDock::refresh()
 		m_radius->setValue(int(objects.first()->cornerRadius() + 0.5));
 		m_objectBox->setTitle(objects.size() == 1 ? QStringLiteral("Object")
 		                                          : QString("Objects (%1)").arg(objects.size()));
+	}
+
+	Category* home = soleDiagramHome();
+	m_insideBox->setVisible(home != nullptr);
+	if (home != nullptr)
+	{
+		m_insideBox->setTitle(QString("The diagram in %1").arg(home->id()));
+		m_rowsExact->setChecked(home->rowsExact());
+		m_columnsExact->setChecked(home->columnsExact());
 	}
 
 	MapsElements* maps = soleMapping();

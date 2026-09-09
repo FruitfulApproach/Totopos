@@ -127,6 +127,11 @@ namespace
 	{
 		qint32 count = 0;
 		in >> pattern >> count;
+		if (in.status() != QDataStream::Ok || count < 0 || count > 10000)
+		{
+			in.setStatus(QDataStream::ReadCorruptData);
+			return;
+		}
 		for (qint32 i = 0; i < count; ++i)
 		{
 			QList<int> path;
@@ -235,7 +240,12 @@ namespace
 			// an arrow holds nothing but its own label
 			qint32 count = 0;
 			in >> count;
-			for (qint32 i = 0; i < count; ++i)
+			if (in.status() != QDataStream::Ok || count < 0 || count > 100000)
+			{
+				in.setStatus(QDataStream::ReadCorruptData);
+				return;
+			}
+			for (qint32 i = 0; i < count && in.status() == QDataStream::Ok; ++i)
 				readNode(in, parent, pending, derived, version);
 			return;
 		}
@@ -288,7 +298,14 @@ namespace
 
 		qint32 count = 0;
 		in >> count;
-		for (qint32 i = 0; i < count; ++i)
+		// a count no diagram could have means the stream is misread: stop,
+		// rather than build a million nodes out of noise
+		if (in.status() != QDataStream::Ok || count < 0 || count > 100000)
+		{
+			in.setStatus(QDataStream::ReadCorruptData);
+			return;
+		}
+		for (qint32 i = 0; i < count && in.status() == QDataStream::Ok; ++i)
 			readNode(in, node, pending, derived, version);
 	}
 }
@@ -317,7 +334,24 @@ SceneFile::Heading SceneFile::peek(const QString& path)
 		return heading;
 	}
 	quint16 kind = 0;
-	in >> kind >> heading.name;
+	in >> kind;
+	// The name is a QString: a length, then the text. Read the length by hand
+	// and refuse anything absurd - a damaged file must not become an attempt
+	// to allocate gigabytes.
+	quint32 bytes = 0;
+	in >> bytes;
+	if (bytes != 0xFFFFFFFFu && bytes > 0)
+	{
+		if (bytes > 8192 || in.status() != QDataStream::Ok)
+			return heading;   // not a heading we believe: treat the file as unreadable
+		QByteArray utf16(int(bytes), Qt::Uninitialized);
+		if (in.readRawData(utf16.data(), int(bytes)) != int(bytes))
+			return heading;
+		// QDataStream writes a QString as UTF-16 big-endian, whatever the machine
+		heading.name.reserve(int(bytes / 2));
+		for (int i = 0; i + 1 < int(bytes); i += 2)
+			heading.name.append(QChar(ushort((uchar(utf16.at(i)) << 8) | uchar(utf16.at(i + 1)))));
+	}
 	heading.kind = int(kind);
 	heading.valid = true;
 	return heading;
@@ -438,6 +472,12 @@ bool SceneFile::load(DiagramScene* scene, const QString& path, QString* error)
 	QString ambientImageFunctor, ambientImageSource;
 	if (version >= 3)
 		data >> ambientRadius >> ambientImageFunctor >> ambientImageSource;
+	// writeNode writes these for EVERY node, the ambient one included; reading
+	// the ambient by hand and leaving them out put every later field two
+	// strings early, and the child count that came out of that was garbage
+	QString ambientMappingId, ambientImageMapping;
+	if (version >= 8)
+		data >> ambientMappingId >> ambientImageMapping;
 	QString ambientPattern;
 	QList<QPair<QList<int>, QString>> ambientPatternSources;
 	if (version >= 5)
@@ -471,8 +511,18 @@ bool SceneFile::load(DiagramScene* scene, const QString& path, QString* error)
 	QList<PendingDerived> derived;
 	qint32 count = 0;
 	data >> count;
-	for (qint32 i = 0; i < count; ++i)
+	if (data.status() != QDataStream::Ok || count < 0 || count > 100000)
+	{
+		if (error != nullptr) *error = QStringLiteral("The file does not add up: its contents cannot be read.");
+		return false;
+	}
+	for (qint32 i = 0; i < count && data.status() == QDataStream::Ok; ++i)
 		readNode(data, ambient, pending, derived, version);
+	if (data.status() != QDataStream::Ok)
+	{
+		if (error != nullptr) *error = QStringLiteral("The file is damaged part way through.");
+		return false;
+	}
 
 	// now every object exists, so the arrows can find their ends
 	for (const PendingArrow& p : pending)

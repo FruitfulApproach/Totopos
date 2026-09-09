@@ -15,6 +15,11 @@
 #include <QSet>
 #include <functional>
 #include <QGraphicsLineItem>
+#include <QApplication>
+#include <QGraphicsSceneHoverEvent>
+#include <QCursor>
+#include <QFontMetricsF>
+#include <functional>
 
 DiagramScene::DiagramScene(QObject* parent)
 	: QGraphicsScene(parent)
@@ -32,22 +37,6 @@ DiagramScene::DiagramScene(QObject* parent)
 	});
 	// the check itself can be switched off, and the grid setting shares the signal
 	connect(&AppSettings::instance(), &AppSettings::changed, this, [this] { checkDiagram(); });
-	// a press that stays still this long is a hold, not the start of a drag
-	m_holdTimer.setSingleShot(true);
-	m_holdTimer.setInterval(350);
-	connect(&m_holdTimer, &QTimer::timeout, this, [this] {
-		if (m_pressed.isNull() || !m_carrying.isNull())
-			return;
-		Node* node = m_pressed.data();
-		m_pressed = nullptr;
-		m_carrying = node;
-		m_carryFrom = node->pos();
-		if (QGraphicsItem* parent = node->parentItem())
-			m_carryGrab = node->pos() - parent->mapFromScene(m_pressScenePos);
-		emit message(QString("Carrying %1. Let go to drop it; Esc or the right button puts it back.")
-			.arg(node->id()));
-	});
-
 	setAmbientCategory("BigCat");
 	connect(&AppSettings::instance(), &AppSettings::changed, this, [this] {
 		// sizes changed: the labels are re-sized and every frame re-measured,
@@ -91,6 +80,13 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	if (m_ambientCategory != nullptr && m_ambientCategory->id() == name)
 		return;
 
+	// Whatever is pointing into the old canvas - a tutor's arrow, the handle
+	// bar, a half-drawn arrow - has to let go before it is taken away.
+	if (!m_session.isNull())
+		m_session->cancel();
+	hideHandles();
+	hideArrowPreview();
+
 	// a built-in is its own subclass (it knows what it is made of); anything
 	// else is a plain category the user defined
 	Category* fresh = Category::createBuiltIn(name);
@@ -116,11 +112,15 @@ void DiagramScene::setAmbientCategory(const QString& name)
 			fresh->adopt(node, child->scenePos());
 		}
 		removeItem(m_ambientCategory);
-		delete m_ambientCategory;
+		// deleteLater, not delete: this runs from a combo box's signal, and
+		// destroying a QObject inside the signal that asked for it is asking
+		// for a slot further down the list to find it gone
+		m_ambientCategory->deleteLater();
 	}
 
 	m_ambientCategory = fresh;
 	emit ambientCategoryChanged(fresh);
+	emit statementChanged(statementText());
 }
 
 Category* DiagramScene::categoryAt(QGraphicsItem* item) const
@@ -144,11 +144,10 @@ void DiagramScene::beginSession(TutorSession* session)
 
 void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-	// the right button puts down what is being carried, rather than opening a
-	// menu on top of it
-	if (isCarrying())
+	// the right button abandons a move, rather than opening a menu on top of it
+	if (isMoving())
 	{
-		cancelCarry();
+		cancelMove();
 		event->accept();
 		return;
 	}
@@ -399,6 +398,11 @@ namespace
 			return false;
 		if (fa == nullptr)
 			return true;   // two objects side by side: the same one, twice
+		// the category's own unnamed arrow - the zero map - may be drawn as
+		// often as it is needed, between whatever ends it is needed between
+		if (auto* home = dynamic_cast<const Category*>(a->parentItem());
+		    home != nullptr && !home->implicitArrowName().isEmpty() && a->id() == home->implicitArrowName())
+			return true;
 		auto name = [](const Node* end) { return end != nullptr ? end->id() : QString(); };
 		return name(fa->domain()) == name(fb->domain())
 		    && name(fa->codomain()) == name(fb->codomain());
@@ -501,9 +505,22 @@ namespace
 	// a composite, written the way it is read: the last arrow travelled first
 	QString composite(const QList<Arrow*>& path, bool ring)
 	{
+		// The zero map ABSORBS: anything composed with 0 is 0, on either side.
+		// So a path with the zero map anywhere in it is not written out - it
+		// is 0, and that is all it is.
+		Category* home = path.isEmpty() ? nullptr : path.first()->surroundingCategory();
+		const QString zero = home != nullptr ? home->implicitArrowName() : QString();
+
 		QStringList names;
 		for (Arrow* arrow : path)
-			names.prepend(arrow->id().isEmpty() ? QStringLiteral("?") : arrow->id());
+		{
+			// a blank label reads as what the category says it is - 0 in
+			// R-Mod - and only an arrow nobody can name shows as ?
+			const QString name = arrow->effectiveId();
+			if (!zero.isEmpty() && name == zero)
+				return zero;
+			names.prepend(name.isEmpty() ? QStringLiteral("?") : name);
+		}
 		return names.join(ring ? QString(" %1 ").arg(QChar(0x2218)) : QString());
 	}
 
@@ -511,9 +528,13 @@ namespace
 	// diagram with a cycle (which cannot commute anyway) still terminates.
 	void walkPaths(Node* at, const QHash<Node*, QList<QPair<Node*, Arrow*>>>& out,
 	               QList<Arrow*>& sofar, QSet<Node*>& onPath,
-	               QHash<Node*, QList<QList<Arrow*>>>& found, int maxLength, int maxPaths)
+	               QHash<Node*, QList<QList<Arrow*>>>& found, int maxLength, int maxPaths,
+	               int& budget)
 	{
-		if (sofar.size() >= maxLength)
+		// Every simple path in a dense diagram is an exponential number of
+		// paths. The buckets cap what is KEPT; this caps what is LOOKED AT, so
+		// a well-connected diagram costs milliseconds rather than minutes.
+		if (sofar.size() >= maxLength || --budget < 0)
 			return;
 		for (const QPair<Node*, Arrow*>& edge : out.value(at))
 		{
@@ -524,7 +545,7 @@ namespace
 			QList<QList<Arrow*>>& bucket = found[edge.first];
 			if (bucket.size() < maxPaths)
 				bucket.append(sofar);
-			walkPaths(edge.first, out, sofar, onPath, found, maxLength, maxPaths);
+			walkPaths(edge.first, out, sofar, onPath, found, maxLength, maxPaths, budget);
 			onPath.remove(edge.first);
 			sofar.removeLast();
 		}
@@ -556,7 +577,8 @@ namespace
 			QList<Arrow*> sofar;
 			QSet<Node*> onPath;
 			onPath.insert(from);
-			walkPaths(from, out, sofar, onPath, found, 8, 8);
+			int visits = 20000;   // per starting object: plenty for any diagram drawn by hand
+			walkPaths(from, out, sofar, onPath, found, 8, 8, visits);
 
 			for (auto it = found.constBegin(); it != found.constEnd(); ++it)
 			{
@@ -565,9 +587,12 @@ namespace
 					continue;   // one way round only: nothing is being asserted
 				for (int i = 1; i < paths.size() && budget > 0; ++i)
 				{
+					const QString left = composite(paths.at(0), ring);
+					const QString right = composite(paths.at(i), ring);
+					if (left == right)
+						continue;   // 0 = 0 says nothing; neither does f = f
 					lines << QString("%1 %2 %3:   %4  =  %5")
-						.arg(from->id(), to, it.key()->id(),
-						     composite(paths.at(0), ring), composite(paths.at(i), ring));
+						.arg(from->id(), to, it.key()->id(), left, right);
 					--budget;
 				}
 			}
@@ -739,12 +764,23 @@ QString DiagramScene::statementText() const
 	QString given = phrase(givenItems, forAll);
 	const QString claimed = phrase(claimedItems, exists);
 
-	// which pieces of the diagram claim exactness, and of what
+	// which pieces of the diagram claim exactness, and of what - and which
+	// nodes claim it of the diagram drawn inside them
 	QStringList exactRows, exactColumns;
 	for (const Component& piece : components())
 	{
 		if (piece.rowsExact) exactRows << piece.title;
 		if (piece.columnsExact) exactColumns << piece.title;
+	}
+	{
+		QList<Node*> everything;
+		collectNamed(m_ambientCategory, everything);
+		for (Node* node : everything)
+			if (auto* home = dynamic_cast<Category*>(node); home != nullptr && home->holdsAnything())
+			{
+				if (home->rowsExact()) exactRows << QString("the diagram in %1").arg(home->id());
+				if (home->columnsExact()) exactColumns << QString("the diagram in %1").arg(home->id());
+			}
 	}
 	if (!exactRows.isEmpty())
 		given += QString("%1 with exact rows in %2").arg(given.isEmpty() ? "" : ",", exactRows.join(", "));
@@ -833,8 +869,12 @@ void DiagramScene::deleteNodes(const QList<Node*>& nodes)
 
 void DiagramScene::clearDiagram()
 {
+	endRule();
 	hideHandles();
 	cancelArrow();
+	// a tutor pointing into the diagram has nothing to point at once it is gone
+	if (!m_session.isNull())
+		m_session->cancel();
 	if (m_ambientCategory != nullptr)
 	{
 		// arrows first: nothing must be left pointing at an object that has gone
@@ -946,8 +986,8 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		// from here until the button comes up, a node that moves is a node the
 		// user is moving - and only those shove their neighbours
 		Node::setUserDragging(true);
-		m_holdTimer.stop();
 		m_pressed = nullptr;
+		m_gesture = Gesture::None;
 
 		// remember where everything that could be dragged is standing, so the
 		// move can be recorded as one change when the button comes back up
@@ -979,22 +1019,22 @@ void DiagramScene::notePushed(Node* node, const QPointF& before)
 
 void DiagramScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-	m_holdTimer.stop();
-	m_pressed = nullptr;
-
-	// dropped where it now stands, as one change in the history
-	if (!m_carrying.isNull())
+	// a move ends where the button comes up, as one change in the history
+	if (isMoving())
 	{
-		Node* node = m_carrying.data();
-		m_carrying = nullptr;
-		if (node->pos() != m_carryFrom && m_history != nullptr)
+		Node* node = m_pressed.data();
+		m_pressed = nullptr;
+		m_gesture = Gesture::None;
+		QApplication::restoreOverrideCursor();
+		if (m_moved && node->pos() != m_moveFrom && m_history != nullptr)
 			m_history->record(new ItemsMoved(QString("Moved %1").arg(node->id()),
-				{ ItemsMoved::Move{ QPointer<Node>(node), m_carryFrom, node->pos() } }));
-		emit message(QString("%1 dropped.").arg(node->id()));
+				{ ItemsMoved::Move{ QPointer<Node>(node), m_moveFrom, node->pos() } }));
 		Node::setUserDragging(false);
 		event->accept();
 		return;
 	}
+	m_pressed = nullptr;
+	m_gesture = Gesture::None;
 
 	QGraphicsScene::mouseReleaseEvent(event);
 	Node::setUserDragging(false);
@@ -1020,25 +1060,33 @@ void DiagramScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 	if (arrowPending() && m_preview != nullptr)
 		m_preview->setLine(QLineF(m_arrowFrom->sceneBoundingRect().center(), event->scenePos()));
 
-	// carrying it: it goes where the mouse goes, on the grid
-	if (!m_carrying.isNull())
+	if (!m_pressed.isNull() && m_gesture != Gesture::None)
 	{
-		if (QGraphicsItem* parent = m_carrying->parentItem())
-			m_carrying->setPos(parent->mapFromScene(event->scenePos()) + m_carryGrab);
-		event->accept();
-		return;
-	}
+		const bool gone = QLineF(m_pressScenePos, event->scenePos()).length() > 6.0;
 
-	// pressed and now moving: that is an arrow being pulled out of it
-	if (!m_pressed.isNull()
-	 && QLineF(m_pressScenePos, event->scenePos()).length() > 6.0)
-	{
-		Node* from = m_pressed.data();
-		m_pressed = nullptr;
-		m_holdTimer.stop();
-		beginArrow(from);
-		event->accept();
-		return;
+		// by the label: the object goes where the mouse goes, on the grid
+		if (m_gesture == Gesture::Move)
+		{
+			if (gone || m_moved)
+			{
+				m_moved = true;
+				if (QGraphicsItem* parent = m_pressed->parentItem())
+					m_pressed->setPos(parent->mapFromScene(event->scenePos()) + m_moveGrab);
+			}
+			event->accept();
+			return;
+		}
+
+		// by the body: an arrow being pulled out of it
+		if (gone)
+		{
+			Node* from = m_pressed.data();
+			m_pressed = nullptr;
+			m_gesture = Gesture::None;
+			beginArrow(from);
+			event->accept();
+			return;
+		}
 	}
 
 	QGraphicsScene::mouseMoveEvent(event);
@@ -1060,9 +1108,16 @@ void DiagramScene::keyPressEvent(QKeyEvent* event)
 		return;
 	}
 
-	if (event->key() == Qt::Key_Escape && isCarrying())
+	if (event->key() == Qt::Key_Escape && isMoving())
 	{
-		cancelCarry();
+		cancelMove();
+		event->accept();
+		return;
+	}
+	if (event->key() == Qt::Key_Escape && ruleActive())
+	{
+		endRule();
+		emit message("Rule taken off.");
 		event->accept();
 		return;
 	}
@@ -1285,21 +1340,251 @@ void DiagramScene::recordNote(const QString& text)
 		m_history->record(new Note(text));
 }
 
-void DiagramScene::beginPress(Node* node, const QPointF& scenePos)
+
+void DiagramScene::beginPress(Node* node, const QPointF& scenePos, Gesture gesture)
 {
-	if (node == nullptr)
+	if (node == nullptr || gesture == Gesture::None)
 		return;
 	m_pressed = node;
 	m_pressScenePos = scenePos;
-	m_holdTimer.start();
+	m_gesture = gesture;
+	m_moved = false;
+	if (gesture == Gesture::Move)
+	{
+		m_moveFrom = node->pos();
+		if (QGraphicsItem* parent = node->parentItem())
+			m_moveGrab = node->pos() - parent->mapFromScene(scenePos);
+		// the cursor says what the drag is, for as long as it lasts
+		QApplication::setOverrideCursor(Qt::SizeAllCursor);
+	}
 }
 
-void DiagramScene::cancelCarry()
+void DiagramScene::cancelMove()
 {
-	if (m_carrying.isNull())
+	if (!isMoving())
 		return;
-	Node* node = m_carrying.data();
-	m_carrying = nullptr;
-	node->setPos(m_carryFrom);
+	Node* node = m_pressed.data();
+	m_pressed = nullptr;
+	m_gesture = Gesture::None;
+	QApplication::restoreOverrideCursor();
+	node->setPos(m_moveFrom);
 	emit message(QString("%1 put back.").arg(node->id()));
+}
+// ---------------------------------------------------------------- rules
+
+namespace
+{
+	// The button that sits under a place the rule fits. A scene-level item at
+	// screen size, like the handle bar; a click applies the rule there.
+	class ApplyButton : public QGraphicsObject
+	{
+	public:
+		explicit ApplyButton(const QString& text)
+			: m_text(text)
+		{
+			setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+			setZValue(10001);
+			setAcceptHoverEvents(true);
+			setCursor(QCursor(Qt::PointingHandCursor));
+
+			// as wide as its words need, with room either side; a very long
+			// name is shortened with an ellipsis rather than cut off
+			m_font.setBold(true);
+			m_font.setPointSizeF(9.5);
+			const QFontMetricsF metrics(m_font);
+			const qreal most = 260;
+			if (metrics.horizontalAdvance(m_text) > most)
+				m_text = metrics.elidedText(m_text, Qt::ElideRight, most);
+			m_width = metrics.horizontalAdvance(m_text) + 28;
+		}
+
+		std::function<void()> onClick;
+
+		QRectF boundingRect() const override { return QRectF(-m_width / 2, -14, m_width, 28); }
+		QPainterPath shape() const override
+		{
+			QPainterPath path;
+			path.addRoundedRect(boundingRect().adjusted(2, 2, -2, -2), 12, 12);
+			return path;
+		}
+		void paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*) override
+		{
+			painter->setRenderHint(QPainter::Antialiasing, true);
+			painter->setPen(QPen(QColor(255, 255, 255, 230), 1.2));
+			painter->setBrush(m_hover ? QColor(21, 128, 61) : QColor(34, 197, 94, 240));
+			painter->drawRoundedRect(boundingRect().adjusted(2, 2, -2, -2), 12, 12);
+			painter->setPen(Qt::white);
+			painter->setFont(m_font);
+			painter->drawText(boundingRect(), Qt::AlignCenter, m_text);
+		}
+
+	protected:
+		void mousePressEvent(QGraphicsSceneMouseEvent* event) override
+		{
+			if (event->button() == Qt::LeftButton)
+			{
+				event->accept();
+				if (onClick)
+					onClick();
+				return;
+			}
+			QGraphicsObject::mousePressEvent(event);
+		}
+		void hoverEnterEvent(QGraphicsSceneHoverEvent*) override { m_hover = true; update(); }
+		void hoverLeaveEvent(QGraphicsSceneHoverEvent*) override { m_hover = false; update(); }
+
+	private:
+		QString m_text;
+		QFont m_font;
+		qreal m_width = 92;
+		bool m_hover = false;
+	};
+
+	void everyNode(QGraphicsItem* parent, QList<Node*>& out)
+	{
+		for (QGraphicsItem* child : parent->childItems())
+			if (auto* node = dynamic_cast<Node*>(child))
+			{
+				out << node;
+				everyNode(node, out);
+			}
+	}
+}
+
+QString DiagramScene::ruleName() const
+{
+	return m_rule != nullptr ? m_rule->name() : QString();
+}
+
+bool DiagramScene::beginRule(const QString& path)
+{
+	endRule();
+	auto rule = std::make_unique<Rule>(path);
+	if (!rule->isValid())
+	{
+		emit message(QString("%1 could not be read as a rule.").arg(path));
+		return false;
+	}
+	if (!rule->hasConclusion())
+	{
+		emit message(QString("%1 concludes nothing - nothing in it is drawn dotted - so there is nothing "
+		                     "to apply.").arg(rule->name()));
+		return false;
+	}
+	m_rule = std::move(rule);
+	refreshRuleOverlay();
+	return !m_matches.isEmpty();
+}
+
+void DiagramScene::endRule()
+{
+	if (m_rule == nullptr)
+		return;
+	clearRuleOverlay();
+	m_rule.reset();
+	m_matches.clear();
+	emit ruleChanged(QString(), 0);
+}
+
+void DiagramScene::clearRuleOverlay()
+{
+	for (QGraphicsObject* button : m_applyButtons)
+	{
+		removeItem(button);
+		delete button;
+	}
+	m_applyButtons.clear();
+
+	// everything back to itself
+	if (m_ambientCategory != nullptr)
+	{
+		QList<Node*> nodes;
+		everyNode(m_ambientCategory, nodes);
+		nodes << m_ambientCategory;
+		for (Node* node : nodes)
+		{
+			node->setOpacity(1.0);
+			node->setFlag(QGraphicsItem::ItemIgnoresParentOpacity, false);
+			node->setHighlight(false);
+		}
+	}
+}
+
+void DiagramScene::refreshRuleOverlay()
+{
+	clearRuleOverlay();
+	if (m_rule == nullptr)
+		return;
+
+	m_matches = RuleMatcher::find(*m_rule, this);
+
+	if (m_ambientCategory != nullptr)
+	{
+		// what the rule fits is lit; the rest steps back. Each node keeps its
+		// own opacity rather than its parent's, so a lit object inside a
+		// dimmed one stays lit.
+		QSet<Node*> lit;
+		for (const RuleMatch& match : m_matches)
+		{
+			for (Node* node : match.objects)
+				lit.insert(node);
+			for (Arrow* arrow : match.arrows)
+				lit.insert(arrow);
+		}
+		QList<Node*> nodes;
+		everyNode(m_ambientCategory, nodes);
+		for (Node* node : nodes)
+		{
+			node->setFlag(QGraphicsItem::ItemIgnoresParentOpacity, true);
+			const bool on = lit.contains(node);
+			node->setOpacity(on ? 1.0 : 0.22);
+			node->setHighlight(on);
+		}
+		m_ambientCategory->setOpacity(1.0);   // the canvas itself stays as it is
+	}
+
+	// a button under each place it fits
+	for (int i = 0; i < m_matches.size(); ++i)
+	{
+		auto* button = new ApplyButton(QString("Apply %1").arg(m_rule->name()));
+		const QRectF at = m_matches.at(i).bounds;
+		button->setPos(at.center().x(), at.bottom() + 18);
+		button->onClick = [this, i] { applyMatch(i); };
+		addItem(button);
+		m_applyButtons << button;
+	}
+
+	emit ruleChanged(m_rule->name(), m_matches.size());
+	emit message(m_matches.isEmpty()
+		? QString("%1 fits nowhere in this diagram.").arg(m_rule->name())
+		: QString("%1 fits in %2 place%3. Press Apply at one, or apply to all.")
+			.arg(m_rule->name()).arg(m_matches.size()).arg(m_matches.size() == 1 ? "" : "s"));
+}
+
+void DiagramScene::applyMatch(int index)
+{
+	if (m_rule == nullptr || index < 0 || index >= m_matches.size())
+		return;
+	const QList<Node*> made = RuleMatcher::apply(*m_rule, m_matches.at(index), this);
+	emit message(made.isEmpty()
+		? QString("%1 made nothing there.").arg(m_rule->name())
+		: QString("%1 applied: %2 thing%3 drawn in.").arg(m_rule->name()).arg(made.size()).arg(made.size() == 1 ? "" : "s"));
+	// the diagram has changed: find it again, and light up what is left
+	refreshRuleOverlay();
+}
+
+void DiagramScene::applyAllMatches()
+{
+	if (m_rule == nullptr)
+		return;
+	// the matches as they stand now: applying one never removes anything, so
+	// the others stay good, and what a new one might match is not chased
+	const QList<RuleMatch> pending = m_matches;
+	int drawn = 0;
+	for (const RuleMatch& match : pending)
+		drawn += RuleMatcher::apply(*m_rule, match, this).size();
+	emit message(QString("%1 applied in %2 place%3: %4 thing%5 drawn in.")
+		.arg(m_rule->name()).arg(pending.size()).arg(pending.size() == 1 ? "" : "s")
+		.arg(drawn).arg(drawn == 1 ? "" : "s"));
+	refreshRuleOverlay();
 }

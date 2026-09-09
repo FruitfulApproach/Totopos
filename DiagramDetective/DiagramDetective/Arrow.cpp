@@ -637,12 +637,24 @@ void Arrow::setProperties(const QStringList& keys)
 }
 
 
+QString Arrow::effectiveId() const
+{
+	if (!id().isEmpty())
+		return id();
+	Category* home = surroundingCategory();
+	return home != nullptr ? home->implicitArrowName() : QString();
+}
+
 QString Arrow::contextTitle() const
 {
 	Category* home = surroundingCategory();
 	if (home == nullptr)
 		return Node::contextTitle();
-	return QString("%1 %2").arg(sentenceCase(home->morphismName()), id());
+	// an implicit name is shown as such, so it is clear the label is blank
+	const QString name = id().isEmpty() && !effectiveId().isEmpty()
+		? QString("%1 (implicit)").arg(effectiveId())
+		: id();
+	return QString("%1 %2").arg(sentenceCase(home->morphismName()), name);
 }
 
 void Arrow::populateActions(QMenu& menu)

@@ -185,6 +185,14 @@ DiagramDetective::DiagramDetective(QWidget *parent)
                 .arg(QFileInfo(path).completeBaseName()), 8000);
     });
 
+    // a click in the library lays that file over the diagram as a rule
+    connect(m_library, &LibraryDock::chosen, this, [this](const QString& path) {
+        m_diagram->beginRule(path);
+    });
+    connect(m_library, &LibraryDock::applyAllRequested, m_diagram, &DiagramScene::applyAllMatches);
+    connect(m_library, &LibraryDock::stopRequested, m_diagram, &DiagramScene::endRule);
+    connect(m_diagram, &DiagramScene::ruleChanged, m_library, &LibraryDock::setRuleState);
+
     // Every diagram keeps the steps that made it, so any of them can be gone
     // through again - which is what teaching a proof comes to here.
     connect(teachMe, &QAction::triggered, this, [this] {

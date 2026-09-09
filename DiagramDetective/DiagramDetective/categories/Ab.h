@@ -11,6 +11,7 @@ public:
 
 public:
 	QString objectName() const override { return QStringLiteral("abelian group"); }
+	QString implicitArrowName() const override { return QStringLiteral("0"); }   // the zero map
 	QString morphismName() const override { return QStringLiteral("homomorphism"); }
 
 protected:

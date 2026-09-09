@@ -5,9 +5,10 @@
 #include <QGraphicsSceneContextMenuEvent>
 #include <QPointer>
 #include "TutorSession.h"   // QPointer needs the complete type
-#include <QTimer>
+#include <memory>
 #include "Object.h"
 #include "Category.h"
+#include "rules/Rule.h"
 
 class Arrow;
 
@@ -128,12 +129,26 @@ public:
 	// between one construction and the next.
 	void recordNote(const QString& text);
 
-	// An object was pressed. A drag from here draws an arrow; holding still
-	// picks the object up and carries it until the button comes up, or Escape
-	// or the right button puts it back.
-	void beginPress(Node* node, const QPointF& scenePos);
-	bool isCarrying() const { return !m_carrying.isNull(); }
-	void cancelCarry();   // put it back where it was
+	// A rule from the library laid over the diagram. Every place its premise
+	// is found - as a subdiagram, the rule's variables standing for whatever
+	// is there - is lit up with an Apply button, and the rest is dimmed.
+	// Applying draws the rule's conclusion in at that place.
+	bool beginRule(const QString& path);
+	void endRule();
+	bool ruleActive() const { return m_rule != nullptr; }
+	QString ruleName() const;
+	int matchCount() const { return m_matches.size(); }
+	void applyMatch(int index);
+	void applyAllMatches();
+
+	// An object was pressed, and WHERE decides what the drag will be: on its
+	// label, the object is moved; anywhere else inside it, an arrow is drawn
+	// out of it. Escape or the right button abandons a move and puts the
+	// object back.
+	enum class Gesture { None, Arrow, Move };
+	void beginPress(Node* node, const QPointF& scenePos, Gesture gesture);
+	bool isMoving() const { return m_gesture == Gesture::Move && !m_pressed.isNull(); }
+	void cancelMove();   // put it back where it was
 
 	// a node shoved out of the way by another: it moved too, so it belongs in
 	// the same entry of the history as the drag that shoved it
@@ -184,6 +199,9 @@ signals:
 	void error(const QString& text);
 	// what was just drawn / just taken out: a live functor listens to these
 	void nodesAdded(const QList<Node*>& nodes);
+	// a rule was laid over the diagram, or taken off (empty name), and how
+	// many places it fits
+	void ruleChanged(const QString& name, int matches);
 	void nodesRemoved(const QList<Node*>& nodes);
 	// the sentence the diagram now makes
 	void statementChanged(const QString& statement);
@@ -222,12 +240,19 @@ private:
 	QString m_statementName;
 	QList<QPointer<Node>> m_hypotheses;
 
-	QPointer<Node> m_pressed;      // pressed, the gesture not yet decided
+	// the rule being applied, where it fits, and the buttons at those places
+	void refreshRuleOverlay();
+	void clearRuleOverlay();
+	std::unique_ptr<Rule> m_rule;
+	QList<RuleMatch> m_matches;
+	QList<QGraphicsObject*> m_applyButtons;
+
+	QPointer<Node> m_pressed;      // the object under the button
 	QPointF m_pressScenePos;
-	QTimer m_holdTimer;
-	QPointer<Node> m_carrying;
-	QPointF m_carryFrom;           // where it stood, for Escape
-	QPointF m_carryGrab;           // where in the object the mouse took hold
+	Gesture m_gesture = Gesture::None;
+	bool m_moved = false;          // has the move actually gone anywhere yet
+	QPointF m_moveFrom;            // where it stood, for Escape and for the history
+	QPointF m_moveGrab;            // where in the object the mouse took hold
 	// where the items being dragged were when the drag started
 	QList<QPair<QPointer<Node>, QPointF>> m_dragFrom;
 };

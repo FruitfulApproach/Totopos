@@ -1,9 +1,10 @@
 ﻿#pragma once
 
 #include <QObject>
+#include <QPointer>
+#include <QGraphicsObject>
 #include <QList>
 #include <QTimer>
-#include <QPointer>
 
 class Tutor;
 class DiagramScene;
@@ -57,7 +58,10 @@ private:
 	Tutor* m_tutor = nullptr;
 	DiagramScene* m_scene = nullptr;
 	QList<Node*> m_picks;
-	QGraphicsItem* m_target = nullptr;
+	// What the pointer follows. A QPointer, because the diagram can lose the
+	// item while the session is up - a file opened, a node deleted - and the
+	// 33 ms timer would otherwise ask a freed item for its rect.
+	QPointer<QGraphicsObject> m_target;
 	TutorPointer* m_pointer = nullptr;
 	QList<QGraphicsItem*> m_badges;
 	QPointer<QFrame> m_bubble;

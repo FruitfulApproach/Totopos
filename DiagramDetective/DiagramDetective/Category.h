@@ -108,6 +108,13 @@ public:
 	// and what an OBJECT of it is called: an R-module, a set, a category
 	virtual QString objectName() const { return QStringLiteral("object"); }
 
+	// What an arrow drawn WITHOUT a label means here. In an additive category
+	// there is one arrow that needs no name - the zero map - so a blank label
+	// is read as 0 wherever the name is needed, while the label itself stays
+	// blank on the canvas. Anywhere else a blank label is simply an arrow
+	// with no name.
+	virtual QString implicitArrowName() const { return QString(); }
+
 protected:
 
 	// nested categories fade, so the yellow does not pile up level on level

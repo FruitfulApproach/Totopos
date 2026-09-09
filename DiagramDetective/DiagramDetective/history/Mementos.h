@@ -7,6 +7,7 @@
 #include <QPen>
 #include "Memento.h"
 #include "../Node.h"
+#include <QGraphicsObject>
 
 class QGraphicsItem;
 class Arrow;
@@ -167,7 +168,10 @@ protected:
 	struct Held
 	{
 		QPointer<Node> node;
-		QGraphicsItem* parent = nullptr;
+		// where it was: a category, hence a QGraphicsObject, hence watchable.
+		// The ambient category can be swapped out from under a memento, and
+		// a raw pointer here would put a node back into a freed parent.
+		QPointer<QGraphicsObject> parent;
 		QGraphicsScene* scene = nullptr;
 		QPointF pos;
 		bool owned = false;   // out of the scene: ours to destroy

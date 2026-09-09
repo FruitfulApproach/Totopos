@@ -60,6 +60,12 @@ public:
 	// "R-linear map f", "Functor F"
 	QString contextTitle() const override;
 
+	// The name to READ this arrow by: its label, or - when the label is blank
+	// - whatever the category says an unlabelled arrow is. In R-Mod that is
+	// 0, so an unnamed arrow into the zero module reads as the zero map in
+	// every equation without the label saying so.
+	QString effectiveId() const;
+
 	Node* domain() const { return m_domain; }
 	Node* codomain() const { return m_codomain; }
 	virtual void setDomain(Node* domain);

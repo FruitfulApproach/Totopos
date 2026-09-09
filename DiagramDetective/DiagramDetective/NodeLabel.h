@@ -28,6 +28,9 @@ protected:
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
+	// let go of the selection the editor made, so it is not painted for ever
+	void dropSelection();
+
 	Node* m_node = nullptr;
 	QString m_before;
 	QPointF m_dragFrom;

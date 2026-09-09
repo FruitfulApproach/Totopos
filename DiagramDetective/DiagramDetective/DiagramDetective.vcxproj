@@ -114,6 +114,7 @@
     <ClCompile Include="LibraryDock.cpp" />
     <ClCompile Include="ProofTutor.cpp" />
     <ClCompile Include="library\Library.cpp" />
+    <ClCompile Include="rules\Rule.cpp" />
     <ClCompile Include="CommutativeEquationsDock.cpp" />
     <ClCompile Include="SetupTutor.cpp" />
     <ClCompile Include="history\Mementos.cpp" />

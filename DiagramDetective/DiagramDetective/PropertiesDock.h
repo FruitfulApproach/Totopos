@@ -43,6 +43,8 @@ private:
 	QList<Node*> selection() const;
 	// the mapping of the one arrow selected on its own, if that is what this is
 	MapsElements* soleMapping() const;
+	// the one node selected on its own, when it has a diagram drawn inside it
+	Category* soleDiagramHome() const;
 
 	void applyExistsSuch(bool on);
 	void applyRounding(int radius);
@@ -64,6 +66,11 @@ private:
 
 	QGroupBox* m_objectBox = nullptr;
 	QSpinBox* m_radius = nullptr;
+
+	// the diagram drawn INSIDE the selected node, when there is one
+	QGroupBox* m_insideBox = nullptr;
+	ToggleSwitch* m_rowsExact = nullptr;
+	ToggleSwitch* m_columnsExact = nullptr;
 
 	QGroupBox* m_componentBox = nullptr;
 	QListWidget* m_components = nullptr;
