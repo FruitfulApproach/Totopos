@@ -22,6 +22,7 @@ namespace MementoTag
 		Note         = 11,
 		Monic        = 12,
 		Epic         = 13,
+		NodeRetyped  = 14,
 	};
 }
 

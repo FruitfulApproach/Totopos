@@ -9,6 +9,8 @@ class Set : public Category
 public:
 	explicit Set(QGraphicsItem* parent = nullptr);
 
+	QString builtInName() const override { return QStringLiteral("Set"); }
+
 public:
 	QString objectName() const override { return QStringLiteral("set"); }
 	QString morphismName() const override { return QStringLiteral("function"); }

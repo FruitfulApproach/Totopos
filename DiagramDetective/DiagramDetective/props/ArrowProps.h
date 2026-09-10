@@ -7,7 +7,7 @@
 // this one arrow, drawn the way the fact is usually written by hand.
 
 // f is cancellable on the left: for g, h : Z -> X, f o g = f o h implies
-// g = h. Drawn with a hooked tail, the way an inclusion usually is (X ↪ Y).
+// g = h. Drawn with a split vee tail, the way an inclusion usually is (X ↪ Y).
 class Monomorphism : public ArrowProp
 {
 	Q_OBJECT
@@ -19,7 +19,7 @@ public:
 	QString description() const override
 	{
 		return QStringLiteral("Cancellable on the left: for g, h : Z → X, f∘g = f∘h implies g = h. "
-		                      "Drawn with a hooked tail, the way an inclusion usually is.");
+		                      "Drawn with a split vee tail, the way an inclusion usually is.");
 	}
 };
 

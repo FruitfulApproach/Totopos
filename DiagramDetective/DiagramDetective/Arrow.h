@@ -84,7 +84,7 @@ public:
 	ArrowProp* prop(const QString& key) const;
 
 	// Cancellable on the left / on the right (props/ArrowProps.h): whether this
-	// is asserted, drawn with a hooked tail / a doubled head. Checked often
+	// is asserted, drawn with a split vee tail / a doubled head. Checked often
 	// enough (paint, the context menu) to be worth their own bool, like
 	// existsSuch() is on Node - the underlying fact still lives as a Prop, so
 	// it saves, loads and lists itself the same way every other one does.

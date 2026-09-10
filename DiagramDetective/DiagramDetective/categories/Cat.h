@@ -10,6 +10,8 @@ class Cat : public Category
 public:
 	explicit Cat(QGraphicsItem* parent = nullptr);
 
+	QString builtInName() const override { return QStringLiteral("Cat"); }
+
 public:
 	QString objectName() const override { return QStringLiteral("category"); }
 	QString morphismName() const override { return QStringLiteral("functor"); }

@@ -548,22 +548,18 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// curve does not show a corner where two segments meet
 	pen.setCapStyle(Qt::RoundCap);
 	pen.setJoinStyle(Qt::RoundJoin);
-	if (existsSuch())
-		pen.setStyle(Qt::DotLine);   // dotted along its line: this arrow is asserted to exist
 	if (hasError())
-	{
-		const Qt::PenStyle style = pen.style();
 		pen = QPen(QColor(255, 0, 0), 2.5);
-		pen.setStyle(style);
-	}
 	if (isHighlighted())
-	{
-		const Qt::PenStyle style = pen.style();
 		pen = QPen(QColor(22, 163, 74), qMax(3.0, pen.widthF() + 1.0));
-		pen.setStyle(style);
-	}
 	if (option->state & QStyle::State_Selected)
 		pen.setWidthF(pen.widthF() + 1.5);
+	// Dashed along its line: this arrow is asserted to exist. Applied LAST, once
+	// an error or a highlight has had its say about the colour and the width -
+	// the dash is measured against the width the line is finally drawn with,
+	// and a fresh pen would not carry the pattern over anyway.
+	if (existsSuch())
+		applyExistsDash(pen);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
 	painter->drawPath(path);
@@ -595,8 +591,9 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		painter->drawLine(tip2, tip2 - dir * headLength - normal * headWidth);
 	}
 
-	// asserted monic: a short cross-stroke near the tail, the way an
-	// inclusion is usually drawn (X ↣ Y)
+	// asserted monic: a vee at the tail, split back along the line, the way an
+	// inclusion is usually drawn (X ↣ Y). Its apex points the way the arrow
+	// goes, so the tail reads as a mirror of the head rather than a bar across it.
 	if (isMonic())
 	{
 		const QPointF tail = path.pointAtPercent(0.0);
@@ -604,8 +601,9 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		const qreal tailLen = qSqrt(tailDir.x() * tailDir.x() + tailDir.y() * tailDir.y());
 		tailDir /= (tailLen > 1e-6 ? tailLen : 1);
 		const QPointF tailNormal(-tailDir.y(), tailDir.x());
-		const QPointF at = tail + tailDir * (headLength * 0.6);
-		painter->drawLine(at - tailNormal * headWidth, at + tailNormal * headWidth);
+		const QPointF apex = tail + tailDir * headLength;
+		painter->drawLine(apex, tail + tailNormal * headWidth);
+		painter->drawLine(apex, tail - tailNormal * headWidth);
 	}
 
 	// the points it is pulled through, while it is being worked on

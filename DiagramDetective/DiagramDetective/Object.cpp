@@ -33,25 +33,22 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	// something in here, so it appears the moment anything is placed inside.
 	// A colour chosen by hand always shows, and the setting turns the whole
 	// rule off for anyone who wants every object boxed.
-	if (containedCount() == 0 && !hasChosenStyle() && !AppSettings::instance().frameEmptyNodes())
+	if (containedCount() == 0 && !alwaysFramed() && !hasChosenStyle() && !AppSettings::instance().frameEmptyNodes())
 	{
 		pen = QPen(Qt::NoPen);
 		brush = QBrush(Qt::NoBrush);
 	}
 
-	if (existsSuch())
+	if (existsSuch() && pen.style() == Qt::NoPen)
 	{
-		// dots around the border: this object is asserted to exist
-		if (pen.style() == Qt::NoPen)
-			pen = QPen(QColor(60, 60, 70), 1.6);
-		pen.setStyle(Qt::DotLine);
+		// this object is asserted to exist, so it has a border to dash even
+		// when nothing else would have given it one
+		pen = QPen(QColor(60, 60, 70), 1.6);
 	}
 	if (hasError())
 	{
 		// part of something the diagram cannot mean: shown, not hidden
-		const Qt::PenStyle style = pen.style() == Qt::DotLine ? Qt::DotLine : Qt::SolidLine;
 		pen = QPen(QColor(255, 0, 0), 2.5);
-		pen.setStyle(style);
 	}
 	if (isHighlighted())
 	{
@@ -60,6 +57,11 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 		pen = QPen(QColor(22, 163, 74), 3.0);
 		brush = QBrush(QColor(34, 197, 94, 70));
 	}
+	// Dashes round the border: this object is asserted to exist. Applied last,
+	// so the claim still reads on a border an error or a highlight has taken
+	// over the colour and the width of.
+	if (existsSuch())
+		applyExistsDash(pen);
 
 	painter->setBrush(brush);
 	painter->setPen(pen);

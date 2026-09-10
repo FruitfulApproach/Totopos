@@ -7,6 +7,7 @@
 #include "../Category.h"
 #include "../DiagramScene.h"
 #include "../Functor.h"
+#include "../NodeKind.h"
 
 // ---------------------------------------------------------------- purely graphical
 
@@ -377,5 +378,64 @@ QByteArray StatementDeclared::payload() const
 	QDataStream out(&bytes, QIODevice::WriteOnly);
 	out.setVersion(QDataStream::Qt_6_0);
 	out << qint32(m_kindAfter) << m_nameAfter;
+	return bytes;
+}
+
+// ---------------------------------------------------------------- what a node is
+
+NodeRetyped::NodeRetyped(const QString& description, Node* before, Node* after)
+	: Memento(description), m_before(before), m_after(after)
+{
+	// the change has already happened: `after` is the one in the scene
+}
+
+NodeRetyped::~NodeRetyped()
+{
+	// whichever shell is standing outside the scene is ours to destroy; the
+	// one inside it belongs to the diagram
+	Node* spare = m_isAfter ? m_before.data() : m_after.data();
+	if (spare != nullptr && spare->scene() == nullptr && spare->parentItem() == nullptr)
+		delete spare;
+}
+
+void NodeRetyped::swap(Node* from, Node* to)
+{
+	if (from == nullptr || to == nullptr)
+		return;
+	NodeKind::transplant(from, to);
+	to->setSelected(false);
+	if (auto* diagram = dynamic_cast<DiagramScene*>(to->scene()))
+	{
+		emit diagram->statementChanged(diagram->statementText());
+		diagram->checkDiagram();
+	}
+}
+
+void NodeRetyped::undo()
+{
+	if (!m_isAfter || m_before.isNull() || m_after.isNull())
+		return;
+	swap(m_after.data(), m_before.data());
+	m_isAfter = false;
+}
+
+void NodeRetyped::redo()
+{
+	if (m_isAfter || m_before.isNull() || m_after.isNull())
+		return;
+	swap(m_before.data(), m_after.data());
+	m_isAfter = true;
+}
+
+QByteArray NodeRetyped::payload() const
+{
+	// pointers mean nothing in a file: what it was, what it became, and what
+	// it is called
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_before.isNull() ? QString() : NodeKind::of(m_before.data()))
+	    << (m_after.isNull() ? QString() : NodeKind::of(m_after.data()))
+	    << (m_after.isNull() ? QString() : m_after->id());
 	return bytes;
 }

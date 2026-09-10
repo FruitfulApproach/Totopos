@@ -157,7 +157,9 @@ void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 		return;
 	if (m_ambientCategory != nullptr)
 	{
-		m_ambientCategory->popupContextMenu(event->screenPos());
+		// where on the canvas it was, so "place something here" means here
+		m_ambientCategory->popupContextMenu(event->screenPos(),
+		                                    m_ambientCategory->mapFromScene(event->scenePos()));
 		event->accept();
 	}
 }
@@ -772,16 +774,34 @@ QString DiagramScene::statementText() const
 		if (piece.rowsExact) exactRows << piece.title;
 		if (piece.columnsExact) exactColumns << piece.title;
 	}
+	QStringList commuting, subcategories;
 	{
 		QList<Node*> everything;
 		collectNamed(m_ambientCategory, everything);
+		const QString subsetOf = QString(QChar(0x2286));
 		for (Node* node : everything)
-			if (auto* home = dynamic_cast<Category*>(node); home != nullptr && home->holdsAnything())
+		{
+			auto* home = dynamic_cast<Category*>(node);
+			if (home == nullptr)
+				continue;
+			if (home->isSubcategory())
 			{
-				if (home->rowsExact()) exactRows << QString("the diagram in %1").arg(home->id());
-				if (home->columnsExact()) exactColumns << QString("the diagram in %1").arg(home->id());
+				Category* over = home->ambient();
+				subcategories << (over != nullptr
+					? QString("%1 %2 %3").arg(home->id(), subsetOf, over->id())
+					: home->id());
 			}
+			if (!home->holdsAnything())
+				continue;
+			if (home->rowsExact()) exactRows << QString("the diagram in %1").arg(home->id());
+			if (home->columnsExact()) exactColumns << QString("the diagram in %1").arg(home->id());
+			if (home->commutes()) commuting << QString("the diagram in %1").arg(home->id());
+		}
 	}
+	if (!subcategories.isEmpty())
+		given += QString("%1 with %2").arg(given.isEmpty() ? "" : ",", subcategories.join(", "));
+	if (!commuting.isEmpty())
+		given += QString("%1 with %2 commuting").arg(given.isEmpty() ? "" : ",", commuting.join(", "));
 	if (!exactRows.isEmpty())
 		given += QString("%1 with exact rows in %2").arg(given.isEmpty() ? "" : ",", exactRows.join(", "));
 	if (!exactColumns.isEmpty())

@@ -151,6 +151,8 @@
     <ClCompile Include="DiagramScene.cpp" />
     <ClCompile Include="Node.cpp" />
     <ClCompile Include="Object.cpp" />
+    <ClCompile Include="AtomicElement.cpp" />
+    <ClCompile Include="NodeKind.cpp" />
     <QtRcc Include="DiagramDetective.qrc" />
     <QtUic Include="DiagramDetective.ui" />
     <QtUic Include="CategoryDialog.ui" />
@@ -201,7 +203,11 @@
     <QtMoc Include="CategoryDialog.h" />
     <QtMoc Include="SketchView.h" />
     <QtMoc Include="Category.h" />
+    <QtMoc Include="AtomicElement.h" />
     <QtMoc Include="SketchWithinCategory.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NodeKind.h" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="DiagramScene.h" />

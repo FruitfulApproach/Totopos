@@ -523,6 +523,12 @@ void Node::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 	event->accept();
 }
 
+void Node::popupContextMenu(const QPoint& screenPos, const QPointF& itemPos)
+{
+	m_contextPos = itemPos;
+	popupContextMenu(screenPos);
+}
+
 void Node::popupContextMenu(const QPoint& screenPos)
 {
 	QMenu menu;
@@ -531,6 +537,21 @@ void Node::popupContextMenu(const QPoint& screenPos)
 	menu.exec(screenPos);
 }
 
+
+void Node::applyExistsDash(QPen& pen)
+{
+	if (pen.style() == Qt::NoPen)
+		return;   // nothing is being drawn: nothing to dash
+	// A dash pattern is measured in PEN WIDTHS, so divide the lengths we want
+	// by the width to get the same dash out of a hairline border and out of
+	// the thick pen an error or a highlight repaints with. A width of 0 is
+	// Qt's cosmetic one-pixel pen, which dashes as though it were 1.
+	const qreal width = pen.widthF() > 0.0 ? pen.widthF() : 1.0;
+	pen.setDashPattern({ ExistsDashLength / width, ExistsDashGap / width });
+	// Flat ends, not round: a round cap adds half the width to each end of
+	// every dash, which on a thick line closes the gaps back up.
+	pen.setCapStyle(Qt::FlatCap);
+}
 
 QString Node::sentenceCase(const QString& text)
 {

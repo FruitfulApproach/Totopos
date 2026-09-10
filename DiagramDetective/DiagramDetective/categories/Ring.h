@@ -9,6 +9,8 @@ class Ring : public Category
 public:
 	explicit Ring(QGraphicsItem* parent = nullptr);
 
+	QString builtInName() const override { return QStringLiteral("Ring"); }
+
 public:
 	QString objectName() const override { return QStringLiteral("ring"); }
 	QString morphismName() const override { return QStringLiteral("ring homomorphism"); }

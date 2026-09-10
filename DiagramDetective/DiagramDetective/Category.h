@@ -25,6 +25,38 @@ public:
 	// a fresh built-in by name, or nullptr when the name is not built in
 	static Category* createBuiltIn(const QString& name, QGraphicsItem* parent = nullptr);
 
+	// Which built-in this category IS, by the name the registry knows it
+	// under: "R-Mod", "BigCat", ... Empty for one the user defined, which is
+	// a plain Category carrying whatever structure was ticked. This is not
+	// id(): a category can be renamed and still be R-Mod.
+	virtual QString builtInName() const { return QString(); }
+
+	// A fresh category of the SAME KIND as another - the same built-in class,
+	// or a plain one carrying the same structure. This is what a subcategory
+	// is made with: a subcategory of R-Mod has to be an R-Mod, so that what
+	// is placed in it is an R-module and what is drawn between them is an
+	// R-linear map.
+	static Category* createLike(const Category* model, const QString& name, QGraphicsItem* parent = nullptr);
+
+	// A category drawn INSIDE another and asserted to be a subcategory of it:
+	// its objects are objects of the surrounding category, and its arrows are
+	// arrows of it. Drawn with a dotted border and a fainter fill, so it can
+	// be told from an object of that category at a glance. Nesting has no
+	// limit - a subcategory of a subcategory of R-Mod is still R-modules.
+	bool isSubcategory() const { return m_subcategory; }
+	void setSubcategory(bool subcategory);
+	// the category this is a subcategory OF, or nullptr when it is not one
+	Category* ambient() const;
+
+	// Place a fresh subcategory of THIS category at a scene position, as a
+	// child. It is made as a category of the same kind - a subcategory of
+	// R-Mod is an R-Mod - so what is placed inside it is an R-module and what
+	// is drawn between them an R-linear map, and it can hold subcategories of
+	// its own with no limit to the nesting.
+	Category* createSubcategory(const QPointF& scenePos);
+	// the next letter free for a subcategory: S, T, U, ... then S', T', ...
+	QString nextSubcategoryName() const;
+
 	// Put a fresh object of this category at a scene position, as a child of
 	// this category: makeObject decides the kind, firstLetter the naming
 	// (C, D, ..., Z, then A', B', ..., then A'', ...).
@@ -73,6 +105,24 @@ public:
 	void setRowsExactRecorded(bool exact);
 	void setColumnsExactRecorded(bool exact);
 
+	// Whether the diagram drawn IN HERE is asserted to commute. Off is not
+	// the claim that it fails to commute: it is the absence of a claim. The
+	// ambient category is the whole canvas, and keeps this on the scene
+	// instead, so that the panel over the canvas and this page never disagree.
+	bool commutes() const;
+	void setCommutes(bool commutes);
+
+	// What the diagram drawn in here is put forward AS, and what it is
+	// called. The same routing as commuting: the ambient category answers
+	// for the scene.
+	int statementKind() const;
+	void setStatementKind(int kind);
+	QString statementName() const;
+	void setStatementName(const QString& name);
+
+	// is this the category everything else is drawn in?
+	bool isAmbient() const;
+
 	// The structure the category is known to have, as CategoryProp objects it
 	// owns (props/CategoryProps.h: HasProducts, IsAbelian, ...).
 	const QList<CategoryProp*>& props() const { return m_props; }
@@ -86,19 +136,26 @@ public:
 	// a category frames its objects with more room than a plain object gives its label
 	QRectF boundingRect() const override { return childFrame().adjusted(-9, -9, 9, 9); }
 
+	// "Category C", or "Subcategory S of R-Mod" when it is one
+	QString contextTitle() const override;
+
+public:
+	// The kind of object this category is made of; the default is a plain
+	// object. Public, not protected: a subcategory has to ask the category
+	// it sits in what its objects are, and C++ would not let it reach a
+	// protected member through a pointer to another category.
+	virtual Object* makeObject(const QString& name);
+	// where the object names start
+	virtual QChar firstLetter() const { return QChar('C'); }
+	// where the arrow names start (lower case stays lower case)
+	virtual QChar firstArrowLetter() const { return QChar('f'); }
+
 protected:
 	// what this category lets you build, grouped under Construct
 	void populateActions(QMenu& menu) override;
 
 	// the next letter nothing has taken yet, advancing the counter past it
 	QString freshName(int& counter, QChar first) const;
-
-	// the kind of object this category is made of; the default is a plain object
-	virtual Object* makeObject(const QString& name);
-	// where the object names start
-	virtual QChar firstLetter() const { return QChar('C'); }
-	// where the arrow names start (lower case stays lower case)
-	virtual QChar firstArrowLetter() const { return QChar('f'); }
 
 public:
 	// What an arrow of this category is called: a functor in BigCat, an
@@ -120,9 +177,17 @@ protected:
 	// nested categories fade, so the yellow does not pile up level on level
 	void applyDepthAppearance(int depth) override;
 
+	// an empty subcategory still shows its dotted frame: being one is a
+	// claim about the diagram, not a look that waits for something to frame
+	bool alwaysFramed() const override { return m_subcategory; }
+
 private:
 	bool m_rowsExact = false;
 	bool m_columnsExact = false;
+	bool m_subcategory = false;
+	bool m_commutes = false;
+	int m_statementKind = 0;
+	QString m_statementName;
 	int m_nextIndex = 0;
 	int m_nextArrowIndex = 0;
 	QList<CategoryProp*> m_props;

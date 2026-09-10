@@ -199,6 +199,32 @@ public:
 	quint16 typeTag() const override { return MementoTag::NodesRemoved; }
 };
 
+// What a node IS: an object, an element, a category, a subcategory. Changing
+// it does not edit a node - it puts another one in its place and hands over
+// the name, the position, what is drawn inside and the arrows that end on it.
+// So this memento holds BOTH shells, and undoing hands everything back the
+// other way. Whichever shell is out of the scene at the time is ours to keep
+// alive, and ours to destroy when the history lets go.
+class NodeRetyped : public Memento
+{
+public:
+	NodeRetyped(const QString& description, Node* before, Node* after);
+	~NodeRetyped() override;
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::NodeRetyped; }
+	QByteArray payload() const override;
+
+private:
+	// hand everything over from the shell in the scene to the one outside it
+	void swap(Node* from, Node* to);
+
+	QPointer<Node> m_before;
+	QPointer<Node> m_after;
+	bool m_isAfter = true;   // which of the two is in the scene right now
+};
+
 // Whether a part of the diagram is given or claimed to exist. Not graphical:
 // it is what the diagram SAYS.
 class ExistsSuchChanged : public Memento
