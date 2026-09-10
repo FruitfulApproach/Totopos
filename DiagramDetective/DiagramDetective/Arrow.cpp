@@ -4,6 +4,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneHoverEvent>
 #include "props/ArrowProp.h"
+#include "props/ArrowProps.h"
 #include "DiagramScene.h"
 #include "Category.h"
 #include "AppSettings.h"
@@ -585,6 +586,28 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	painter->drawLine(tip, tip - dir * headLength + normal * headWidth);
 	painter->drawLine(tip, tip - dir * headLength - normal * headWidth);
 
+	// asserted epic: a second chevron stacked back along the line, the way a
+	// quotient is usually drawn (X ↠ Y)
+	if (isEpic())
+	{
+		const QPointF tip2 = tip - dir * (headLength * 1.15);
+		painter->drawLine(tip2, tip2 - dir * headLength + normal * headWidth);
+		painter->drawLine(tip2, tip2 - dir * headLength - normal * headWidth);
+	}
+
+	// asserted monic: a short cross-stroke near the tail, the way an
+	// inclusion is usually drawn (X ↣ Y)
+	if (isMonic())
+	{
+		const QPointF tail = path.pointAtPercent(0.0);
+		QPointF tailDir = path.pointAtPercent(0.04) - tail;
+		const qreal tailLen = qSqrt(tailDir.x() * tailDir.x() + tailDir.y() * tailDir.y());
+		tailDir /= (tailLen > 1e-6 ? tailLen : 1);
+		const QPointF tailNormal(-tailDir.y(), tailDir.x());
+		const QPointF at = tail + tailDir * (headLength * 0.6);
+		painter->drawLine(at - tailNormal * headWidth, at + tailNormal * headWidth);
+	}
+
 	// the points it is pulled through, while it is being worked on
 	if (!m_bends.isEmpty() && ((option->state & QStyle::State_Selected) || m_hovered))
 	{
@@ -628,12 +651,80 @@ void Arrow::addProperty(const QString& key)
 		qWarning("Arrow '%s': unknown property '%s'", qPrintable(id()), qPrintable(key));
 }
 
+void Arrow::removeProperty(const QString& key)
+{
+	for (int i = 0; i < m_props.size(); ++i)
+	{
+		if (m_props.at(i)->key() == key)
+		{
+			delete m_props.takeAt(i);
+			return;
+		}
+	}
+}
+
 void Arrow::setProperties(const QStringList& keys)
 {
 	qDeleteAll(m_props);
 	m_props.clear();
 	for (const QString& key : keys)
 		addProperty(key);
+}
+
+bool Arrow::isMonic() const
+{
+	return has(Monomorphism::Key());
+}
+
+bool Arrow::isEpic() const
+{
+	return has(Epimorphism::Key());
+}
+
+void Arrow::setMonic(bool monic)
+{
+	if (monic == isMonic())
+		return;
+	if (monic) addProperty(Monomorphism::Key());
+	else removeProperty(Monomorphism::Key());
+	update();
+	emit styleChanged(this);
+}
+
+void Arrow::setEpic(bool epic)
+{
+	if (epic == isEpic())
+		return;
+	if (epic) addProperty(Epimorphism::Key());
+	else removeProperty(Epimorphism::Key());
+	update();
+	emit styleChanged(this);
+}
+
+void Arrow::setMonicRecorded(bool monic)
+{
+	if (monic == isMonic())
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setMonic(monic);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new MonicChanged(
+			monic ? QString("%1 is asserted a monomorphism").arg(name)
+			      : QString("%1 is no longer asserted a monomorphism").arg(name),
+			this, !monic, monic));
+}
+
+void Arrow::setEpicRecorded(bool epic)
+{
+	if (epic == isEpic())
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setEpic(epic);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new EpicChanged(
+			epic ? QString("%1 is asserted an epimorphism").arg(name)
+			     : QString("%1 is no longer asserted an epimorphism").arg(name),
+			this, !epic, epic));
 }
 
 
@@ -663,6 +754,28 @@ void Arrow::populateActions(QMenu& menu)
 	// else its properties offer
 	for (ArrowProp* p : m_props)
 		p->arrowContextMenu(menu, this);
+
+	// what this arrow is asserted to be, cancellable on the left or the
+	// right (or both - though in most categories that still falls short of
+	// invertible). Checkable, like Exists such: the ASSERTION, not a
+	// construction, so it lives here rather than under Construct.
+	Arrow* self = this;
+	QAction* monic = menu.addAction(Emoji::monomorphism() + "  Monomorphism");
+	monic->setCheckable(true);
+	monic->setChecked(isMonic());
+	monic->setToolTip(QString("Cancellable on the left: for g, h : Z %1 X, f%2g = f%2h implies g = h. "
+	                         "Drawn with a hooked tail, the way an inclusion usually is.")
+		.arg(Emoji::to(), Emoji::compose()));
+	QObject::connect(monic, &QAction::toggled, &menu, [self](bool on) { self->setMonicRecorded(on); });
+
+	QAction* epic = menu.addAction(Emoji::epimorphism() + "  Epimorphism");
+	epic->setCheckable(true);
+	epic->setChecked(isEpic());
+	epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
+	                        "Drawn with a doubled head, the way a quotient usually is.")
+		.arg(Emoji::to(), Emoji::compose()));
+	QObject::connect(epic, &QAction::toggled, &menu, [self](bool on) { self->setEpicRecorded(on); });
+	menu.addSeparator();
 
 	// the shape of the line. No asking twice about a bend - the history has
 	// it either way.

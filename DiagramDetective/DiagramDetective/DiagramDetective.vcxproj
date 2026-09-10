@@ -178,6 +178,7 @@
     <QtMoc Include="history\SceneHistory.h" />
     <QtMoc Include="ArrowTutor.h" />
     <QtMoc Include="props\ArrowProp.h" />
+    <QtMoc Include="props\ArrowProps.h" />
     <QtMoc Include="props\MapsElements.h" />
     <QtMoc Include="AppSettings.h" />
     <QtMoc Include="SettingsDialog.h" />

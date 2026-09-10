@@ -222,6 +222,52 @@ QByteArray ExistsSuchChanged::payload() const
 	return bytes;
 }
 
+void MonicChanged::undo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setMonic(m_before);
+}
+
+void MonicChanged::redo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setMonic(m_after);
+}
+
+QByteArray MonicChanged::payload() const
+{
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_arrow.isNull() ? QString() : m_arrow->id())
+	    << (m_arrow.isNull() ? QList<int>() : m_arrow->pathFromRoot())
+	    << m_after;
+	return bytes;
+}
+
+void EpicChanged::undo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setEpic(m_before);
+}
+
+void EpicChanged::redo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setEpic(m_after);
+}
+
+QByteArray EpicChanged::payload() const
+{
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_arrow.isNull() ? QString() : m_arrow->id())
+	    << (m_arrow.isNull() ? QList<int>() : m_arrow->pathFromRoot())
+	    << m_after;
+	return bytes;
+}
+
 void Renamed::undo()
 {
 	if (!m_node.isNull())

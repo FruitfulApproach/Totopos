@@ -20,6 +20,8 @@ namespace MementoTag
 		Exactness    = 9,
 		Statement    = 10,
 		Note         = 11,
+		Monic        = 12,
+		Epic         = 13,
 	};
 }
 

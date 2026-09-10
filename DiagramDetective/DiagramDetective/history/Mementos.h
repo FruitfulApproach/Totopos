@@ -218,6 +218,43 @@ private:
 	bool m_after;
 };
 
+// Whether an arrow is asserted cancellable on the left. Not graphical: it is
+// a claim about the mathematics, drawn with a hooked tail as a side effect.
+class MonicChanged : public Memento
+{
+public:
+	MonicChanged(const QString& description, Arrow* arrow, bool before, bool after)
+		: Memento(description), m_arrow(arrow), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::Monic; }
+	QByteArray payload() const override;
+
+private:
+	QPointer<Arrow> m_arrow;
+	bool m_before;
+	bool m_after;
+};
+
+// The same, cancellable on the right - drawn with a doubled head.
+class EpicChanged : public Memento
+{
+public:
+	EpicChanged(const QString& description, Arrow* arrow, bool before, bool after)
+		: Memento(description), m_arrow(arrow), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::Epic; }
+	QByteArray payload() const override;
+
+private:
+	QPointer<Arrow> m_arrow;
+	bool m_before;
+	bool m_after;
+};
+
 // What something is called. Not a look: the label IS the object as far as the
 // diagram is concerned.
 class Renamed : public Memento

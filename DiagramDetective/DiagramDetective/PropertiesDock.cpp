@@ -22,6 +22,7 @@
 #include <QMouseEvent>
 #include "ToggleSwitch.h"
 #include "Notation.h"
+#include "Emoji.h"
 #include "props/MapsElements.h"
 #include "history/SceneHistory.h"
 #include "history/Mementos.h"
@@ -155,6 +156,29 @@ void PropertiesDock::build()
 	connect(m_radius, &QSpinBox::valueChanged, this, [this](int value) { applyRounding(value); });
 	objectForm->addRow("Corner rounding", m_radius);
 	layout->addWidget(m_objectBox);
+
+	// ---- what an arrow is asserted to be
+	m_arrowBox = new QGroupBox("Arrow", body);
+	auto* arrowForm = new QFormLayout(m_arrowBox);
+	const QString to = Emoji::to();
+	const QString ring = Emoji::compose();
+	m_monic = new ToggleSwitch(m_arrowBox);
+	m_monic->setToolTip(QString("Cancellable on the left: for g, h : Z %1 X, f%2g = f%2h implies g = h. "
+	                            "Drawn with a hooked tail, the way an inclusion usually is.").arg(to, ring));
+	connect(m_monic, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Arrow* arrow = soleArrow()) arrow->setMonicRecorded(on);
+	});
+	arrowForm->addRow("Monomorphism", m_monic);
+	m_epic = new ToggleSwitch(m_arrowBox);
+	m_epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
+	                           "Drawn with a doubled head, the way a quotient usually is.").arg(to, ring));
+	connect(m_epic, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Arrow* arrow = soleArrow()) arrow->setEpicRecorded(on);
+	});
+	arrowForm->addRow("Epimorphism", m_epic);
+	layout->addWidget(m_arrowBox);
 
 	// ---- the diagram drawn inside the selected node. Exactness is a claim
 	// about a diagram, so it belongs to whatever HOLDS one: not to an object
@@ -305,6 +329,14 @@ QList<Node*> PropertiesDock::selection() const
 	return nodes;
 }
 
+Arrow* PropertiesDock::soleArrow() const
+{
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return nullptr;
+	return dynamic_cast<Arrow*>(nodes.first());
+}
+
 Category* PropertiesDock::soleDiagramHome() const
 {
 	const QList<Node*> nodes = selection();
@@ -352,6 +384,7 @@ void PropertiesDock::refresh()
 		m_hint->hide();
 		m_nodeBox->hide();
 		m_objectBox->hide();
+		m_arrowBox->hide();
 		m_mappingBox->hide();
 		m_insideBox->hide();
 
@@ -365,6 +398,7 @@ void PropertiesDock::refresh()
 		m_hint->show();
 		m_nodeBox->hide();
 		m_objectBox->hide();
+		m_arrowBox->hide();
 		m_mappingBox->hide();
 		m_insideBox->hide();
 		m_componentBox->hide();
@@ -400,6 +434,14 @@ void PropertiesDock::refresh()
 		m_radius->setValue(int(objects.first()->cornerRadius() + 0.5));
 		m_objectBox->setTitle(objects.size() == 1 ? QStringLiteral("Object")
 		                                          : QString("Objects (%1)").arg(objects.size()));
+	}
+
+	Arrow* soleA = soleArrow();
+	m_arrowBox->setVisible(soleA != nullptr);
+	if (soleA != nullptr)
+	{
+		m_monic->setChecked(soleA->isMonic());
+		m_epic->setChecked(soleA->isEpic());
 	}
 
 	Category* home = soleDiagramHome();

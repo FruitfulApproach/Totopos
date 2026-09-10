@@ -41,6 +41,8 @@ public slots:
 private:
 	void build();
 	QList<Node*> selection() const;
+	// the one arrow selected on its own, if that is what this is
+	Arrow* soleArrow() const;
 	// the mapping of the one arrow selected on its own, if that is what this is
 	MapsElements* soleMapping() const;
 	// the one node selected on its own, when it has a diagram drawn inside it
@@ -66,6 +68,11 @@ private:
 
 	QGroupBox* m_objectBox = nullptr;
 	QSpinBox* m_radius = nullptr;
+
+	// what an arrow is asserted to be, cancellable on the left / the right
+	QGroupBox* m_arrowBox = nullptr;
+	ToggleSwitch* m_monic = nullptr;
+	ToggleSwitch* m_epic = nullptr;
 
 	// the diagram drawn INSIDE the selected node, when there is one
 	QGroupBox* m_insideBox = nullptr;
