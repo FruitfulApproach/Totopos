@@ -94,6 +94,7 @@ public:
 	QStringList properties() const;
 	void setProperties(const QStringList& keys);
 	void addProperty(const QString& key);
+	void removeProperty(const QString& key);
 	bool has(const QString& key) const;
 	ArrowProp* prop(const QString& key) const;
 
@@ -126,6 +127,22 @@ public:
 
 	// the line, the head and the bend handles - not the label beside it (see Node::boxRect)
 	QRectF boxRect() const override;
+
+	// Cancellable on the left / on the right (props/ArrowProps.h): whether this
+	// is asserted, drawn with a split vee tail / a doubled head. Checked often
+	// enough (paint, the context menu) to be worth their own bool, like
+	// existsSuch() is on Node - the underlying fact still lives as a Prop, so
+	// it saves, loads and lists itself the same way every other one does.
+	bool isMonic() const;
+	bool isEpic() const;
+	// the plain setters: undo/redo call these, so putting a change back never
+	// records a second one
+	void setMonic(bool monic);
+	void setEpic(bool epic);
+	// set it AND put it in the scene's history, the way a user's click does
+	void setMonicRecorded(bool monic);
+	void setEpicRecorded(bool epic);
+
 	QRectF boundingRect() const override;
 	QPainterPath shape() const override;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;

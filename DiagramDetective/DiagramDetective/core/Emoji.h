@@ -43,4 +43,6 @@ namespace Emoji
 	inline QString mapsTo()      { return QStringLiteral("↦"); }       // maps to
 	inline QString compose()     { return QStringLiteral("∘"); }       // ring operator
 	inline QString to()          { return QStringLiteral("→"); }       // rightwards arrow
+	inline QString monomorphism(){ return QStringLiteral("↣"); }       // rightwards arrow with tail
+	inline QString epimorphism() { return QStringLiteral("↠"); }       // rightwards two-headed arrow
 }

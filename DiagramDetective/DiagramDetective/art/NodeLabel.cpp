@@ -7,6 +7,9 @@
 #include <QGraphicsSceneMouseEvent>
 #include "art/DiagramScene.h"
 #include "core/Notation.h"
+#include "core/Emoji.h"
+#include <QVariantAnimation>
+#include <QPainter>
 
 NodeLabel::NodeLabel(const QString& text, Node* node)
 	: QGraphicsTextItem(node)
@@ -90,10 +93,73 @@ void NodeLabel::renderSource()
 		setPlainText(m_source);
 }
 
+QRectF NodeLabel::boundingRect() const
+{
+	const QRectF base = QGraphicsTextItem::boundingRect();
+	// room for the padlock, and only while it is out: a permanent margin here
+	// would widen every node's frame for nothing
+	return m_hinting ? base.adjusted(-2, -15, 15, 2) : base;
+}
+
+void NodeLabel::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
+{
+	QGraphicsTextItem::paint(painter, option, widget);
+	if (m_hintLevel <= 0.01)
+		return;
+
+	painter->setRenderHint(QPainter::Antialiasing, true);
+	const int alpha = int(230 * m_hintLevel);
+	const QRectF text = QGraphicsTextItem::boundingRect();
+	painter->setBrush(Qt::NoBrush);
+	painter->setPen(QPen(QColor(180, 83, 9, alpha), 1.6));
+	painter->drawRoundedRect(text.adjusted(-1.5, -1.5, 1.5, 1.5), 4, 4);
+
+	painter->setPen(QColor(180, 83, 9, alpha));
+	painter->setFont(Emoji::font(11));
+	painter->drawText(QRectF(text.right() - 3, text.top() - 15, 17, 17),
+	                  Qt::AlignCenter, QStringLiteral("\U0001F512"));
+}
+
+void NodeLabel::showLockedHint()
+{
+	if (m_hint == nullptr)
+	{
+		m_hint = new QVariantAnimation(this);
+		m_hint->setDuration(700);
+		m_hint->setLoopCount(2);
+		m_hint->setKeyValueAt(0.0, 0.0);
+		m_hint->setKeyValueAt(0.5, 1.0);
+		m_hint->setKeyValueAt(1.0, 0.0);
+		connect(m_hint, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+			m_hintLevel = value.toReal();
+			update();
+		});
+		connect(m_hint, &QVariantAnimation::finished, this, [this] {
+			prepareGeometryChange();
+			m_hinting = false;
+			m_hintLevel = 0.0;
+			update();
+		});
+	}
+	if (!m_hinting)
+	{
+		prepareGeometryChange();
+		m_hinting = true;
+	}
+	m_hint->stop();
+	m_hint->start();
+}
+
 void NodeLabel::beginEdit()
 {
 	if (m_editing)
 		return;
+	if (m_node != nullptr && m_node->labelIsLocked())
+	{
+		// not ours to change: say so and leave it alone
+		showLockedHint();
+		return;
+	}
 	m_editing = true;
 	m_before = m_source;
 	// the editor shows the SOURCE: v_{x}, not v with a subscript. The markers

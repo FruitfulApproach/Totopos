@@ -8,6 +8,9 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QSignalBlocker>
 
 #include <QListWidget>
 #include <QEvent>
@@ -20,14 +23,32 @@
 #include "art/Arrow.h"
 #include "art/Functor.h"
 #include <QMouseEvent>
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/widget/PropertiesDock.cpp
 #include "widget/ToggleSwitch.h"
 #include "core/Notation.h"
 #include "core/props/MapsElements.h"
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
+=======
+#include "ToggleSwitch.h"
+#include "Notation.h"
+#include "Emoji.h"
+#include "props/MapsElements.h"
+#include "NodeKind.h"
+#include "AtomicElement.h"
+#include "CategoryDialog.h"
+#include "Tutor.h"
+#include "AppSettings.h"
+#include "history/SceneHistory.h"
+#include "history/Mementos.h"
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/PropertiesDock.cpp
 
 namespace
 {
+	// the last entry of the category list: it opens the dialog instead of
+	// naming a category that already exists
+	const QString kCustom = QStringLiteral("Custom...");
+
 	// One line of the component list: what it is called, how big it is, and a
 	// switch saying whether it commutes. It lights the component up as the
 	// mouse passes over it, and a double-click takes the view there.
@@ -137,6 +158,31 @@ void PropertiesDock::build()
 	m_id->setToolTip("The label drawn on it. Anything built out of this label follows it.");
 	connect(m_id, &QLineEdit::editingFinished, this, [this] { applyId(m_id->text()); });
 	nodeForm->addRow("Label", m_id);
+
+	// What this node IS. Not a setting on the node: picking another entry
+	// builds the node afresh as that kind and hands everything over - the
+	// name, where it sits, what is drawn inside it, the arrows that end on
+	// it - because what a node can DO is decided by which kind it is.
+	m_type = new QComboBox(m_nodeBox);
+	m_type->setToolTip("What this node is. An object is an object of the category it is drawn in; an "
+	                   "element is a member of the node it is drawn in and holds nothing; a category is a "
+	                   "world of its own; a subcategory is a PART of the category it is drawn in.");
+	connect(m_type, &QComboBox::currentIndexChanged, this, [this](int index) {
+		if (m_updating || index < 0)
+			return;
+		// The node this combo is about is taken out of the scene by the
+		// change, and this runs from that very combo's signal: let the signal
+		// finish first.
+		const QString kind = m_type->itemData(index).toString();
+		QMetaObject::invokeMethod(this, [this, kind] { applyNodeKind(kind); }, Qt::QueuedConnection);
+	});
+	nodeForm->addRow("Type", m_type);
+
+	m_typeHint = new QLabel(m_nodeBox);
+	m_typeHint->setWordWrap(true);
+	m_typeHint->setEnabled(false);
+	nodeForm->addRow(QString(), m_typeHint);
+
 	m_exists = new ToggleSwitch(m_nodeBox);
 	m_exists->setToolTip("Draw it dotted and read it as the part that is claimed to EXIST.");
 	connect(m_exists, &QAbstractButton::toggled, this, [this](bool on) { applyExistsSuch(on); });
@@ -147,6 +193,96 @@ void PropertiesDock::build()
 	connect(m_deleteMark, &QAbstractButton::toggled, this, [this](bool on) { applyDeleteMark(on); });
 	nodeForm->addRow("Delete on apply", m_deleteMark);
 	layout->addWidget(m_nodeBox);
+
+	// ---- what a CATEGORY is, and what the diagram drawn in it claims.
+	// These used to live only on the panel over the canvas, where they could
+	// only ever be about the whole picture. They belong to a category, and
+	// the canvas is simply the outermost one - so a subcategory of R-Mod
+	// drawn four levels down is asked exactly the same questions.
+	m_categoryBox = new QGroupBox("Category", body);
+	auto* categoryForm = new QFormLayout(m_categoryBox);
+
+	m_categoryKind = new QComboBox(m_categoryBox);
+	m_categoryKind->addItems(Category::builtInNames());
+	m_categoryKind->addItem(kCustom);   // last: defines a new one through the dialog
+	m_categoryKind->setToolTip("Which category this is. A built-in knows what its objects and its arrows "
+	                           "are, so choosing R-Mod here makes what you place inside it an R-module and "
+	                           "what you draw between them an R-linear map.");
+	connect(m_categoryKind, &QComboBox::currentIndexChanged, this, [this](int index) {
+		if (m_updating || index < 0)
+			return;
+		const QString name = m_categoryKind->itemText(index);
+		QMetaObject::invokeMethod(this, [this, name] { applyCategoryKind(name); }, Qt::QueuedConnection);
+	});
+	categoryForm->addRow("Category", m_categoryKind);
+
+	m_subcategoryHint = new QLabel(m_categoryBox);
+	m_subcategoryHint->setWordWrap(true);
+	m_subcategoryHint->setEnabled(false);
+	categoryForm->addRow(QString(), m_subcategoryHint);
+
+	// tutor mode: guided interactions coach with remarks and an arrow; off,
+	// they run quietly. App-wide, and shown here because it is what decides
+	// how everything you do in this category behaves.
+	m_tutor = new QCheckBox("Tutor mode", m_categoryBox);
+	m_tutor->setToolTip("Guided actions (Define a product...) explain each step with remarks and an arrow. "
+	                    "Untick to run them quietly. This is the same setting as the one on the sketch "
+	                    "panel and in Tools > Settings.");
+	connect(m_tutor, &QCheckBox::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		AppSettings::instance().setValue(AppSettings::TutorEnabled, on);
+		AppSettings::instance().apply();
+	});
+	categoryForm->addRow(QString(), m_tutor);
+
+	m_commutesLabel = new QLabel(m_categoryBox);
+	m_commutes = new ToggleSwitch(m_categoryBox);
+	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
+		refreshCommutesLabel(on);
+		if (m_updating) return;
+		if (Category* category = pageCategory())
+			category->setCommutes(on);
+	});
+	categoryForm->addRow(m_commutesLabel, m_commutes);
+	refreshCommutesLabel(false);
+
+	m_statementKind = new QComboBox(m_categoryBox);
+	m_statementKind->addItems(DiagramScene::kindNames());
+	m_statementKind->setToolTip("The picture says the same thing either way; what changes is what saying "
+	                            "it amounts to. An axiom is granted, a definition names something, a "
+	                            "conjecture is neither, and a theorem owes a proof.");
+	connect(m_statementKind, &QComboBox::currentIndexChanged, this, [this](int index) {
+		if (m_updating || index < 0) return;
+		if (Category* category = pageCategory())
+			category->setStatementKind(index);
+	});
+	categoryForm->addRow("This is", m_statementKind);
+
+	m_statementName = new QLineEdit(m_categoryBox);
+	m_statementName->setPlaceholderText("Additive identity exists");
+	m_statementName->setToolTip("What to call it, so it can be referred to from elsewhere.");
+	connect(m_statementName, &QLineEdit::editingFinished, this, [this] {
+		if (m_updating) return;
+		if (Category* category = pageCategory())
+			category->setStatementName(m_statementName->text().trimmed());
+	});
+	categoryForm->addRow("Called", m_statementName);
+
+	m_mode = new QLabel("Let", m_categoryBox);
+	QFont modeFont = m_mode->font();
+	modeFont.setBold(true);
+	m_mode->setFont(modeFont);
+	m_mode->setToolTip("A let is what you are given. A chase forces anything you add into the hypotheses "
+	                   "of the statement. The chase belongs to the whole diagram, not to one category.");
+	categoryForm->addRow("Mode", m_mode);
+
+	m_chase = new QPushButton("Start diagram chase", m_categoryBox);
+	connect(m_chase, &QPushButton::clicked, this, [this] {
+		if (m_scene != nullptr)
+			m_scene->toggleChase();
+	});
+	categoryForm->addRow(QString(), m_chase);
+	layout->addWidget(m_categoryBox);
 
 	// ---- what an object has
 	m_objectBox = new QGroupBox("Object", body);
@@ -160,6 +296,29 @@ void PropertiesDock::build()
 	connect(m_radius, &QSpinBox::valueChanged, this, [this](int value) { applyRounding(value); });
 	objectForm->addRow("Corner rounding", m_radius);
 	layout->addWidget(m_objectBox);
+
+	// ---- what an arrow is asserted to be
+	m_arrowBox = new QGroupBox("Arrow", body);
+	auto* arrowForm = new QFormLayout(m_arrowBox);
+	const QString to = Emoji::to();
+	const QString ring = Emoji::compose();
+	m_monic = new ToggleSwitch(m_arrowBox);
+	m_monic->setToolTip(QString("Cancellable on the left: for g, h : Z %1 X, f%2g = f%2h implies g = h. "
+	                            "Drawn with a hooked tail, the way an inclusion usually is.").arg(to, ring));
+	connect(m_monic, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Arrow* arrow = soleArrow()) arrow->setMonicRecorded(on);
+	});
+	arrowForm->addRow("Monomorphism", m_monic);
+	m_epic = new ToggleSwitch(m_arrowBox);
+	m_epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
+	                           "Drawn with a doubled head, the way a quotient usually is.").arg(to, ring));
+	connect(m_epic, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Arrow* arrow = soleArrow()) arrow->setEpicRecorded(on);
+	});
+	arrowForm->addRow("Epimorphism", m_epic);
+	layout->addWidget(m_arrowBox);
 
 	// ---- the diagram drawn inside the selected node. Exactness is a claim
 	// about a diagram, so it belongs to whatever HOLDS one: not to an object
@@ -295,8 +454,35 @@ void PropertiesDock::setScene(DiagramScene* scene)
 		connect(m_scene, &DiagramScene::nodesRemoved, this, &PropertiesDock::refresh);
 		// the pieces change shape whenever an arrow does
 		connect(m_scene, &DiagramScene::statementChanged, this, &PropertiesDock::refresh);
+		// the chase is the whole diagram's mode, and the page says which it is in
+		connect(m_scene, &DiagramScene::chasingChanged, this, &PropertiesDock::refresh);
+		connect(m_scene, &DiagramScene::commutesChanged, this, &PropertiesDock::refresh);
+		connect(m_scene, &DiagramScene::ambientCategoryChanged, this, &PropertiesDock::refresh);
 	}
+	// Tutor mode is app-wide: Tools > Settings and the sketch panel set the
+	// same thing, and the tick here must not be left saying otherwise.
+	connect(&AppSettings::instance(), &AppSettings::changed, this, &PropertiesDock::refresh, Qt::UniqueConnection);
 	refresh();
+}
+
+Category* PropertiesDock::soleCategory() const
+{
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return nullptr;
+	return dynamic_cast<Category*>(nodes.first());
+}
+
+Category* PropertiesDock::pageCategory() const
+{
+	// One category picked out is that category. Nothing picked out is a
+	// question about the whole picture, and the whole picture is the ambient
+	// category - so the same page answers both.
+	if (Category* sole = soleCategory())
+		return sole;
+	if (m_scene == nullptr)
+		return nullptr;
+	return selection().isEmpty() ? m_scene->ambientCategory() : nullptr;
 }
 
 QList<Node*> PropertiesDock::selection() const
@@ -308,6 +494,14 @@ QList<Node*> PropertiesDock::selection() const
 		if (auto* node = dynamic_cast<Node*>(item))
 			nodes << node;
 	return nodes;
+}
+
+Arrow* PropertiesDock::soleArrow() const
+{
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return nullptr;
+	return dynamic_cast<Arrow*>(nodes.first());
 }
 
 Category* PropertiesDock::soleDiagramHome() const
@@ -357,9 +551,13 @@ void PropertiesDock::refresh()
 		m_hint->hide();
 		m_nodeBox->hide();
 		m_objectBox->hide();
+		m_arrowBox->hide();
 		m_mappingBox->hide();
 		m_insideBox->hide();
 
+		// nothing picked out is a question about the whole picture, and the
+		// whole picture is the category everything is drawn in
+		refreshCategoryBox(ambient);
 		refreshComponents();
 		m_updating = false;
 		return;
@@ -370,8 +568,10 @@ void PropertiesDock::refresh()
 		m_hint->show();
 		m_nodeBox->hide();
 		m_objectBox->hide();
+		m_arrowBox->hide();
 		m_mappingBox->hide();
 		m_insideBox->hide();
+		m_categoryBox->hide();
 		m_componentBox->hide();
 		m_updating = false;
 		return;
@@ -385,12 +585,47 @@ void PropertiesDock::refresh()
 		m_header->setText(node->contextTitle());   // "R-module S", "R-linear map n"
 		m_id->setEnabled(true);
 		m_id->setText(node->id());
+
+		// What it could be instead. The list is built afresh each time: a
+		// subcategory is only on offer inside a category, and the entry has to
+		// name the category it would be a subcategory OF.
+		const QList<NodeKind::Choice> choices = NodeKind::choices(node);
+		const QString current = NodeKind::of(node);
+		m_type->clear();
+		for (const NodeKind::Choice& choice : choices)
+		{
+			m_type->addItem(choice.label, choice.id);
+			m_type->setItemData(m_type->count() - 1, choice.tip, Qt::ToolTipRole);
+		}
+		// A kind the list does not offer - the canvas, or a node whose kind
+		// has gone - still has to show as what it is rather than as the first
+		// entry, which would be a change nobody asked for.
+		int index = m_type->findData(current);
+		if (index < 0 && !choices.isEmpty())
+		{
+			m_type->addItem(NodeKind::label(current), current);
+			index = m_type->count() - 1;
+		}
+		m_type->setCurrentIndex(index);
+
+		// the canvas is not one of the things drawn on it, and an arrow is a
+		// different question with its own page
+		const bool retypeable = !choices.isEmpty()
+			&& (m_scene == nullptr || m_scene->ambientCategory() != node);
+		m_type->setVisible(retypeable);
+		m_typeHint->setVisible(retypeable);
+		if (retypeable && index >= 0 && index < choices.size())
+			m_typeHint->setText(choices.at(index).tip);
+		else
+			m_typeHint->clear();
 	}
 	else
 	{
 		m_header->setText(QString("%1 items selected").arg(nodes.size()));
 		m_id->setEnabled(false);
 		m_id->setText(QString());
+		m_type->setVisible(false);
+		m_typeHint->setVisible(false);
 	}
 
 	m_nodeBox->show();
@@ -410,6 +645,16 @@ void PropertiesDock::refresh()
 		m_objectBox->setTitle(objects.size() == 1 ? QStringLiteral("Object")
 		                                          : QString("Objects (%1)").arg(objects.size()));
 	}
+
+	Arrow* soleA = soleArrow();
+	m_arrowBox->setVisible(soleA != nullptr);
+	if (soleA != nullptr)
+	{
+		m_monic->setChecked(soleA->isMonic());
+		m_epic->setChecked(soleA->isEpic());
+	}
+
+	refreshCategoryBox(soleCategory());
 
 	Category* home = soleDiagramHome();
 	m_insideBox->setVisible(home != nullptr);
@@ -475,6 +720,175 @@ void PropertiesDock::applyId(const QString& id)
 	node->bindLabelReferences();
 	if (m_scene != nullptr)
 		m_scene->history()->record(new Renamed(QString("Renamed %1 to %2").arg(before, written), node, before, written));
+}
+
+void PropertiesDock::applyNodeKind(const QString& kindId)
+{
+	if (m_updating || kindId.isEmpty())
+		return;
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return;
+	Node* node = nodes.first();
+	if (NodeKind::of(node) == kindId)
+		return;
+
+	Node* fresh = NodeKind::retype(node, kindId);
+	if (fresh != nullptr && fresh != node && m_scene != nullptr)
+	{
+		// the node the page was about has been put away; the page follows the
+		// one that has taken its place
+		m_scene->clearSelection();
+		fresh->setSelected(true);
+	}
+	refresh();
+}
+
+void PropertiesDock::applyCategoryKind(const QString& name)
+{
+	if (m_updating || name.isEmpty() || m_scene == nullptr)
+		return;
+	Category* category = pageCategory();
+	if (category == nullptr)
+		return;
+
+	// Custom... is not a category: it is the dialog that defines one
+	QString kindName = name;
+	QStringList customProps;
+	bool custom = false;
+	if (name == kCustom)
+	{
+		CategoryDialog dialog(window());
+		if (dialog.exec() != QDialog::Accepted || dialog.name().isEmpty())
+		{
+			refresh();   // put the combo back to what it was, quietly
+			return;
+		}
+		kindName = dialog.name();
+		customProps = dialog.properties();
+		custom = Category::createBuiltIn(kindName) == nullptr;
+	}
+
+	// The canvas is not one of the things drawn on it, so it is not swapped
+	// for another node: the scene changes what it is drawn in.
+	if (category->isAmbient())
+	{
+		m_scene->setAmbientCategory(kindName);
+		if (custom)
+			if (Category* ambient = m_scene->ambientCategory())
+				ambient->setProperties(customProps);
+		refresh();
+		return;
+	}
+
+	const bool wasSubcategory = category->isSubcategory();
+	Node* fresh = NodeKind::retype(category, custom ? NodeKind::category() : NodeKind::builtIn(kindName));
+	if (auto* freshCat = dynamic_cast<Category*>(fresh))
+	{
+		if (custom)
+		{
+			freshCat->setId(kindName);
+			freshCat->setProperties(customProps);
+		}
+		// changing WHICH category it is does not stop it being a part of the
+		// one it is drawn in
+		if (wasSubcategory)
+			freshCat->setSubcategory(true);
+		if (fresh != category)
+		{
+			m_scene->clearSelection();
+			fresh->setSelected(true);
+		}
+	}
+	refresh();
+}
+
+void PropertiesDock::refreshCommutesLabel(bool commutes)
+{
+	if (m_commutesLabel == nullptr)
+		return;
+
+	// The off state is NOT the claim that the diagram fails to commute. It is
+	// the absence of a claim: the paths may or may not agree, and the diagram
+	// says nothing about it either way.
+	const QString name = commutes ? QStringLiteral("Commutative") : QStringLiteral("Non-commutative");
+	const QString tip = commutes
+		? QStringLiteral("Commutative: every pair of paths with the same two ends is asserted to be the "
+		                 "same arrow. The statement then reads \"... such that the diagram commutes\", the "
+		                 "Equations dock lists what that says, and a cycle becomes an error - a ring gives "
+		                 "endlessly many paths, which cannot be read this way.")
+		: QStringLiteral("Non-commutative means NOT NECESSARILY COMMUTATIVE. It is not the claim that the "
+		                 "diagram fails to commute: it is the absence of any claim. Two paths with the same "
+		                 "ends may or may not be the same arrow, nothing is asserted either way, and cycles "
+		                 "are perfectly all right.");
+
+	m_commutesLabel->setText(name);
+	m_commutesLabel->setToolTip(tip);
+	if (m_commutes != nullptr)
+		m_commutes->setToolTip(tip);
+}
+
+void PropertiesDock::refreshCategoryBox(Category* category)
+{
+	m_categoryBox->setVisible(category != nullptr);
+	if (category == nullptr)
+		return;
+
+	const bool ambient = category->isAmbient();
+	m_categoryBox->setTitle(ambient
+		? QString("The whole diagram, drawn in %1").arg(category->id())
+		: QString("The category %1").arg(category->id()));
+
+	// which category it is. A built-in answers with its own name; one the
+	// user defined is not in the list, so its label goes in before Custom...
+	{
+		const QSignalBlocker block(m_categoryKind);
+		QString kind = category->builtInName();
+		if (kind.isEmpty())
+			kind = category->id();
+		int index = m_categoryKind->findText(kind);
+		if (index < 0)
+		{
+			index = m_categoryKind->count() - 1;   // before Custom...
+			m_categoryKind->insertItem(index, kind);
+		}
+		m_categoryKind->setCurrentIndex(index);
+	}
+
+	if (category->isSubcategory())
+	{
+		Category* home = category->ambient();
+		m_subcategoryHint->setText(home != nullptr
+			? QString("A subcategory of %1. Its objects are %2s of %1 and its arrows are %3s of %1.")
+				.arg(home->id(), home->objectName(), home->morphismName())
+			: QStringLiteral("A subcategory."));
+		m_subcategoryHint->show();
+	}
+	else
+	{
+		m_subcategoryHint->setText(QString("Its objects are %1s and its arrows are %2s.")
+			.arg(category->objectName(), category->morphismName()));
+		m_subcategoryHint->show();
+	}
+
+	m_tutor->setChecked(Tutor::isEnabled());
+
+	m_commutes->setChecked(category->commutes());
+	refreshCommutesLabel(category->commutes());
+
+	m_statementKind->setCurrentIndex(category->statementKind());
+	if (m_statementName->text() != category->statementName())
+		m_statementName->setText(category->statementName());
+
+	// the chase is the whole diagram's mode, so it reads the same on every
+	// category's page
+	const bool chasing = m_scene != nullptr && m_scene->isChasing();
+	m_mode->setText(chasing ? "Chasing" : "Let");
+	m_chase->setText(chasing ? "End the chase" : "Start diagram chase");
+	m_chase->setToolTip(chasing
+		? "Go back to a let: the diagram is what you are given again, and adding to it assumes nothing."
+		: "Start the diagram chase (Ctrl+Shift+Enter): from then on anything you draw is forced into "
+		  "the hypotheses of the statement.");
 }
 
 void PropertiesDock::applyExistsSuch(bool on)

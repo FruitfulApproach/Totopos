@@ -2,6 +2,8 @@
 
 #include <QGraphicsTextItem>
 
+class QVariantAnimation;
+
 class Node;
 
 // The text drawn on a node. Double-click it and it becomes an editor with the
@@ -25,6 +27,14 @@ public:
 	QString source() const { return m_source; }
 	void setSource(const QString& text);
 
+	// Say no, without saying it in words: the label flashes and wears a
+	// padlock for a moment. What beginEdit does instead of opening the editor
+	// when the name is not this node's to change (see Node::labelIsLocked).
+	void showLockedHint();
+
+	QRectF boundingRect() const override;
+	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+
 	void beginEdit();
 	void commitEdit();   // keep what was typed
 	void cancelEdit();   // put back what was there before
@@ -44,6 +54,10 @@ private:
 	void dropSelection();
 	// put the drawn form of m_source into the document
 	void renderSource();
+
+	QVariantAnimation* m_hint = nullptr;
+	qreal m_hintLevel = 0.0;   // 0 nothing, 1 full pulse
+	bool m_hinting = false;    // the rect is wider while the padlock is out
 
 	Node* m_node = nullptr;
 	QString m_source;    // as typed: v_{x}

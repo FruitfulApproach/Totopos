@@ -3,10 +3,18 @@
 #include <QGraphicsScene>
 #include <QDataStream>
 #include <QIODevice>
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.cpp
 #include "art/Arrow.h"
 #include "art/Category.h"
 #include "art/DiagramScene.h"
 #include "art/Functor.h"
+=======
+#include "../Arrow.h"
+#include "../Category.h"
+#include "../DiagramScene.h"
+#include "../Functor.h"
+#include "../NodeKind.h"
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.cpp
 
 // ---------------------------------------------------------------- purely graphical
 
@@ -222,6 +230,7 @@ QByteArray ExistsSuchChanged::payload() const
 	return bytes;
 }
 
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.cpp
 void ArrowStyleChanged::undo()
 {
 	if (!m_arrow.isNull())
@@ -235,12 +244,28 @@ void ArrowStyleChanged::redo()
 }
 
 QByteArray ArrowStyleChanged::payload() const
+=======
+void MonicChanged::undo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setMonic(m_before);
+}
+
+void MonicChanged::redo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setMonic(m_after);
+}
+
+QByteArray MonicChanged::payload() const
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.cpp
 {
 	QByteArray bytes;
 	QDataStream out(&bytes, QIODevice::WriteOnly);
 	out.setVersion(QDataStream::Qt_6_0);
 	out << (m_arrow.isNull() ? QString() : m_arrow->id())
 	    << (m_arrow.isNull() ? QList<int>() : m_arrow->pathFromRoot())
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.cpp
 	    << qint32(m_after);
 	return bytes;
 }
@@ -264,10 +289,13 @@ QByteArray DeleteMarkChanged::payload() const
 	out.setVersion(QDataStream::Qt_6_0);
 	out << (m_node.isNull() ? QString() : m_node->id())
 	    << (m_node.isNull() ? QList<int>() : m_node->pathFromRoot())
+=======
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.cpp
 	    << m_after;
 	return bytes;
 }
 
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.cpp
 RuleApplied::RuleApplied(const QString& description, const QList<Node*>& made,
                          const QString& rulePath, const QString& ruleName,
                          const QStringList& variables, const QStringList& values)
@@ -288,6 +316,28 @@ QByteArray RuleApplied::payload() const
 	out.setVersion(QDataStream::Qt_6_0);
 	out << m_rulePath << m_ruleName << m_variables << m_values;
 	out << NodesCreated::payload();
+=======
+void EpicChanged::undo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setEpic(m_before);
+}
+
+void EpicChanged::redo()
+{
+	if (!m_arrow.isNull())
+		m_arrow->setEpic(m_after);
+}
+
+QByteArray EpicChanged::payload() const
+{
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_arrow.isNull() ? QString() : m_arrow->id())
+	    << (m_arrow.isNull() ? QList<int>() : m_arrow->pathFromRoot())
+	    << m_after;
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.cpp
 	return bytes;
 }
 
@@ -400,5 +450,64 @@ QByteArray StatementDeclared::payload() const
 	QDataStream out(&bytes, QIODevice::WriteOnly);
 	out.setVersion(QDataStream::Qt_6_0);
 	out << qint32(m_kindAfter) << m_nameAfter;
+	return bytes;
+}
+
+// ---------------------------------------------------------------- what a node is
+
+NodeRetyped::NodeRetyped(const QString& description, Node* before, Node* after)
+	: Memento(description), m_before(before), m_after(after)
+{
+	// the change has already happened: `after` is the one in the scene
+}
+
+NodeRetyped::~NodeRetyped()
+{
+	// whichever shell is standing outside the scene is ours to destroy; the
+	// one inside it belongs to the diagram
+	Node* spare = m_isAfter ? m_before.data() : m_after.data();
+	if (spare != nullptr && spare->scene() == nullptr && spare->parentItem() == nullptr)
+		delete spare;
+}
+
+void NodeRetyped::swap(Node* from, Node* to)
+{
+	if (from == nullptr || to == nullptr)
+		return;
+	NodeKind::transplant(from, to);
+	to->setSelected(false);
+	if (auto* diagram = dynamic_cast<DiagramScene*>(to->scene()))
+	{
+		emit diagram->statementChanged(diagram->statementText());
+		diagram->checkDiagram();
+	}
+}
+
+void NodeRetyped::undo()
+{
+	if (!m_isAfter || m_before.isNull() || m_after.isNull())
+		return;
+	swap(m_after.data(), m_before.data());
+	m_isAfter = false;
+}
+
+void NodeRetyped::redo()
+{
+	if (m_isAfter || m_before.isNull() || m_after.isNull())
+		return;
+	swap(m_before.data(), m_after.data());
+	m_isAfter = true;
+}
+
+QByteArray NodeRetyped::payload() const
+{
+	// pointers mean nothing in a file: what it was, what it became, and what
+	// it is called
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_before.isNull() ? QString() : NodeKind::of(m_before.data()))
+	    << (m_after.isNull() ? QString() : NodeKind::of(m_after.data()))
+	    << (m_after.isNull() ? QString() : m_after->id());
 	return bytes;
 }

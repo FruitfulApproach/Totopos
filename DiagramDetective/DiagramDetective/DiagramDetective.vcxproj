@@ -110,6 +110,62 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+<<<<<<< HEAD
+=======
+    <ClCompile Include="Arrow.cpp" />
+    <ClCompile Include="NodeHandles.cpp" />
+    <ClCompile Include="NodeLabel.cpp" />
+    <ClCompile Include="Notation.cpp" />
+    <ClCompile Include="ToggleSwitch.cpp" />
+    <ClCompile Include="Emoji.cpp" />
+    <ClCompile Include="PropertiesDock.cpp" />
+    <ClCompile Include="LibraryDock.cpp" />
+    <ClCompile Include="ProofTutor.cpp" />
+    <ClCompile Include="library\Library.cpp" />
+    <ClCompile Include="rules\Rule.cpp" />
+    <ClCompile Include="CommutativeEquationsDock.cpp" />
+    <ClCompile Include="SetupTutor.cpp" />
+    <ClCompile Include="history\Mementos.cpp" />
+    <ClCompile Include="history\SceneHistory.cpp" />
+    <ClCompile Include="io\SceneFile.cpp" />
+    <ClCompile Include="ArrowTutor.cpp" />
+    <ClCompile Include="props\ArrowProp.cpp" />
+    <ClCompile Include="props\MapsElements.cpp" />
+    <ClCompile Include="AppSettings.cpp" />
+    <ClCompile Include="SettingsDialog.cpp" />
+    <ClCompile Include="Tutor.cpp" />
+    <ClCompile Include="TutorSession.cpp" />
+    <ClCompile Include="props\Constructions.cpp" />
+    <ClCompile Include="props\Prop.cpp" />
+    <ClCompile Include="props\CategoryProp.cpp" />
+    <ClCompile Include="props\CategoryProps.cpp" />
+    <ClCompile Include="props\SketchProp.cpp" />
+    <ClCompile Include="categories\BigCat.cpp" />
+    <ClCompile Include="categories\Cat.cpp" />
+    <ClCompile Include="categories\Set.cpp" />
+    <ClCompile Include="categories\Ab.cpp" />
+    <ClCompile Include="categories\RMod.cpp" />
+    <ClCompile Include="categories\ModR.cpp" />
+    <ClCompile Include="categories\Grp.cpp" />
+    <ClCompile Include="categories\Ring.cpp" />
+    <ClCompile Include="categories\Top.cpp" />
+    <ClCompile Include="categories\Vect.cpp" />
+    <ClCompile Include="categories\BuiltInCategories.cpp" />
+    <ClCompile Include="CategoryDialog.cpp" />
+    <ClCompile Include="Functor.cpp" />
+    <ClCompile Include="SketchView.cpp" />
+    <ClCompile Include="Category.cpp" />
+    <ClCompile Include="SketchWithinCategory.cpp" />
+    <ClCompile Include="DiagramScene.cpp" />
+    <ClCompile Include="Node.cpp" />
+    <ClCompile Include="Object.cpp" />
+    <ClCompile Include="AtomicElement.cpp" />
+    <ClCompile Include="NodeKind.cpp" />
+    <QtRcc Include="DiagramDetective.qrc" />
+    <QtUic Include="DiagramDetective.ui" />
+    <QtUic Include="CategoryDialog.ui" />
+    <QtMoc Include="DiagramDetective.h" />
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9
     <ClCompile Include="DiagramDetective.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="art\Arrow.cpp" />
@@ -233,7 +289,63 @@
     <QtUic Include="dialog\CategoryDialog.ui" />
     <QtRcc Include="DiagramDetective.qrc" />
     <ResourceCompile Include="DiagramDetective.rc" />
+<<<<<<< HEAD
     <None Include="DiagramDetective.ico" />
+=======
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="Node.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="Object.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="Arrow.h" />
+    <QtMoc Include="NodeHandles.h" />
+    <QtMoc Include="ToggleSwitch.h" />
+    <QtMoc Include="PropertiesDock.h" />
+    <QtMoc Include="LibraryDock.h" />
+    <QtMoc Include="ProofTutor.h" />
+    <QtMoc Include="CommutativeEquationsDock.h" />
+    <QtMoc Include="SetupTutor.h" />
+    <QtMoc Include="history\SceneHistory.h" />
+    <QtMoc Include="ArrowTutor.h" />
+    <QtMoc Include="props\ArrowProp.h" />
+    <QtMoc Include="props\ArrowProps.h" />
+    <QtMoc Include="props\MapsElements.h" />
+    <QtMoc Include="AppSettings.h" />
+    <QtMoc Include="SettingsDialog.h" />
+    <QtMoc Include="TutorSession.h" />
+    <QtMoc Include="props\Constructions.h" />
+    <QtMoc Include="props\Prop.h" />
+    <QtMoc Include="props\CategoryProp.h" />
+    <QtMoc Include="props\CategoryProps.h" />
+    <QtMoc Include="props\SketchProp.h" />
+    <QtMoc Include="categories\BigCat.h" />
+    <QtMoc Include="categories\Cat.h" />
+    <QtMoc Include="categories\Set.h" />
+    <QtMoc Include="categories\Ab.h" />
+    <QtMoc Include="categories\RMod.h" />
+    <QtMoc Include="categories\ModR.h" />
+    <QtMoc Include="categories\Grp.h" />
+    <QtMoc Include="categories\Ring.h" />
+    <QtMoc Include="categories\Top.h" />
+    <QtMoc Include="categories\Vect.h" />
+    <QtMoc Include="CategoryDialog.h" />
+    <QtMoc Include="SketchView.h" />
+    <QtMoc Include="Category.h" />
+    <QtMoc Include="AtomicElement.h" />
+    <QtMoc Include="SketchWithinCategory.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NodeKind.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="DiagramScene.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="Functor.h" />
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

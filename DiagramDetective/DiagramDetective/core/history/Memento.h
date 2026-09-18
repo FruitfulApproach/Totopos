@@ -23,6 +23,12 @@ namespace MementoTag
 		DeleteMark   = 12,
 		RuleApplied  = 13,
 		ArrowStyle   = 14,
+		// from the other line of work: an arrow's claims as props, and a
+		// node rebuilt as another kind. Numbered after the above rather
+		// than over it - a tag is what a saved step is read back BY.
+		Monic        = 15,
+		Epic         = 16,
+		NodeRetyped  = 17,
 	};
 }
 

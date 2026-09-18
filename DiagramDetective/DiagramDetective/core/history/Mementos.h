@@ -199,6 +199,32 @@ public:
 	quint16 typeTag() const override { return MementoTag::NodesRemoved; }
 };
 
+// What a node IS: an object, an element, a category, a subcategory. Changing
+// it does not edit a node - it puts another one in its place and hands over
+// the name, the position, what is drawn inside and the arrows that end on it.
+// So this memento holds BOTH shells, and undoing hands everything back the
+// other way. Whichever shell is out of the scene at the time is ours to keep
+// alive, and ours to destroy when the history lets go.
+class NodeRetyped : public Memento
+{
+public:
+	NodeRetyped(const QString& description, Node* before, Node* after);
+	~NodeRetyped() override;
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::NodeRetyped; }
+	QByteArray payload() const override;
+
+private:
+	// hand everything over from the shell in the scene to the one outside it
+	void swap(Node* from, Node* to);
+
+	QPointer<Node> m_before;
+	QPointer<Node> m_after;
+	bool m_isAfter = true;   // which of the two is in the scene right now
+};
+
 // Whether a part of the diagram is given or claimed to exist. Not graphical:
 // it is what the diagram SAYS.
 class ExistsSuchChanged : public Memento
@@ -218,6 +244,7 @@ private:
 	bool m_after;
 };
 
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.h
 // Whether a part of the diagram is struck off - taken out where this diagram
 // is applied as a rule. The other half of what the dotted part says, and just
 // as much a claim.
@@ -245,15 +272,28 @@ class ArrowStyleChanged : public Memento
 {
 public:
 	ArrowStyleChanged(const QString& description, Arrow* arrow, int before, int after)
+=======
+// Whether an arrow is asserted cancellable on the left. Not graphical: it is
+// a claim about the mathematics, drawn with a hooked tail as a side effect.
+class MonicChanged : public Memento
+{
+public:
+	MonicChanged(const QString& description, Arrow* arrow, bool before, bool after)
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.h
 		: Memento(description), m_arrow(arrow), m_before(before), m_after(after) {}
 
 	void undo() override;
 	void redo() override;
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.h
 	quint16 typeTag() const override { return MementoTag::ArrowStyle; }
+=======
+	quint16 typeTag() const override { return MementoTag::Monic; }
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.h
 	QByteArray payload() const override;
 
 private:
 	QPointer<Arrow> m_arrow;
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/history/Mementos.h
 	// the enumerator as an int: Mementos.h is included where Arrow is only
 	// forward declared, and a memento does not need to know the spelling
 	int m_before;
@@ -285,6 +325,28 @@ private:
 	QString m_ruleName;
 	QStringList m_variables;
 	QStringList m_values;
+=======
+	bool m_before;
+	bool m_after;
+};
+
+// The same, cancellable on the right - drawn with a doubled head.
+class EpicChanged : public Memento
+{
+public:
+	EpicChanged(const QString& description, Arrow* arrow, bool before, bool after)
+		: Memento(description), m_arrow(arrow), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::Epic; }
+	QByteArray payload() const override;
+
+private:
+	QPointer<Arrow> m_arrow;
+	bool m_before;
+	bool m_after;
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/history/Mementos.h
 };
 
 // What something is called. Not a look: the label IS the object as far as the

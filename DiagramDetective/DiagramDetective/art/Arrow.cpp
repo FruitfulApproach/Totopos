@@ -4,6 +4,7 @@
 #include <QActionGroup>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneHoverEvent>
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/art/Arrow.cpp
 #include "core/props/ArrowProp.h"
 #include "art/DiagramScene.h"
 #include "art/Category.h"
@@ -11,6 +12,16 @@
 #include "core/Emoji.h"
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
+=======
+#include "props/ArrowProp.h"
+#include "props/ArrowProps.h"
+#include "DiagramScene.h"
+#include "Category.h"
+#include "AppSettings.h"
+#include "Emoji.h"
+#include "history/SceneHistory.h"
+#include "history/Mementos.h"
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/Arrow.cpp
 #include <QPainterPathStroker>
 #include <QStyleOptionGraphicsItem>
 #include <QtMath>
@@ -594,23 +605,25 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// curve does not show a corner where two segments meet
 	pen.setCapStyle(Qt::RoundCap);
 	pen.setJoinStyle(Qt::RoundJoin);
-	if (existsSuch())
-		pen.setStyle(Qt::DotLine);   // dotted along its line: this arrow is asserted to exist
 	if (hasError())
-	{
-		const Qt::PenStyle style = pen.style();
 		pen = QPen(QColor(255, 0, 0), 2.5);
-		pen.setStyle(style);
-	}
 	if (isHighlighted())
-	{
-		const Qt::PenStyle style = pen.style();
 		pen = QPen(QColor(22, 163, 74), qMax(3.0, pen.widthF() + 1.0));
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/art/Arrow.cpp
 		pen.setStyle(style);
 	}
 	const bool selected = (option->state & QStyle::State_Selected) != 0;
 	if (selected)
+=======
+	if (option->state & QStyle::State_Selected)
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/Arrow.cpp
 		pen.setWidthF(pen.widthF() + 1.5);
+	// Dashed along its line: this arrow is asserted to exist. Applied LAST, once
+	// an error or a highlight has had its say about the colour and the width -
+	// the dash is measured against the width the line is finally drawn with,
+	// and a fresh pen would not carry the pattern over anyway.
+	if (existsSuch())
+		applyExistsDash(pen);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
 	painter->drawPath(path);
@@ -637,6 +650,7 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	painter->drawLine(tip, tip - dir * headLength + normal * headWidth);
 	painter->drawLine(tip, tip - dir * headLength - normal * headWidth);
 
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/art/Arrow.cpp
 	// What KIND of arrow this is, said in the usual marks. Everything below is
 	// drawn in a frame standing on the line with +x running ALONG it and +y
 	// across it, so each shape can be written as if the arrow were horizontal
@@ -720,6 +734,30 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		painter->setPen(QPen(QColor(220, 38, 38), 2.5, Qt::SolidLine, Qt::RoundCap));
 		painter->drawLine(at + QPointF(-reach, -reach), at + QPointF(reach, reach));
 		painter->drawLine(at + QPointF(-reach, reach), at + QPointF(reach, -reach));
+=======
+	// asserted epic: a second chevron stacked back along the line, the way a
+	// quotient is usually drawn (X ↠ Y)
+	if (isEpic())
+	{
+		const QPointF tip2 = tip - dir * (headLength * 1.15);
+		painter->drawLine(tip2, tip2 - dir * headLength + normal * headWidth);
+		painter->drawLine(tip2, tip2 - dir * headLength - normal * headWidth);
+	}
+
+	// asserted monic: a vee at the tail, split back along the line, the way an
+	// inclusion is usually drawn (X ↣ Y). Its apex points the way the arrow
+	// goes, so the tail reads as a mirror of the head rather than a bar across it.
+	if (isMonic())
+	{
+		const QPointF tail = path.pointAtPercent(0.0);
+		QPointF tailDir = path.pointAtPercent(0.04) - tail;
+		const qreal tailLen = qSqrt(tailDir.x() * tailDir.x() + tailDir.y() * tailDir.y());
+		tailDir /= (tailLen > 1e-6 ? tailLen : 1);
+		const QPointF tailNormal(-tailDir.y(), tailDir.x());
+		const QPointF apex = tail + tailDir * headLength;
+		painter->drawLine(apex, tail + tailNormal * headWidth);
+		painter->drawLine(apex, tail - tailNormal * headWidth);
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/Arrow.cpp
 	}
 
 	// the points it is pulled through, while it is being worked on
@@ -765,12 +803,80 @@ void Arrow::addProperty(const QString& key)
 		qWarning("Arrow '%s': unknown property '%s'", qPrintable(id()), qPrintable(key));
 }
 
+void Arrow::removeProperty(const QString& key)
+{
+	for (int i = 0; i < m_props.size(); ++i)
+	{
+		if (m_props.at(i)->key() == key)
+		{
+			delete m_props.takeAt(i);
+			return;
+		}
+	}
+}
+
 void Arrow::setProperties(const QStringList& keys)
 {
 	qDeleteAll(m_props);
 	m_props.clear();
 	for (const QString& key : keys)
 		addProperty(key);
+}
+
+bool Arrow::isMonic() const
+{
+	return has(Monomorphism::Key());
+}
+
+bool Arrow::isEpic() const
+{
+	return has(Epimorphism::Key());
+}
+
+void Arrow::setMonic(bool monic)
+{
+	if (monic == isMonic())
+		return;
+	if (monic) addProperty(Monomorphism::Key());
+	else removeProperty(Monomorphism::Key());
+	update();
+	emit styleChanged(this);
+}
+
+void Arrow::setEpic(bool epic)
+{
+	if (epic == isEpic())
+		return;
+	if (epic) addProperty(Epimorphism::Key());
+	else removeProperty(Epimorphism::Key());
+	update();
+	emit styleChanged(this);
+}
+
+void Arrow::setMonicRecorded(bool monic)
+{
+	if (monic == isMonic())
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setMonic(monic);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new MonicChanged(
+			monic ? QString("%1 is asserted a monomorphism").arg(name)
+			      : QString("%1 is no longer asserted a monomorphism").arg(name),
+			this, !monic, monic));
+}
+
+void Arrow::setEpicRecorded(bool epic)
+{
+	if (epic == isEpic())
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setEpic(epic);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new EpicChanged(
+			epic ? QString("%1 is asserted an epimorphism").arg(name)
+			     : QString("%1 is no longer asserted an epimorphism").arg(name),
+			this, !epic, epic));
 }
 
 
@@ -801,6 +907,7 @@ void Arrow::populateActions(QMenu& menu)
 	for (ArrowProp* p : m_props)
 		p->arrowContextMenu(menu, this);
 
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/art/Arrow.cpp
 	// what kind of arrow this is claimed to be
 	QMenu* style = menu.addMenu(Emoji::to() + "  Style");
 	auto* styles = new QActionGroup(style);
@@ -814,6 +921,29 @@ void Arrow::populateActions(QMenu& menu)
 		styles->addAction(act);
 		QObject::connect(act, &QAction::triggered, style, [this, option] { setStyleRecorded(option); });
 	}
+=======
+	// what this arrow is asserted to be, cancellable on the left or the
+	// right (or both - though in most categories that still falls short of
+	// invertible). Checkable, like Exists such: the ASSERTION, not a
+	// construction, so it lives here rather than under Construct.
+	Arrow* self = this;
+	QAction* monic = menu.addAction(Emoji::monomorphism() + "  Monomorphism");
+	monic->setCheckable(true);
+	monic->setChecked(isMonic());
+	monic->setToolTip(QString("Cancellable on the left: for g, h : Z %1 X, f%2g = f%2h implies g = h. "
+	                         "Drawn with a hooked tail, the way an inclusion usually is.")
+		.arg(Emoji::to(), Emoji::compose()));
+	QObject::connect(monic, &QAction::toggled, &menu, [self](bool on) { self->setMonicRecorded(on); });
+
+	QAction* epic = menu.addAction(Emoji::epimorphism() + "  Epimorphism");
+	epic->setCheckable(true);
+	epic->setChecked(isEpic());
+	epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
+	                        "Drawn with a doubled head, the way a quotient usually is.")
+		.arg(Emoji::to(), Emoji::compose()));
+	QObject::connect(epic, &QAction::toggled, &menu, [self](bool on) { self->setEpicRecorded(on); });
+	menu.addSeparator();
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/Arrow.cpp
 
 	// the shape of the line. No asking twice about a bend - the history has
 	// it either way.

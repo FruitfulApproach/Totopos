@@ -114,6 +114,12 @@ public:
 	bool hasError() const { return m_inCycle; }
 	void setError(bool error);
 
+	// A frame that is drawn whatever this node holds. An object with nothing
+	// inside it is just its label, which is right for an R-module called M
+	// and wrong for anything whose SHAPE is part of what it claims - a
+	// subcategory says so with a dotted frame, empty or not.
+	virtual bool alwaysFramed() const { return false; }
+
 	// How round the corners of the frame are drawn, in scene units. 0 is a
 	// plain rectangle.
 	qreal cornerRadius() const { return m_cornerRadius; }
@@ -125,8 +131,8 @@ public:
 	static DiagramScene* diagramOf(const Node* node);
 
 	// "Exists such": this part of the diagram is not given, it is what is
-	// CLAIMED TO EXIST. Drawn dotted - dots around the border of an object,
-	// a dotted line for an arrow - and read as the existential part of the
+	// CLAIMED TO EXIST. Drawn DASHED - a dashed border round an object, a
+	// dashed line for an arrow - and read as the existential part of the
 	// statement the diagram makes.
 	bool existsSuch() const { return m_existsSuch; }
 	void setExistsSuch(bool existsSuch);
@@ -143,6 +149,17 @@ public:
 	// the same, and put it in the scene's history (it changes what the rule
 	// does, so it is a step, not a look)
 	void setDeleteMarkRecorded(bool marked);
+	// The line a claim of existence is drawn with: long dashes, put on a pen
+	// that is otherwise ready to draw. Long, because a subcategory's border
+	// is DOTTED (Category::applyDepthAppearance) and the two must not read as
+	// the same line - "there exists such an X" and "this is a part of R-Mod"
+	// are different claims. The lengths are in scene units rather than pen
+	// widths, so every dashed thing in the diagram is dashed alike however
+	// thick its line happens to be drawn.
+	static void applyExistsDash(QPen& pen);
+	// how long each dash is, and how much line is left out between them
+	static constexpr qreal ExistsDashLength = 9.0;
+	static constexpr qreal ExistsDashGap = 5.0;
 
 	// Added while chasing: part of the hypotheses of the statement, not of
 	// the setup it started from.
@@ -207,6 +224,11 @@ public:
 
 	// the right-click menu, built by populateContextMenu, shown at a screen point
 	void popupContextMenu(const QPoint& screenPos);
+	// The same, told WHERE in this node it was opened, so an entry that is
+	// about that spot - placing something there - lands under the cursor. A
+	// right-click on the canvas is a right-click on the ambient category, and
+	// arrives this way.
+	void popupContextMenu(const QPoint& screenPos, const QPointF& itemPos);
 
 	// Put an "Add object" entry on `menu` that places a new object in `home`
 	// at the point the menu was opened on. This is how objects are made now:
@@ -279,6 +301,15 @@ public:
 	// says yes for the same reason - its label has to get out of the way of
 	// whatever the line crosses. The label itself calls these, so they are
 	// public.
+	// A NAME THAT IS NOT THIS NODE'S TO CHANGE.
+	//
+	// An image drawn by a functor is called H(X): made out of the functor's
+	// name and the source's, and remade from those every time either changes.
+	// Typing over it here would be undone by the next sync, so the editor
+	// does not open on it at all - the label says so instead, with a lock.
+	// Rename the functor, or rename X.
+	bool labelIsLocked() const;
+
 	virtual bool labelIsMovable() const { return holdsAnything(); }
 	virtual void labelMoved(const QPointF& pos);
 	virtual void labelDragFinished(const QPointF& fromPos);

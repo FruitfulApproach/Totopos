@@ -9,6 +9,8 @@ class ModR : public Category
 public:
 	explicit ModR(QGraphicsItem* parent = nullptr);
 
+	QString builtInName() const override { return QStringLiteral("Mod-R"); }
+
 public:
 	QString objectName() const override { return QStringLiteral("R-module"); }
 	QString implicitArrowName() const override { return QStringLiteral("0"); }   // the zero map

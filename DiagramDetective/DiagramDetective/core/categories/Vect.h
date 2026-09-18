@@ -9,6 +9,8 @@ class Vect : public Category
 public:
 	explicit Vect(QGraphicsItem* parent = nullptr);
 
+	QString builtInName() const override { return QStringLiteral("Vect"); }
+
 public:
 	QString objectName() const override { return QStringLiteral("vector space"); }
 	QString implicitArrowName() const override { return QStringLiteral("0"); }   // the zero map

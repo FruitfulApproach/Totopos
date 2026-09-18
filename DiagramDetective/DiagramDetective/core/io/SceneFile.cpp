@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QDataStream>
 #include <QSaveFile>
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/io/SceneFile.cpp
 #include <QFileInfo>
 #include "art/DiagramScene.h"
 #include "art/Category.h"
@@ -11,17 +12,32 @@
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
 #include "core/props/MapsElements.h"
+=======
+#include "../DiagramScene.h"
+#include "../Category.h"
+#include "../Arrow.h"
+#include "../Functor.h"
+#include "../AtomicElement.h"
+#include "../history/SceneHistory.h"
+#include "../history/Mementos.h"
+#include "../props/MapsElements.h"
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/io/SceneFile.cpp
 
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
+<<<<<<< HEAD:DiagramDetective/DiagramDetective/core/io/SceneFile.cpp
 	const quint16 kVersion = 17;   // 17: each node's own identity, so a functor can tell two objects of the same name apart   // 16: what kind of arrow it is - inclusion, monic, epic, invertible   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+=======
+	const quint16 kVersion = 15;   // 15: what each node IS - the built-in a category is, subcategories, elements, and what the diagram in a category claims. 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+>>>>>>> 3e9da9ce39d6dc74c5a0385266cfd9f7c2eeaba9:DiagramDetective/DiagramDetective/io/SceneFile.cpp
 
 	QString kindOf(Node* node)
 	{
-		if (dynamic_cast<Functor*>(node) != nullptr)  return QStringLiteral("Functor");
-		if (dynamic_cast<Arrow*>(node) != nullptr)    return QStringLiteral("Arrow");
-		if (dynamic_cast<Category*>(node) != nullptr) return QStringLiteral("Category");
+		if (dynamic_cast<Functor*>(node) != nullptr)       return QStringLiteral("Functor");
+		if (dynamic_cast<Arrow*>(node) != nullptr)         return QStringLiteral("Arrow");
+		if (dynamic_cast<AtomicElement*>(node) != nullptr) return QStringLiteral("Element");
+		if (dynamic_cast<Category*>(node) != nullptr)      return QStringLiteral("Category");
 		return QStringLiteral("Object");
 	}
 
@@ -79,6 +95,12 @@ namespace
 		{
 			out << category->properties() << qint32(category->nextObjectIndex()) << qint32(category->nextArrowIndex());
 			out << category->rowsExact() << category->columnsExact();
+			// WHICH category this is - a nested R-Mod used to come back as a
+			// plain one, and its objects stopped being R-modules - and whether
+			// it is a subcategory of the one it is drawn in
+			out << category->builtInName() << category->isSubcategory();
+			// and what the diagram drawn in it is put forward as
+			out << category->commutes() << qint32(category->statementKind()) << category->statementName();
 		}
 		else if (auto* arrow = dynamic_cast<Arrow*>(node))
 		{
@@ -278,21 +300,46 @@ namespace
 
 		if (kind == "Category")
 		{
-			auto* category = new Category(id, parent);
 			QStringList props;
 			qint32 nextObject = 0, nextArrow = 0;
 			in >> props >> nextObject >> nextArrow;
-			category->setProperties(props);
+			bool rows = false, columns = false;
+			if (version >= 10)
+				in >> rows >> columns;
+			QString builtIn;
+			bool subcategory = false;
+			bool commutes = false;
+			qint32 statementKind = 0;
+			QString statementName;
+			if (version >= 15)
+			{
+				in >> builtIn >> subcategory;
+				in >> commutes >> statementKind >> statementName;
+			}
+
+			// The class comes first: it is what decides that an object placed
+			// in here is an R-module rather than a plain object, so it cannot
+			// be put on afterwards.
+			Category* category = Category::createBuiltIn(builtIn, parent);
+			if (category != nullptr)
+				category->setId(id);
+			else
+				category = new Category(id, parent);
+			if (builtIn.isEmpty())
+				category->setProperties(props);   // a built-in comes with its own
 			category->setNextObjectIndex(nextObject);
 			category->setNextArrowIndex(nextArrow);
-			if (version >= 10)
-			{
-				bool rows = false, columns = false;
-				in >> rows >> columns;
-				category->setRowsExact(rows);
-				category->setColumnsExact(columns);
-			}
+			category->setRowsExact(rows);
+			category->setColumnsExact(columns);
+			category->setSubcategory(subcategory);
+			category->setCommutes(commutes);
+			category->setStatementKind(statementKind);
+			category->setStatementName(statementName);
 			node = category;
+		}
+		else if (kind == "Element")
+		{
+			node = new AtomicElement(id, parent);
 		}
 		else
 		{
@@ -586,25 +633,46 @@ bool SceneFile::load(DiagramScene* scene, const QString& path, QString* error)
 	QStringList props;
 	qint32 nextObject = 0, nextArrow = 0;
 	data >> props >> nextObject >> nextArrow;
+	bool ambientRowsExact = false, ambientColumnsExact = false;
+	if (version >= 10)
+		data >> ambientRowsExact >> ambientColumnsExact;
+	// Which category the canvas IS. The whole block has to be read here, and
+	// in this order, whether or not it is used: everything after it in the
+	// stream depends on the reading having got this far.
+	QString ambientBuiltIn;
+	bool ambientSubcategory = false;
+	bool ambientClaimsCommutes = false;
+	qint32 ambientStatementKind = 0;
+	QString ambientStatementName;
+	if (version >= 15)
+	{
+		data >> ambientBuiltIn >> ambientSubcategory;
+		data >> ambientClaimsCommutes >> ambientStatementKind >> ambientStatementName;
+	}
 
 	scene->clearDiagram();
-	scene->setAmbientCategory(id);
+	// the class is what makes the canvas R-Mod, rather than something merely
+	// CALLED R-Mod; whatever the file has named it goes on afterwards
+	scene->setAmbientCategory(ambientBuiltIn.isEmpty() ? id : ambientBuiltIn);
 	Category* ambient = scene->ambientCategory();
 	if (ambient == nullptr)
 	{
 		if (error != nullptr) *error = QStringLiteral("The file names a category that cannot be made.");
 		return false;
 	}
-	ambient->setProperties(props);
+	ambient->setId(id);
+	if (ambientBuiltIn.isEmpty())
+		ambient->setProperties(props);   // a built-in brings its own structure
 	ambient->setNextObjectIndex(nextObject);
 	ambient->setNextArrowIndex(nextArrow);
-	if (version >= 10)
-	{
-		bool rows = false, columns = false;
-		data >> rows >> columns;
-		ambient->setRowsExact(rows);
-		ambient->setColumnsExact(columns);
-	}
+	ambient->setRowsExact(ambientRowsExact);
+	ambient->setColumnsExact(ambientColumnsExact);
+	// what the canvas claims is the SCENE's, and is read again at the end of
+	// the body; these two are the same numbers, and are left to that reading
+	Q_UNUSED(ambientClaimsCommutes);
+	Q_UNUSED(ambientStatementKind);
+	Q_UNUSED(ambientStatementName);
+	Q_UNUSED(ambientSubcategory);
 	if (fill.isValid()) ambient->setFill(QBrush(fill));
 	if (border.isValid()) ambient->setBorder(QPen(border, width));
 	ambient->setLabelOffset(ambientLabelOffset);
