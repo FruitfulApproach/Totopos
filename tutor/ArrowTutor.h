@@ -24,6 +24,8 @@ public:
 protected:
 	void onBegin(TutorSession& session) override;
 	bool onPick(TutorSession& session, Node* node) override;
+	// double-clicked blank space: put an object there and go to it
+	Node* onPlace(TutorSession& session, const QPointF& scenePos) override;
 	bool onDone(TutorSession& session) override;
 	void onCancel(TutorSession& session) override;
 

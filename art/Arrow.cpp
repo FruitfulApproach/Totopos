@@ -91,6 +91,15 @@ void Arrow::onObjectDeleted(Node* object)
 		m_domain = nullptr;
 	if (m_codomain == object)
 		m_codomain = nullptr;
+
+	// Out of sight AT ONCE, and only then deleteLater. Between this and the
+	// event loop coming back round, the scene may repaint or hit-test any
+	// number of times, and every one of those walks an arrow with an end
+	// that no longer exists. Hiding it first is what keeps the half-dead
+	// arrow out of all of that - and it is also why a deleted arrow no
+	// longer flickers in and out of the canvas until its turn comes.
+	setVisible(false);
+	setAcceptedMouseButtons(Qt::NoButton);
 	deleteLater();
 }
 
@@ -108,6 +117,9 @@ void Arrow::disconnectFromObject(Node* object)
 
 namespace
 {
+	// half the space between the two lines of an equals, in scene units
+	const qreal kEqualsGap = 1.8;
+
 	qreal norm(const QPointF& p)
 	{
 		return qSqrt(p.x() * p.x() + p.y() * p.y());
@@ -355,6 +367,25 @@ QList<QPointF> Arrow::throughPoints() const
 			end -= (in / length) * 3;
 	}
 
+	// A VEE TAIL IS NOT SOMETHING THE LINE RUNS THROUGH.
+	//
+	// The vee is drawn backwards from its point, with its open ends against
+	// the domain, and the line proper starts AT that point. Left alone the
+	// line ran the whole way and came out through the middle of the vee. So
+	// the start is moved along by a head's length and the vee fills the gap.
+	//
+	// Not for a hook - an inclusion's line really does run into its hook - and
+	// not on an arrow too short to give up the room.
+	if (m_style == Style::Mono || (isMonic() && !isInclusion()))
+	{
+		const QPointF toward = m_bends.isEmpty() ? end : m_bends.first();
+		QPointF along = toward - start;
+		const qreal length = norm(along);
+		const qreal room = AppSettings::instance().arrowHeadLength();
+		if (length > room * 1.5)
+			start += (along / length) * room;
+	}
+
 	pts << start;
 	pts << m_bends;
 	pts << end;
@@ -502,10 +533,47 @@ QPointF Arrow::labelAnchor() const
 	return QPointF(at.x() - text.width() / 2, at.y() - text.height() / 2);
 }
 
+bool Arrow::labelFrame(QPointF& along, QPointF& across, qreal& length) const
+{
+	const QList<QPointF> pts = throughPoints();
+	if (pts.size() < 2)
+		return false;
+	along = pts.last() - pts.first();
+	length = norm(along);
+	if (length < 1e-6)
+		return false;   // the two ends on top of each other: nothing to measure
+	along /= length;
+	across = QPointF(-along.y(), along.x());
+	return true;
+}
+
+void Arrow::rememberLabelPlacement()
+{
+	QPointF along, across;
+	qreal length = 0;
+	if (!labelFrame(along, across, length))
+		return;   // nothing to measure against: keep what was remembered
+	m_labelAlong = QPointF::dotProduct(m_labelOffset, along) / length;
+	m_labelAcross = QPointF::dotProduct(m_labelOffset, across) / length;
+	m_labelPlacedByHand = !m_labelOffset.isNull();
+}
+
 void Arrow::placeLabel()
 {
-	if (label() != nullptr)
-		label()->setPos(labelAnchor() + m_labelOffset);
+	if (label() == nullptr)
+		return;
+	// The line may have moved, turned or changed length since the label was
+	// put where it is. It was remembered as a fraction of that line, so it is
+	// worked out again here and stays where it was PUT rather than where the
+	// pixels used to be.
+	if (m_labelPlacedByHand)
+	{
+		QPointF along, across;
+		qreal length = 0;
+		if (labelFrame(along, across, length))
+			m_labelOffset = (along * m_labelAlong + across * m_labelAcross) * length;
+	}
+	label()->setPos(labelAnchor() + m_labelOffset);
 }
 
 void Arrow::setLabelOffset(const QPointF& offset)
@@ -513,6 +581,7 @@ void Arrow::setLabelOffset(const QPointF& offset)
 	if (m_labelOffset == offset)
 		return;
 	m_labelOffset = offset;
+	rememberLabelPlacement();
 	refreshGeometry();
 }
 
@@ -520,11 +589,15 @@ void Arrow::labelMoved(const QPointF& pos)
 {
 	// what the user dragged is remembered as a displacement, so the label
 	// travels with the line rather than staying where the screen was
+	const QPointF was = m_labelOffset;
 	m_labelOffset = pos - labelAnchor();
+	rememberLabelPlacement();   // dragged HERE, against the line as it stands
 	prepareGeometryChange();
 	ancestorsPrepareGeometryChange();
 	update();
 	ancestorsUpdate();
+	if (m_labelOffset != was)
+		emit labelDragged(this, m_labelOffset - was);
 }
 
 void Arrow::labelDragFinished(const QPointF& fromPos)
@@ -614,7 +687,22 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		pen.setWidthF(pen.widthF() + 1.5);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
-	painter->drawPath(path);
+	if (m_style == Style::Equals)
+	{
+		// The equals sign as it is written: two lines side by side. The path
+		// is drawn twice, shifted either way ACROSS the line it runs along, so
+		// the pair reads as one mark rather than as two arrows.
+		QPointF run = path.pointAtPercent(1.0) - path.pointAtPercent(0.0);
+		const qreal span = norm(run);
+		run = span > 1e-6 ? run / span : QPointF(1, 0);
+		const QPointF sideways(-run.y() * kEqualsGap, run.x() * kEqualsGap);
+		painter->drawPath(path.translated(sideways));
+		painter->drawPath(path.translated(-sideways));
+	}
+	else
+	{
+		painter->drawPath(path);
+	}
 
 	// the head: a filled triangle at the codomain end, along the curve as it
 	// arrives rather than along the straight line between the ends
@@ -630,13 +718,34 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// Selected thickens the head and whatever tail mark the style draws, not
 	// just the line: an arrow is its line AND its marks, and a fat line with a
 	// hairline hook reads as a mistake rather than as a selection.
+	// HOW FAR BACK THE SECOND HEAD OF AN EPI SITS.
+	//
+	// Not a fixed fraction of the head's length: what the eye reads is the gap
+	// between the two strokes measured ACROSS them, and that depends on how
+	// open the head is. A wide head's strokes lie nearly across the line, so a
+	// small step back already separates them; a narrow head's lie nearly along
+	// it and need a long one. Stepping back a fixed amount made a narrow head
+	// look like one thick mark and a wide head like two unrelated ones.
+	//
+	// A stroke runs from the tip along (-L, W). Shifting a second copy back by
+	// d along the line moves it d*W/hypot(L, W) sideways OF ITSELF, so for a
+	// wanted gap g the step back is g*hypot(L, W)/W.
+	const qreal wantedGap = qMax(2.0, AppSettings::instance().arrowHeadLineWidth() * 1.5);
+	const qreal spread = qMax(0.5, headWidth);
+	const qreal secondHeadBack = wantedGap * qSqrt(headLength * headLength + spread * spread) / spread;
+
 	QPen headPen(pen.color(),
 	             AppSettings::instance().arrowHeadLineWidth() + (selected ? 1.5 : 0.0),
 	             Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 	painter->setPen(headPen);
 	painter->setBrush(Qt::NoBrush);
-	painter->drawLine(tip, tip - dir * headLength + normal * headWidth);
-	painter->drawLine(tip, tip - dir * headLength - normal * headWidth);
+	// An equals points nowhere: it says the two ends are the same thing, and a
+	// head on it would read as a map from one to the other.
+	if (m_style != Style::Equals)
+	{
+		painter->drawLine(tip, tip - dir * headLength + normal * headWidth);
+		painter->drawLine(tip, tip - dir * headLength - normal * headWidth);
+	}
 
 	// What KIND of arrow this is, said in the usual marks. Everything below is
 	// drawn in a frame standing on the line with +x running ALONG it and +y
@@ -672,17 +781,19 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		}
 		case Style::Mono:
 		{
-			// a barb at the tail, pointing the same way as the head
+			// A barb whose point is where the line begins, opening backwards
+			// towards the domain - the same shape the Monic prop draws, and
+			// for the same reason the line does not run through it.
 			const QTransform frame = frameAt(tail, tailDir);
-			const QPointF vertex = frame.map(QPointF(headLength, 0));
-			painter->drawLine(vertex, frame.map(QPointF(0, headWidth)));
-			painter->drawLine(vertex, frame.map(QPointF(0, -headWidth)));
+			const QPointF vertex = frame.map(QPointF(0, 0));
+			painter->drawLine(vertex, frame.map(QPointF(-headLength, headWidth)));
+			painter->drawLine(vertex, frame.map(QPointF(-headLength, -headWidth)));
 			break;
 		}
 		case Style::Epi:
 		{
-			// a second head, a little way behind the first
-			const QPointF back = tip - dir * (headLength * 0.62);
+			// a second head, far enough back to read as two (see secondHeadBack)
+			const QPointF back = tip - dir * secondHeadBack;
 			painter->drawLine(back, back - dir * headLength + normal * headWidth);
 			painter->drawLine(back, back - dir * headLength - normal * headWidth);
 			break;
@@ -706,8 +817,9 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 			painter->drawPath(frameAt(mid + midNormal * 9.0, midDir).map(tilde));
 			break;
 		}
+		case Style::Equals:
 		case Style::Plain:
-			break;
+			break;   // the doubled line above is the whole of an equals
 		}
 	}
 
@@ -718,7 +830,7 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// so an arrow told it is epic both ways is drawn with both.
 	if (isEpic())
 	{
-		const QPointF tip2 = tip - dir * (headLength * 1.15);
+		const QPointF tip2 = tip - dir * secondHeadBack;
 		painter->drawLine(tip2, tip2 - dir * headLength + normal * headWidth);
 		painter->drawLine(tip2, tip2 - dir * headLength - normal * headWidth);
 	}
@@ -727,14 +839,34 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// goes, so the tail reads as a mirror of the head rather than a bar across it
 	if (isMonic())
 	{
-		const QPointF tailAt = path.pointAtPercent(0.0);
-		QPointF tailWay = path.pointAtPercent(0.04) - tailAt;
+		const QPointF start = path.pointAtPercent(0.0);
+		QPointF tailWay = path.pointAtPercent(0.04) - start;
 		const qreal len = qSqrt(tailWay.x() * tailWay.x() + tailWay.y() * tailWay.y());
 		tailWay /= (len > 1e-6 ? len : 1);
 		const QPointF tailNormal(-tailWay.y(), tailWay.x());
-		const QPointF apex = tailAt + tailWay * headLength;
-		painter->drawLine(apex, tailAt + tailNormal * headWidth);
-		painter->drawLine(apex, tailAt - tailNormal * headWidth);
+
+		if (isInclusion())
+		{
+			// a hook, curling back off the end of the line: the line runs INTO
+			// it, which is why no room was made for it in throughPoints
+			const qreal r = qMax(3.0, headWidth * 0.8);
+			QTransform frame;
+			frame.translate(start.x(), start.y());
+			frame.rotate(qRadiansToDegrees(qAtan2(tailWay.y(), tailWay.x())));
+			QPainterPath hook;
+			hook.moveTo(0, 2 * r);
+			hook.cubicTo(-1.34 * r, 2 * r, -1.34 * r, 0, 0, 0);
+			painter->setBrush(Qt::NoBrush);
+			painter->drawPath(frame.map(hook));
+		}
+		else
+		{
+			// the point of the vee IS where the line begins (throughPoints made
+			// room for it); the arms reach back from there towards the domain
+			const QPointF back = start - tailWay * headLength;
+			painter->drawLine(start, back + tailNormal * headWidth);
+			painter->drawLine(start, back - tailNormal * headWidth);
+		}
 	}
 
 	// Struck off: this arrow goes when the rule is applied. On the middle of
@@ -912,6 +1044,7 @@ QString Arrow::styleName(Style style)
 	case Style::Mono:      return QStringLiteral("Monomorphism  ↣");
 	case Style::Epi:       return QStringLiteral("Epimorphism  ↠");
 	case Style::Iso:       return QStringLiteral("Isomorphism  ≃");
+	case Style::Equals:    return QStringLiteral("Equals  =");
 	case Style::Plain:     break;
 	}
 	return QStringLiteral("Plain  →");
@@ -932,6 +1065,9 @@ QString Arrow::styleDescription(Style style)
 	case Style::Iso:
 		return QStringLiteral("A tilde over the line: invertible. There is an arrow back the other way, "
 		                      "and both composites are identities.");
+	case Style::Equals:
+		return QStringLiteral("Two lines and no head: the thing at one end IS the thing at the other. "
+		                      "Not a map between them - an equals reads the same way round either way.");
 	case Style::Plain:
 		break;
 	}
@@ -1097,7 +1233,13 @@ void Arrow::removeProperty(const QString& key)
 
 bool Arrow::isMonic() const
 {
-	return has(Monomorphism::Key());
+	// by type: an Inclusion IS a Monomorphism, and answers yes here
+	return propOfType<Monomorphism>() != nullptr;
+}
+
+bool Arrow::isInclusion() const
+{
+	return propOfType<Inclusion>() != nullptr;
 }
 
 bool Arrow::isEpic() const
@@ -1109,10 +1251,53 @@ void Arrow::setMonic(bool monic)
 {
 	if (monic == isMonic())
 		return;
-	if (monic) addProperty(Monomorphism::Key());
-	else removeProperty(Monomorphism::Key());
+	if (monic)
+	{
+		addProperty(Monomorphism::Key());
+	}
+	else
+	{
+		// take off whichever kind of monomorphism it is wearing: saying it is
+		// not monic has to mean it is not an inclusion either
+		removeProperty(Monomorphism::Key());
+		removeProperty(Inclusion::Key());
+	}
 	update();
 	emit styleChanged(this);
+}
+
+void Arrow::setInclusion(bool inclusion)
+{
+	if (inclusion == isInclusion())
+		return;
+	if (inclusion)
+	{
+		// One property, not two: an inclusion already IS a monomorphism, and
+		// carrying both would let them be turned off separately and disagree.
+		removeProperty(Monomorphism::Key());
+		addProperty(Inclusion::Key());
+	}
+	else
+	{
+		// it stays monic - only the narrower claim is being given up
+		removeProperty(Inclusion::Key());
+		addProperty(Monomorphism::Key());
+	}
+	update();
+	emit styleChanged(this);
+}
+
+void Arrow::setInclusionRecorded(bool inclusion)
+{
+	if (inclusion == isInclusion())
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setInclusion(inclusion);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new MonicChanged(
+			inclusion ? QString("%1 is asserted an inclusion").arg(name)
+			          : QString("%1 is a monomorphism, no longer an inclusion").arg(name),
+			this, !inclusion, inclusion));
 }
 
 void Arrow::setEpic(bool epic)

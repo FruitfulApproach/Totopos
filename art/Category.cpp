@@ -2,6 +2,7 @@
 #include "art/Arrow.h"
 #include "core/props/MapsElements.h"
 #include "art/DiagramScene.h"
+#include "core/layout/GraphLayoutThread.h"
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
 #include "core/props/CategoryProps.h"
@@ -43,6 +44,21 @@ bool Category::isAmbient() const
 {
 	auto* diagram = dynamic_cast<DiagramScene*>(scene());
 	return diagram != nullptr && diagram->ambientCategory() == this;
+}
+
+bool Category::labelIsLocked() const
+{
+	// the same test the combo is locked by, so the two never disagree
+	return Object::labelIsLocked() || (isAmbient() && holdsAnything());
+}
+
+QString Category::labelLockTip() const
+{
+	if (isAmbient() && holdsAnything() && !Object::labelIsLocked())
+		return QStringLiteral("The category is settled once anything is drawn: everything here is an "
+		                      "object or an arrow OF it, and they would all mean something else in "
+		                      "another one. Start a new diagram to choose a different category.");
+	return Object::labelLockTip();
 }
 
 Category* Category::ambient() const
@@ -230,6 +246,24 @@ void Category::populateActions(QMenu& menu)
 	{
 		sub->setEnabled(false);
 	}
+	// Tidy up. Built from GraphLayouts::all() so this menu and the View menu
+	// can never fall out of step with each other.
+	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
+	{
+		QMenu* layout = menu.addMenu("Layout");
+		for (const GraphLayouts::Kind& kind : GraphLayouts::all())
+		{
+			QAction* action = layout->addAction(kind.title);
+			const QString id = kind.id;
+			// queued for the same reason as above: the menu is still closing,
+			// and this moves things about in the scene
+			QObject::connect(action, &QAction::triggered, diagram, [diagram, id] {
+				QMetaObject::invokeMethod(diagram, [diagram, id] { diagram->layOut(id); },
+				                          Qt::QueuedConnection);
+			});
+		}
+	}
+
 	menu.addSeparator();
 
 	if (m_props.isEmpty())
@@ -272,21 +306,25 @@ void Category::populateActions(QMenu& menu)
 		menu.addSeparator();
 	}
 
-	// what the diagram drawn in here is asserted to be
-	menu.addSection(QString("The diagram in %1").arg(id()));
-	QAction* rows = menu.addAction("Rows exact");
-	rows->setCheckable(true);
-	rows->setChecked(m_rowsExact);
-	rows->setToolTip("Every row of this diagram is an exact sequence: at each object along it, the image of "
-	                 "the arrow coming in is the kernel of the arrow going out.");
-	QObject::connect(rows, &QAction::toggled, &menu, [this](bool on) { setRowsExactRecorded(on); });
+	// what the diagram drawn in here is asserted to be. Exactness only when
+	// there is such a thing here to assert - see exactnessDefined().
+	if (exactnessDefined())
+	{
+		menu.addSection(QString("The diagram in %1").arg(id()));
+		QAction* rows = menu.addAction("Rows exact");
+		rows->setCheckable(true);
+		rows->setChecked(m_rowsExact);
+		rows->setToolTip("Every row of this diagram is an exact sequence: at each object along it, the image of "
+		                 "the arrow coming in is the kernel of the arrow going out.");
+		QObject::connect(rows, &QAction::toggled, &menu, [this](bool on) { setRowsExactRecorded(on); });
 
-	QAction* columns = menu.addAction("Columns exact");
-	columns->setCheckable(true);
-	columns->setChecked(m_columnsExact);
-	columns->setToolTip("The same, down each column. Rows and columns are asserted separately.");
-	QObject::connect(columns, &QAction::toggled, &menu, [this](bool on) { setColumnsExactRecorded(on); });
-	menu.addSeparator();
+		QAction* columns = menu.addAction("Columns exact");
+		columns->setCheckable(true);
+		columns->setChecked(m_columnsExact);
+		columns->setToolTip("The same, down each column. Rows and columns are asserted separately.");
+		QObject::connect(columns, &QAction::toggled, &menu, [this](bool on) { setColumnsExactRecorded(on); });
+		menu.addSeparator();
+	}
 
 	// anything a property offers that is not a construction
 	for (CategoryProp* p : m_props)
@@ -300,17 +338,144 @@ void Category::setProperties(const QStringList& keys)
 		addProperty(key);
 }
 
+namespace
+{
+	// The runs of letters an auto-name walks round.
+	//
+	// Written out by code point rather than taken as a range, because the
+	// Greek range has a final sigma sitting in the middle of it: as a NAME
+	// that is the same letter as sigma, so a run built from the range would
+	// offer the same variable twice and the second one would look like a
+	// duplicate that could not be got rid of.
+	QString latinUpper()
+	{
+		QString run;
+		for (ushort c = 'A'; c <= 'Z'; ++c)
+			run += QChar(c);
+		return run;
+	}
+
+	QString latinLower()
+	{
+		QString run;
+		for (ushort c = 'a'; c <= 'z'; ++c)
+			run += QChar(c);
+		return run;
+	}
+
+	QString greekLower()
+	{
+		QString run;
+		for (ushort c = 0x3B1; c <= 0x3C9; ++c)
+			if (c != 0x3C2)   // final sigma: the same letter, written differently
+				run += QChar(c);
+		return run;
+	}
+
+	QString greekUpper()
+	{
+		// only the eleven with a shape of their own. Capital alpha is a Roman
+		// A on every screen there has ever been, and a variable nobody can
+		// tell from another variable is worse than no variable.
+		static const ushort kLetters[] = { 0x393, 0x394, 0x398, 0x39B, 0x39E,
+		                                   0x3A0, 0x3A3, 0x3A5, 0x3A6, 0x3A8, 0x3A9 };
+		QString run;
+		for (ushort c : kLetters)
+			run += QChar(c);
+		return run;
+	}
+
+	// The run `letter` belongs to, or nothing when it belongs to none.
+	QString alphabetOf(QChar letter)
+	{
+		static const QString kRuns[] = { latinUpper(), latinLower(), greekLower(), greekUpper() };
+		for (const QString& run : kRuns)
+			if (run.contains(letter))
+				return run;
+		return QString();
+	}
+
+	bool isPrime(QChar c)
+	{
+		// what the user typed, and what we write back: the apostrophe on the
+		// keyboard and the prime that means the same thing
+		return c == QChar(0x2032) || c == QLatin1Char('\'') || c == QChar(0x2019);
+	}
+}
+
 QString Category::letterName(int index, QChar first)
 {
-	// index 0 -> first; after Z the alphabet wraps round with one more prime each time
-	const bool upper = !first.isLower();
-	const int start = first.toUpper().unicode() - 'A';
-	const int k = start + index;
-	QString name(QChar((upper ? 'A' : 'a') + (k % 26)));
-	const int primes = k / 26;
-	for (int i = 0; i < primes; ++i)
-		name += QChar(0x2032);   // prime
+	const QString alphabet = alphabetOf(first);
+	if (alphabet.isEmpty() || index < 0)
+		return QString(first);
+
+	// The cycle is anchored at `first`, not at the top of the alphabet: from X
+	// the names run X, Y, Z, A, B, ..., W and only THEN X', Y'. Counting the
+	// primes off `index` rather than off the letter's position is the whole of
+	// what makes that so - anchoring them at A instead would put a prime on
+	// the very first wrap, and the second object in a category would be A'.
+	const int n = alphabet.size();
+	const int start = alphabet.indexOf(first);
+	QString name(alphabet.at((start + index) % n));
+	for (int i = 0; i < index / n; ++i)
+		name += QChar(0x2032);
 	return name;
+}
+
+int Category::variableIndex(const QString& text, QChar first)
+{
+	// A variable is one letter and a run of primes: X, B'', an alpha', a
+	// Gamma'''. Anything else - a word, a subscript, Hom(X,Y) - is a name the
+	// person chose, and says nothing about where counting should carry on.
+	if (text.isEmpty())
+		return -1;
+	const QChar letter = text.at(0);
+	const QString alphabet = alphabetOf(letter);
+	if (alphabet.isEmpty())
+		return -1;
+	int primes = 0;
+	for (int at = 1; at < text.size(); ++at)
+	{
+		if (!isPrime(text.at(at)))
+			return -1;
+		++primes;
+	}
+
+	// Only meaningful against an anchor in the SAME run. Renaming an object to
+	// a Greek letter says nothing about how far the Latin counting has got.
+	if (first.isNull() || !alphabet.contains(first))
+		return -1;
+	const int n = alphabet.size();
+	const int start = alphabet.indexOf(first);
+	const int at = alphabet.indexOf(letter);
+	return primes * n + ((at - start + n) % n);
+}
+
+void Category::noteNamed(const Node* child, const QString& name)
+{
+	const bool isArrow = dynamic_cast<const Arrow*>(child) != nullptr;
+	const int at = variableIndex(name, isArrow ? firstArrowLetter() : firstLetter());
+	if (at < 0)
+		return;   // not a variable: leave the counting where it was
+
+	// Start again FROM the name typed, not after it. The name itself is now
+	// taken, so the next one along is what comes out - rename X to S and the
+	// next object is T - but if that S is later deleted, the same rule hands
+	// it straight back.
+	if (isArrow)
+		m_nextArrowIndex = at;
+	else
+		m_nextIndex = at;
+}
+
+bool Category::exactnessDefined() const
+{
+	return has(HasZeroObject::Key()) && has(HasKernels::Key());
+}
+
+bool Category::objectsAreSets() const
+{
+	return has(IsConcrete::Key());
 }
 
 Object* Category::makeObject(const QString& name)
@@ -341,7 +506,7 @@ Arrow* Category::createArrow(const QString& name, Node* from, Node* to)
 
 Arrow* Category::createCanvasArrow(Node* from, Node* to)
 {
-	return createArrow(freshName(m_nextArrowIndex, firstArrowLetter()), from, to);
+	return createArrow(nextArrowName(), from, to);
 }
 
 void Category::applyDepthAppearance(int depth)
@@ -396,7 +561,7 @@ Object* Category::createCanvasObject(const QPointF& scenePos)
 	// click, given in scene coordinates, into ours, so the object lands exactly
 	// under the cursor wherever this category happens to sit, and stays there
 	// when the category later moves (it moves with it).
-	Object* object = makeObject(freshName(m_nextIndex, firstLetter()));
+	Object* object = makeObject(nextObjectName());
 	object->setParentItem(this);   // makeObject normally did this already; a custom one might not
 	object->setPos(mapFromScene(scenePos));
 	object->setZValue(1);   // above the category's fill
@@ -431,13 +596,20 @@ bool Category::nameInUse(const QString& name) const
 	return root->childItems().isEmpty() ? false : nameUsedUnder(root, name);
 }
 
-QString Category::freshName(int& counter, QChar first) const
+QString Category::freshName(int from, QChar first) const
 {
-	QString name = letterName(counter++, first);
-	// a handful of tries, then take it anyway rather than spin
-	for (int guard = 0; guard < 64 && nameInUse(name); ++guard)
-		name = letterName(counter++, first);
-	return name;
+	// The first name from `from` onwards that nobody is using - scanning
+	// rather than counting, and that is what lets a name come BACK. Place A,
+	// B, C, D and delete C, and the next object is C again, then E: the count
+	// is not a tally of how many objects there have ever been, it is a place
+	// to start looking from.
+	for (int at = qMax(0, from); at < from + 512; ++at)
+	{
+		const QString name = letterName(at, first);
+		if (!nameInUse(name))
+			return name;
+	}
+	return letterName(qMax(0, from), first);   // rather than spin for ever
 }
 
 // ---------------------------------------------------------------- exactness

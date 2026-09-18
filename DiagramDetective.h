@@ -87,6 +87,8 @@ private:
     QAction* m_selectAll = nullptr;
     QAction* m_deleteSelection = nullptr;
     QAction* m_startChase = nullptr;
+    // Help > Tutor mode: the tick follows the setting wherever it is changed
+    QAction* m_tutorMode = nullptr;
 
     PropertiesDock* m_properties = nullptr;
     CommutativeEquationsDock* m_equations = nullptr;

@@ -113,11 +113,13 @@ namespace
 
 			// how a functor maps, when it is one
 			auto* maps = dynamic_cast<MapsElements*>(arrow->prop(MapsElements::Key()));
-			out << quint8(maps != nullptr && maps->isLive() ? 1 : 0)
-			    << quint8(maps != nullptr && maps->imaginesPosition() ? 1 : 0)
-			    << quint8(maps != nullptr && maps->reflectsPosition() ? 1 : 0)
-			    << quint8(maps != nullptr && maps->imaginesBends() ? 1 : 0)
-			    << quint8(maps != nullptr && maps->reflectsBends() ? 1 : 0);
+			// The five bytes an older file kept one flag each for - live,
+			// positions each way, bends each way - are one answer now
+			// (MapsElements::mirrorsGeometry), written five times over so
+			// that the format does not move and an older build reading this
+			// file still gets something it understands.
+			const quint8 mirror = quint8(maps != nullptr && maps->mirrorsGeometry() ? 1 : 0);
+			out << mirror << mirror << mirror << mirror << mirror;
 			out << arrow->labelOffset();
 			out << quint8(maps != nullptr && maps->isContravariant() ? 1 : 0);
 			out << arrow->bends();   // the points its line is pulled through
@@ -774,12 +776,10 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		{
 			// first: it decides which images this mapping recognises as its own
 			maps->setMappingId(p.mappingId);
-			maps->setImaginesPosition(p.reflect != 0);
-			maps->setReflectsPosition(p.direction == 1);
 			maps->setContravariant(p.contravariant != 0);
-			maps->setImaginesBends(p.imagineBends != 0);
-			maps->setReflectsBends(p.reflectBends != 0);
-			maps->setLive(p.live != 0);
+			// an older file said this five ways; the first of them is the one
+			// that decided whether anything was kept in step at all
+			maps->setMirrorsGeometry(p.live != 0);
 		}
 	}
 

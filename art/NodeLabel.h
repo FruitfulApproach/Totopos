@@ -40,6 +40,19 @@ public:
 	void cancelEdit();   // put back what was there before
 	bool isEditing() const { return m_editing; }
 
+	// THE NODE IS GOING. STOP, AND SAY NOTHING BACK TO IT.
+	//
+	// A label is destroyed by its node, from inside ~Node - and a
+	// QGraphicsTextItem that has the keyboard gives the focus up as it is
+	// destroyed, which sends it a focusOutEvent, which commits the edit,
+	// which calls back into the node. By then the node is half destroyed:
+	// everything it IS beyond a bare Node has already been unmade, and the
+	// call lands on a vtable that no longer describes it (placeLabel,
+	// refreshFrame, and through them the scene's own index). Node's
+	// destructor calls this first, so the editor is shut down quietly and
+	// the label has nobody to report to.
+	void abandonEdit();
+
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;

@@ -361,6 +361,20 @@ QList<Node*> RuleMatcher::apply(const Rule& rule, const RuleMatch& match, Diagra
 	const QHash<QString, QString> bindings = match.bindings();
 	QHash<Node*, Node*> placed = match.objects;   // pattern -> diagram, growing as we draw
 
+	// ...AND THE ARROWS THE MATCH BOUND.
+	//
+	// A conclusion's label may be built out of premise ARROWS - a composite is
+	// named "%1%2" over the two it composes - and those names have to be looked
+	// up the same way an object's is. With only the objects in here, a
+	// composite's sources resolved to nothing, setDerivedLabel was skipped, and
+	// the arrow kept the name the RULE was written with: gf, whatever the two
+	// arrows it actually matched were called.
+	//
+	// The plain-name path cannot save it either: substituted() replaces whole
+	// names only, and in "gf" neither letter stands alone.
+	for (auto it = match.arrows.constBegin(); it != match.arrows.constEnd(); ++it)
+		placed.insert(it.key(), it.value());
+
 	// the conclusion's objects, parents first, each inside what its pattern
 	// parent stands for
 	for (Node* pattern : rule.conclusionObjects())

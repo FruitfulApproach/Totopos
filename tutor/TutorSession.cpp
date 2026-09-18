@@ -274,8 +274,33 @@ bool TutorSession::eventFilter(QObject* watched, QEvent* event)
 		}
 		return true;   // the scene never sees the press: nothing gets dragged or selected
 	}
-	case QEvent::GraphicsSceneMouseRelease:
 	case QEvent::GraphicsSceneMouseDoubleClick:
+	{
+		// On blank space inside a category, a tutor may make something there
+		// and go on with it. On anything else this is the second half of a
+		// click the press handler has already dealt with.
+		auto* me = static_cast<QGraphicsSceneMouseEvent*>(event);
+		if (me->button() != Qt::LeftButton)
+			return true;
+		QGraphicsItem* item = m_scene->hitItem(me->scenePos());
+		while (item != nullptr && dynamic_cast<Node*>(item) == nullptr)
+			item = item->parentItem();
+		auto* node = dynamic_cast<Node*>(item);
+		const bool blank = node == nullptr || dynamic_cast<Category*>(node) != nullptr;
+		if (blank)
+		{
+			if (Node* made = m_tutor->onPlace(*this, me->scenePos()))
+			{
+				if (m_tutor->onPick(*this, made))
+				{
+					m_picks.append(made);
+					addBadge(made);
+				}
+			}
+		}
+		return true;
+	}
+	case QEvent::GraphicsSceneMouseRelease:
 	case QEvent::GraphicsSceneContextMenu:
 		return true;
 	case QEvent::KeyPress:

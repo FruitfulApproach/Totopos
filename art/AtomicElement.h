@@ -8,8 +8,10 @@
 // exactly what an element is not. Nothing goes inside an element, so it is
 // the one node that ends the nesting.
 //
-// Drawn as its name with a small filled dot beside it, so an element can be
-// told from an object at a glance without reading the properties page.
+// Drawn as nothing but its name, centred like any other node. What tells it
+// from an object is not a mark of its own but where it IS - inside an object
+// rather than beside one - and what it offers when pointed at: + and - rather
+// than an arrow.
 class AtomicElement : public Object
 {
 	Q_OBJECT
@@ -17,14 +19,19 @@ class AtomicElement : public Object
 public:
 	explicit AtomicElement(const QString& id, QGraphicsItem* parent = nullptr);
 
-	// the dot lives to the left of the label, so the frame has to make room
-	QRectF boundingRect() const override;
-	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
-
 	// "Element x of M"
 	QString contextTitle() const override;
 
-	// how far to the left of the label the dot sits, and how big it is
-	static qreal dotSpan() { return 13.0; }
-	static qreal dotRadius() { return 3.0; }
+	// an arrow joins two OBJECTS; x in M is not one of them
+	bool canStartArrow() const override { return false; }
+
+protected:
+	// WHAT CAN BE DONE WITH AN ELEMENT, on the right button.
+	//
+	// These used to be little round buttons on the hover handle, which put
+	// them under the cursor at the cost of a row of icons standing over the
+	// diagram and no room for a third. They live here instead, beside
+	// everything else a node offers: x + y and x - y where the module is
+	// additive, and x = y wherever there are elements at all.
+	void populateActions(QMenu& menu) override;
 };

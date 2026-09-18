@@ -85,6 +85,12 @@ public:
 
 	// does this node hold any other node? (its label does not count)
 	bool holdsAnything() const;
+
+	// Can an arrow be drawn OUT of this? An arrow joins two objects, so an
+	// element - the one thing here that is not an object - says no, and the
+	// menu leaves the entry out rather than offering something that would be
+	// refused as soon as it was aimed.
+	virtual bool canStartArrow() const { return true; }
 	// where its label is drawn, in this node's own coordinates
 	QRectF labelRect() const;
 
@@ -270,6 +276,11 @@ signals:
 	void idChanged(Node* thisNode, const QString& id);
 	void deleted(Node* thisNode);
 	void moved(Node* thisNode, const QPointF& delta);
+	// the label was dragged clear of where it would otherwise sit, BY THIS
+	// MUCH. Only a drag: a label placed by the node itself, or by a mapping
+	// keeping two sides in step, says nothing - that is what stops two
+	// mirrored labels from answering each other for ever.
+	void labelDragged(Node* thisNode, const QPointF& delta);
 	void styleChanged(Node* thisNode);
 
 protected:
@@ -308,7 +319,13 @@ public:
 	// Typing over it here would be undone by the next sync, so the editor
 	// does not open on it at all - the label says so instead, with a lock.
 	// Rename the functor, or rename X.
-	bool labelIsLocked() const;
+	// Virtual: the ambient category's name is locked once anything is drawn
+	// in it, for its own reason (see Category::labelIsLocked).
+	virtual bool labelIsLocked() const;
+
+	// Why it is locked, in words, for the label's tooltip. Only asked when
+	// labelIsLocked() says yes.
+	virtual QString labelLockTip() const;
 
 	virtual bool labelIsMovable() const { return holdsAnything(); }
 	virtual void labelMoved(const QPointF& pos);

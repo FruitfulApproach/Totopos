@@ -21,11 +21,13 @@
 #include "widget/EnglishDock.h"
 #include "tutor/ProofTutor.h"
 #include "core/Emoji.h"
+#include "core/layout/GraphLayoutThread.h"
 #include "tutor/TutorSession.h"
 #include "tutor/Tutor.h"
 #include <QTimer>
 #include <QMenu>
 #include <QKeySequence>
+#include <QSignalBlocker>
 
 QString Document::title() const
 {
@@ -312,6 +314,22 @@ void DiagramDetective::buildMenus()
         }
     });
 
+    // One entry per layout algorithm, built from the list rather than written
+    // out, so a new GraphLayoutThread subclass appears here by being added to
+    // GraphLayouts::all() and nowhere else.
+    view->addSeparator();
+    QMenu* layout = view->addMenu("&Layout");
+    layout->setStatusTip("Tidy the diagram up.");
+    for (const GraphLayouts::Kind& kind : GraphLayouts::all())
+    {
+        QAction* action = layout->addAction(kind.title);
+        action->setStatusTip(QString("Lay the diagram out: %1.").arg(kind.title.toLower()));
+        const QString id = kind.id;
+        connect(action, &QAction::triggered, this, [this, id] {
+            if (DiagramScene* scene = currentScene()) scene->layOut(id);
+        });
+    }
+
     // Chase
     QMenu* chaseMenu = ui->menuBar->addMenu("&Chase");
     QAction* teachMe = chaseMenu->addAction(Emoji::teach() + "  &Teach me this proof");
@@ -340,6 +358,26 @@ void DiagramDetective::buildMenus()
     settings->setShortcut(QKeySequence("Ctrl+,"));
     settings->setIcon(Emoji::icon(Emoji::settings()));
     connect(settings, &QAction::triggered, this, &DiagramDetective::openSettings);
+
+    // Help > Tutor mode. It was a checkbox in the properties panel, sitting
+    // among questions about the category, which is not what it is about: it
+    // decides whether the guided actions EXPLAIN themselves, and that is a
+    // question about being helped, not about the diagram.
+    QMenu* help = ui->menuBar->addMenu("&Help");
+    m_tutorMode = help->addAction(Emoji::teach() + "  &Tutor mode");
+    m_tutorMode->setCheckable(true);
+    m_tutorMode->setChecked(Tutor::isEnabled());
+    m_tutorMode->setStatusTip("Guided actions explain each step with remarks and an arrow; off, they run quietly.");
+    connect(m_tutorMode, &QAction::toggled, this, [](bool on) {
+        AppSettings::instance().setValue(AppSettings::TutorEnabled, on);
+        AppSettings::instance().apply();
+    });
+    // and it follows the setting wherever else it is changed (Tools > Settings,
+    // the sketch panel), so the tick is never telling a different story
+    connect(&AppSettings::instance(), &AppSettings::changed, this, [this] {
+        const QSignalBlocker block(m_tutorMode);
+        m_tutorMode->setChecked(Tutor::isEnabled());
+    });
 }
 
 // ---------------------------------------------------------------- the documents

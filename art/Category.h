@@ -77,7 +77,7 @@ public:
 	virtual Arrow* createArrow(const QString& name, Node* from, Node* to);
 	// the same, named for you: f, g, h, ... (F, G, H in BigCat)
 	Arrow* createCanvasArrow(Node* from, Node* to);
-	QString nextArrowName() const { return letterName(m_nextArrowIndex, firstArrowLetter()); }
+	QString nextArrowName() const { return freshName(m_nextArrowIndex, firstArrowLetter()); }
 
 	// Is that label already taken anywhere in the diagram? A name means one
 	// thing here, so a fresh one steps over what is already spoken for -
@@ -85,19 +85,40 @@ public:
 	bool nameInUse(const QString& name) const;
 
 	// the name the next createCanvasObject will use
-	QString nextObjectName() const { return letterName(m_nextIndex, firstLetter()); }
+	QString nextObjectName() const { return freshName(m_nextIndex, firstLetter()); }
 	// how far the naming has got, so a diagram read from a file carries on
 	// where it left off instead of making a second C
 	int nextObjectIndex() const { return m_nextIndex; }
 	void setNextObjectIndex(int index) { m_nextIndex = index; }
 	int nextArrowIndex() const { return m_nextArrowIndex; }
 	void setNextArrowIndex(int index) { m_nextArrowIndex = index; }
-	static QString letterName(int index, QChar first = QChar('C'));
+	// index 0 is `first` itself; then round the alphabet `first` belongs to,
+	// gaining a prime each time round. From X: X, Y, Z, A, ..., W, X', Y'.
+	// Latin either case and Greek all work, so alpha' counts like B'.
+	static QString letterName(int index, QChar first = QChar('X'));
+	// The inverse, for a name that IS a plain variable - one letter and a run
+	// of primes, in the same alphabet as `first`. -1 for anything else: a
+	// word, a subscript, Hom(X,Y) - names a person chose rather than counted.
+	static int variableIndex(const QString& text, QChar first);
+
+	// A child of ours has just been given a name by hand. If it is a plain
+	// variable the counting starts again from there, so renaming X to S makes
+	// the next object T.
+	void noteNamed(const Node* child, const QString& name);
 
 	// Exactness of the diagram DRAWN IN HERE, asserted the way commuting is:
 	// at every object along a row, the image of the arrow coming in is the
 	// kernel of the arrow going out. Rows and columns are asserted separately
 	// - a diagram may have exact rows and say nothing about its columns.
+	// Is there such a thing as an exact sequence here?
+	//
+	// Exactness says that at each object along a row, the IMAGE of the arrow
+	// coming in is the KERNEL of the arrow going out. That needs a zero
+	// object, so there are zero morphisms to take a kernel of, and kernels to
+	// take. In Set or Top the words mean nothing at all, and a switch
+	// offering to assert them would be offering nonsense.
+	bool exactnessDefined() const;
+
 	bool rowsExact() const { return m_rowsExact; }
 	bool columnsExact() const { return m_columnsExact; }
 	void setRowsExact(bool exact);
@@ -124,6 +145,17 @@ public:
 	// is this the category everything else is drawn in?
 	bool isAmbient() const;
 
+	// THE AMBIENT CATEGORY'S NAME IS NOT A NAME LIKE ANY OTHER.
+	//
+	// Everything drawn on the canvas is an object or an arrow OF it, so once
+	// anything IS drawn the name has been committed to: retyping it here
+	// would silently reinterpret every object and arrow already on the
+	// canvas. That is exactly why the sketch panel's Category combo goes grey
+	// with a padlock (SketchView::setCategoryLocked); the label in the scene
+	// is the same choice by another face and locks with it.
+	bool labelIsLocked() const override;
+	QString labelLockTip() const override;
+
 	// The structure the category is known to have, as CategoryProp objects it
 	// owns (props/CategoryProps.h: HasProducts, IsAbelian, ...).
 	const QList<CategoryProp*>& props() const { return m_props; }
@@ -133,6 +165,23 @@ public:
 	void addProperty(const QString& key);
 	bool has(const QString& key) const;
 	template <typename P> bool has() const { return has(P::Key()); }
+
+	// ARE THIS CATEGORY'S OBJECTS SETS?
+	//
+	// A concrete category is one with a faithful functor to Set, which is to
+	// say its objects HAVE underlying sets - and that is exactly what it takes
+	// for "an element of X" to be a thing that can be named and drawn. R-Mod,
+	// Ab, Grp, Set, Vect all say yes; BigCat and Cat say no, because an object
+	// of theirs is a category, not a set.
+	//
+	// Virtual so a built-in that knows better can say so without carrying the
+	// property; by default it IS the property.
+	virtual bool objectsAreSets() const;
+
+	// a category always holds things, and what it holds are OBJECTS
+	bool canHoldNamedChildren() const override { return true; }
+	Object* createNamedChild(const QString& name, const QPointF& scenePos) override
+	{ return createObject(name, scenePos); }
 
 	// a category frames its objects with more room than a plain object gives its label
 	QRectF boxRect() const override { return contentFrame().adjusted(-9, -9, 9, 9); }
@@ -147,7 +196,11 @@ public:
 	// protected member through a pointer to another category.
 	virtual Object* makeObject(const QString& name);
 	// where the object names start
-	virtual QChar firstLetter() const { return QChar('C'); }
+	// X, because an object of a category is a set-like thing and X, Y, Z is
+	// what everyone writes. NOT related to the category's own name: a generic
+	// category called C would otherwise start its objects at D, purely
+	// because C had just been taken.
+	virtual QChar firstLetter() const { return QChar('X'); }
 	// where the arrow names start (lower case stays lower case)
 	virtual QChar firstArrowLetter() const { return QChar('f'); }
 
@@ -156,7 +209,8 @@ protected:
 	void populateActions(QMenu& menu) override;
 
 	// the next letter nothing has taken yet, advancing the counter past it
-	QString freshName(int& counter, QChar first) const;
+	// the first unused name at or after `from` in the run starting at `first`
+	QString freshName(int from, QChar first) const;
 
 public:
 	// What an arrow of this category is called: a functor in BigCat, an

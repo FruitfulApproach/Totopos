@@ -33,3 +33,8 @@ docs/
 /DiagramDetective/DiagramDetective/.vs
 /DiagramDetective/DiagramDetective/DiagramDetective/x64
 /.vs
+/DiagramDetective/x64
+*.tlog
+/DiagramDetective/x64
+/DiagramDetective/x64
+/DiagramDetective/x64

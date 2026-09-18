@@ -14,7 +14,6 @@ class QLineEdit;
 class QGroupBox;
 class QSpinBox;
 class QPushButton;
-class QListWidget;
 class QComboBox;
 class QCheckBox;
 class SketchView;
@@ -70,8 +69,7 @@ private:
 	// the two states of the commuting claim, named and explained
 	void refreshCommutesLabel(bool commutes);
 	// the pieces of the diagram, each with its own claim to commute
-	void refreshComponents();
-	void lightUp(const QList<Node*>& objects, const QList<Arrow*>& arrows, bool on);
+	// the commuting and exactness switches for the node that holds a diagram
 
 	DiagramScene* m_scene = nullptr;
 	SketchView* m_view = nullptr;
@@ -95,13 +93,11 @@ private:
 	// eight levels down, because they are the same kind of thing.
 	QGroupBox* m_categoryBox = nullptr;
 	QComboBox* m_categoryKind = nullptr;
-	QCheckBox* m_tutor = nullptr;
-	ToggleSwitch* m_commutes = nullptr;
-	QLabel* m_commutesLabel = nullptr;
+
 	QComboBox* m_statementKind = nullptr;
-	QLineEdit* m_statementName = nullptr;
-	QLabel* m_mode = nullptr;
-	QPushButton* m_chase = nullptr;
+
+
+
 	QLabel* m_subcategoryHint = nullptr;
 
 	QGroupBox* m_objectBox = nullptr;
@@ -110,24 +106,20 @@ private:
 	// what an arrow is asserted to be, cancellable on the left / the right
 	QGroupBox* m_arrowBox = nullptr;
 	ToggleSwitch* m_monic = nullptr;
+	ToggleSwitch* m_inclusion = nullptr;
 	ToggleSwitch* m_epic = nullptr;
 
 	// the diagram drawn INSIDE the selected node, when there is one
-	QGroupBox* m_insideBox = nullptr;
+
+	ToggleSwitch* m_commutes = nullptr;
+	QLabel* m_commutesLabel = nullptr;
 	ToggleSwitch* m_rowsExact = nullptr;
 	ToggleSwitch* m_columnsExact = nullptr;
 
-	QGroupBox* m_componentBox = nullptr;
-	QListWidget* m_components = nullptr;
-
 	QGroupBox* m_mappingBox = nullptr;
 	QLabel* m_mappingHint = nullptr;
-	ToggleSwitch* m_showImage = nullptr;
-	ToggleSwitch* m_live = nullptr;
-	ToggleSwitch* m_imagine = nullptr;
-	ToggleSwitch* m_reflect = nullptr;
+	// the whole mirror, in one switch (see MapsElements::mirrorsGeometry)
+	ToggleSwitch* m_mirror = nullptr;
 	ToggleSwitch* m_contravariant = nullptr;
-	ToggleSwitch* m_imagineBends = nullptr;
-	ToggleSwitch* m_reflectBends = nullptr;
 	QPushButton* m_mapNow = nullptr;
 };

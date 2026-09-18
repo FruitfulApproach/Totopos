@@ -41,79 +41,6 @@ namespace
 	// naming a category that already exists
 	const QString kCustom = QStringLiteral("Custom...");
 
-	// One line of the component list: what it is called, how big it is, and a
-	// switch saying whether it commutes. It lights the component up as the
-	// mouse passes over it, and a double-click takes the view there.
-	class ComponentRow : public QWidget
-	{
-	public:
-		ComponentRow(const QString& title, const QString& detail,
-		             bool commutes, bool rowsExact, bool columnsExact, QWidget* parent)
-			: QWidget(parent)
-		{
-			auto* layout = new QHBoxLayout(this);
-			layout->setContentsMargins(8, 5, 8, 5);
-			layout->setSpacing(8);
-
-			auto* name = new QLabel(title, this);
-			QFont bold = name->font();
-			bold.setBold(true);
-			name->setFont(bold);
-			name->setToolTip(title);
-			layout->addWidget(name);
-
-			auto* size = new QLabel(detail, this);
-			size->setEnabled(false);
-			layout->addWidget(size);
-			layout->addStretch();
-
-			// A connected piece IS a diagram, which is what these three are
-			// claims about. A lone object is not a diagram, which is why they
-			// are not to be found on one.
-			commutesSwitch = compactSwitch(commutes,
-				"Every path with the same two ends in this piece is the same arrow.");
-			rowsSwitch = compactSwitch(rowsExact,
-				"Every row of this piece is exact: at each object along it, the image of the arrow coming "
-				"in is the kernel of the arrow going out.");
-			columnsSwitch = compactSwitch(columnsExact,
-				"The same, down each column. Rows and columns are claimed separately.");
-			layout->addWidget(commutesSwitch);
-			layout->addWidget(rowsSwitch);
-			layout->addWidget(columnsSwitch);
-		}
-
-		ToggleSwitch* compactSwitch(bool on, const QString& tip)
-		{
-			auto* toggle = new ToggleSwitch(this);
-			toggle->setCompact(true);
-			toggle->setChecked(on);
-			toggle->setToolTip(tip);
-			return toggle;
-		}
-
-		ToggleSwitch* commutesSwitch = nullptr;
-		ToggleSwitch* rowsSwitch = nullptr;
-		ToggleSwitch* columnsSwitch = nullptr;
-		std::function<void(bool)> onHover;
-		std::function<void()> onActivate;
-
-	protected:
-		void enterEvent(QEnterEvent* event) override
-		{
-			QWidget::enterEvent(event);
-			if (onHover) onHover(true);
-		}
-		void leaveEvent(QEvent* event) override
-		{
-			QWidget::leaveEvent(event);
-			if (onHover) onHover(false);
-		}
-		void mouseDoubleClickEvent(QMouseEvent* event) override
-		{
-			QWidget::mouseDoubleClickEvent(event);
-			if (onActivate) onActivate();
-		}
-	};
 }
 
 PropertiesDock::PropertiesDock(QWidget* parent)
@@ -191,7 +118,7 @@ void PropertiesDock::build()
 	// only ever be about the whole picture. They belong to a category, and
 	// the canvas is simply the outermost one - so a subcategory of R-Mod
 	// drawn four levels down is asked exactly the same questions.
-	m_categoryBox = new QGroupBox("Category", body);
+	m_categoryBox = new QGroupBox("Diagram", body);
 	auto* categoryForm = new QFormLayout(m_categoryBox);
 
 	m_categoryKind = new QComboBox(m_categoryBox);
@@ -213,31 +140,6 @@ void PropertiesDock::build()
 	m_subcategoryHint->setEnabled(false);
 	categoryForm->addRow(QString(), m_subcategoryHint);
 
-	// tutor mode: guided interactions coach with remarks and an arrow; off,
-	// they run quietly. App-wide, and shown here because it is what decides
-	// how everything you do in this category behaves.
-	m_tutor = new QCheckBox("Tutor mode", m_categoryBox);
-	m_tutor->setToolTip("Guided actions (Define a product...) explain each step with remarks and an arrow. "
-	                    "Untick to run them quietly. This is the same setting as the one on the sketch "
-	                    "panel and in Tools > Settings.");
-	connect(m_tutor, &QCheckBox::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		AppSettings::instance().setValue(AppSettings::TutorEnabled, on);
-		AppSettings::instance().apply();
-	});
-	categoryForm->addRow(QString(), m_tutor);
-
-	m_commutesLabel = new QLabel(m_categoryBox);
-	m_commutes = new ToggleSwitch(m_categoryBox);
-	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
-		refreshCommutesLabel(on);
-		if (m_updating) return;
-		if (Category* category = pageCategory())
-			category->setCommutes(on);
-	});
-	categoryForm->addRow(m_commutesLabel, m_commutes);
-	refreshCommutesLabel(false);
-
 	m_statementKind = new QComboBox(m_categoryBox);
 	m_statementKind->addItems(DiagramScene::kindNames());
 	m_statementKind->setToolTip("The picture says the same thing either way; what changes is what saying "
@@ -250,30 +152,45 @@ void PropertiesDock::build()
 	});
 	categoryForm->addRow("This is", m_statementKind);
 
-	m_statementName = new QLineEdit(m_categoryBox);
-	m_statementName->setPlaceholderText("Additive identity exists");
-	m_statementName->setToolTip("What to call it, so it can be referred to from elsewhere.");
-	connect(m_statementName, &QLineEdit::editingFinished, this, [this] {
+	// ---- AND WHAT THE DIAGRAM DRAWN IN IT CLAIMS, in the same box.
+	//
+	// These were a second group of their own, headed "The diagram in BigCat"
+	// while the one above it said "The whole diagram, drawn in BigCat" - two
+	// frames, two headings, one subject. A category and the diagram drawn in
+	// it are not two things to be asked about separately, so they are one
+	// group now, and the rows below appear only once there IS a diagram.
+	// Commuting belongs beside the two exactness switches, and for the same
+	// reason: all three are claims about a DIAGRAM, and a diagram is what a
+	// node holds. It used to sit in the category box and speak for the whole
+	// page, which left a nested category with no way to say that the diagram
+	// drawn inside IT commutes. Each parent now answers for its own.
+	m_commutesLabel = new QLabel(m_categoryBox);
+	m_commutes = new ToggleSwitch(m_categoryBox);
+	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
+		refreshCommutesLabel(on);
 		if (m_updating) return;
-		if (Category* category = pageCategory())
-			category->setStatementName(m_statementName->text().trimmed());
+		// pageCategory, not the selection: with nothing selected the page is
+		// about the ambient category, and the switch has to write there too
+		if (Category* home = pageCategory())
+			home->setCommutes(on);
 	});
-	categoryForm->addRow("Called", m_statementName);
-
-	m_mode = new QLabel("Let", m_categoryBox);
-	QFont modeFont = m_mode->font();
-	modeFont.setBold(true);
-	m_mode->setFont(modeFont);
-	m_mode->setToolTip("A let is what you are given. A chase forces anything you add into the hypotheses "
-	                   "of the statement. The chase belongs to the whole diagram, not to one category.");
-	categoryForm->addRow("Mode", m_mode);
-
-	m_chase = new QPushButton("Start diagram chase", m_categoryBox);
-	connect(m_chase, &QPushButton::clicked, this, [this] {
-		if (m_scene != nullptr)
-			m_scene->toggleChase();
+	categoryForm->addRow(m_commutesLabel, m_commutes);
+	refreshCommutesLabel(false);
+	m_rowsExact = new ToggleSwitch(m_categoryBox);
+	m_rowsExact->setToolTip("Every row of the diagram drawn in here is an exact sequence: at each object "
+	                        "along it, the image of the arrow coming in is the kernel of the arrow going out.");
+	connect(m_rowsExact, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Category* home = pageCategory()) home->setRowsExactRecorded(on);
 	});
-	categoryForm->addRow(QString(), m_chase);
+	categoryForm->addRow("Rows exact", m_rowsExact);
+	m_columnsExact = new ToggleSwitch(m_categoryBox);
+	m_columnsExact->setToolTip("The same, down each column. Rows and columns are claimed separately.");
+	connect(m_columnsExact, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Category* home = pageCategory()) home->setColumnsExactRecorded(on);
+	});
+	categoryForm->addRow("Columns exact", m_columnsExact);
 	layout->addWidget(m_categoryBox);
 
 	// ---- what an object has
@@ -302,6 +219,21 @@ void PropertiesDock::build()
 		if (Arrow* arrow = soleArrow()) arrow->setMonicRecorded(on);
 	});
 	arrowForm->addRow("Monomorphism", m_monic);
+
+	// The narrower claim, under the one it narrows. An inclusion IS a
+	// monomorphism, so turning this on turns that on with it and greys it:
+	// there is no such thing as an inclusion that is not monic, and a switch
+	// that could say otherwise would only invite it.
+	m_inclusion = new ToggleSwitch(m_arrowBox);
+	m_inclusion->setToolTip("Takes a part of something into the whole of it, carrying x to x - "
+	                        "the inclusion of a submodule, a subgroup, a subspace. Every inclusion "
+	                        "is a monomorphism; this one is drawn with a hooked tail.");
+	connect(m_inclusion, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (Arrow* arrow = soleArrow()) arrow->setInclusionRecorded(on);
+	});
+	arrowForm->addRow("Inclusion", m_inclusion);
+
 	m_epic = new ToggleSwitch(m_arrowBox);
 	m_epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
 	                           "Drawn with a doubled head, the way a quotient usually is.").arg(to, ring));
@@ -312,50 +244,6 @@ void PropertiesDock::build()
 	arrowForm->addRow("Epimorphism", m_epic);
 	layout->addWidget(m_arrowBox);
 
-	// ---- the diagram drawn inside the selected node. Exactness is a claim
-	// about a diagram, so it belongs to whatever HOLDS one: not to an object
-	// with nothing in it, but to any node with a diagram drawn inside.
-	m_insideBox = new QGroupBox("Inside", body);
-	auto* insideForm = new QFormLayout(m_insideBox);
-	m_rowsExact = new ToggleSwitch(m_insideBox);
-	m_rowsExact->setToolTip("Every row of the diagram drawn in here is an exact sequence: at each object "
-	                        "along it, the image of the arrow coming in is the kernel of the arrow going out.");
-	connect(m_rowsExact, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (Category* home = soleDiagramHome()) home->setRowsExactRecorded(on);
-	});
-	insideForm->addRow("Rows exact", m_rowsExact);
-	m_columnsExact = new ToggleSwitch(m_insideBox);
-	m_columnsExact->setToolTip("The same, down each column. Rows and columns are claimed separately.");
-	connect(m_columnsExact, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (Category* home = soleDiagramHome()) home->setColumnsExactRecorded(on);
-	});
-	insideForm->addRow("Columns exact", m_columnsExact);
-	layout->addWidget(m_insideBox);
-
-	// ---- the pieces the diagram falls into
-	m_componentBox = new QGroupBox("Components", body);
-	auto* componentLayout = new QVBoxLayout(m_componentBox);
-	componentLayout->setContentsMargins(6, 6, 6, 6);
-	auto* componentHint = new QLabel("Each piece of the diagram that hangs together. Hover to pick it out, "
-	                                 "double-click to go there.", m_componentBox);
-	componentHint->setWordWrap(true);
-	componentHint->setEnabled(false);
-	componentLayout->addWidget(componentHint);
-	// what the three switches on each row are
-	auto* captions = new QLabel("commutes   rows   cols", m_componentBox);
-	captions->setEnabled(false);
-	captions->setAlignment(Qt::AlignRight);
-	componentLayout->addWidget(captions);
-
-	m_components = new QListWidget(m_componentBox);
-	m_components->setAlternatingRowColors(true);
-	m_components->setSelectionMode(QAbstractItemView::NoSelection);
-	m_components->setMinimumHeight(120);
-	componentLayout->addWidget(m_components);
-	layout->addWidget(m_componentBox);
-
 	// ---- what an arrow does to what is drawn in its domain
 	m_mappingBox = new QGroupBox("Mapping", body);
 	auto* mappingForm = new QFormLayout(m_mappingBox);
@@ -365,58 +253,25 @@ void PropertiesDock::build()
 	m_mappingHint->setEnabled(false);
 	mappingForm->addRow(m_mappingHint);
 
-	m_showImage = new ToggleSwitch(m_mappingBox);
-	m_showImage->setToolTip("Put the image away without giving it up: the nodes are hidden, and whatever is "
-	                        "drawn inside them comes back with them. Double-clicking the arrow does the same.");
-	connect(m_showImage, &QAbstractButton::toggled, this, [this](bool on) {
+	// ONE SWITCH, not eight. Showing the image, keeping it live, carrying
+	// object moves, bend points and label placements across - each way round -
+	// were separate toggles, and nobody wanted half of a mirror: the useful
+	// answers were all-on and all-off, and everything between read as a bug.
+	m_mirror = new ToggleSwitch(m_mappingBox);
+	connect(m_mirror, &QAbstractButton::toggled, this, [this](bool on) {
 		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setImagesVisible(on);
+		if (MapsElements* maps = soleMapping()) maps->setMirrorsGeometry(on);
 	});
-	mappingForm->addRow("Show the image", m_showImage);
+	mappingForm->addRow("Mirror geometry changes", m_mirror);
 
-	m_live = new ToggleSwitch(m_mappingBox);
-	m_live->setToolTip("Keep the codomain in step with the domain: whatever is drawn or deleted there "
-	                   "appears or goes here at once.");
-	connect(m_live, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setLive(on);
-	});
-	mappingForm->addRow("Live", m_live);
-
-	m_imagine = new ToggleSwitch(m_mappingBox);
-	connect(m_imagine, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setImaginesPosition(on);
-	});
-	mappingForm->addRow("Imagine position changes", m_imagine);
-
-	m_reflect = new ToggleSwitch(m_mappingBox);
-	connect(m_reflect, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setReflectsPosition(on);
-	});
-	mappingForm->addRow("Reflect position changes", m_reflect);
-
+	// Contravariance is NOT part of the mirror: which way the image arrows run
+	// is what the mapping MEANS, not how its two sides are kept in step.
 	m_contravariant = new ToggleSwitch(m_mappingBox);
 	connect(m_contravariant, &QAbstractButton::toggled, this, [this](bool on) {
 		if (m_updating) return;
 		if (MapsElements* maps = soleMapping()) maps->setContravariant(on);
 	});
 	mappingForm->addRow("Contravariant", m_contravariant);
-
-	m_imagineBends = new ToggleSwitch(m_mappingBox);
-	connect(m_imagineBends, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setImaginesBends(on);
-	});
-	mappingForm->addRow("Imagine bend points", m_imagineBends);
-
-	m_reflectBends = new ToggleSwitch(m_mappingBox);
-	connect(m_reflectBends, &QAbstractButton::toggled, this, [this](bool on) {
-		if (m_updating) return;
-		if (MapsElements* maps = soleMapping()) maps->setReflectsBends(on);
-	});
-	mappingForm->addRow("Reflect bend points", m_reflectBends);
 
 	m_mapNow = new QPushButton("Map the elements now", m_mappingBox);
 	m_mapNow->setToolTip("Draw the image of the domain once, without keeping it live.");
@@ -545,12 +400,11 @@ void PropertiesDock::refresh()
 		m_objectBox->hide();
 		m_arrowBox->hide();
 		m_mappingBox->hide();
-		m_insideBox->hide();
 
 		// nothing picked out is a question about the whole picture, and the
-		// whole picture is the category everything is drawn in
+		// whole picture is the category everything is drawn in - which is a
+		// parent node like any other, and answers for the diagram it holds
 		refreshCategoryBox(ambient);
-		refreshComponents();
 		m_updating = false;
 		return;
 	}
@@ -562,14 +416,11 @@ void PropertiesDock::refresh()
 		m_objectBox->hide();
 		m_arrowBox->hide();
 		m_mappingBox->hide();
-		m_insideBox->hide();
 		m_categoryBox->hide();
-		m_componentBox->hide();
 		m_updating = false;
 		return;
 	}
 	m_hint->hide();
-	m_componentBox->hide();
 
 	if (nodes.size() == 1)
 	{
@@ -643,19 +494,14 @@ void PropertiesDock::refresh()
 	if (soleA != nullptr)
 	{
 		m_monic->setChecked(soleA->isMonic());
+		m_inclusion->setChecked(soleA->isInclusion());
+		// an inclusion is monic whatever the switch says, so the switch stops
+		// being something that can be argued with
+		m_monic->setEnabled(!soleA->isInclusion());
 		m_epic->setChecked(soleA->isEpic());
 	}
 
 	refreshCategoryBox(soleCategory());
-
-	Category* home = soleDiagramHome();
-	m_insideBox->setVisible(home != nullptr);
-	if (home != nullptr)
-	{
-		m_insideBox->setTitle(QString("The diagram in %1").arg(home->id()));
-		m_rowsExact->setChecked(home->rowsExact());
-		m_columnsExact->setChecked(home->columnsExact());
-	}
 
 	MapsElements* maps = soleMapping();
 	m_mappingBox->setVisible(maps != nullptr);
@@ -666,10 +512,16 @@ void PropertiesDock::refresh()
 		const QString to = QString(QChar(0x2192));
 		m_mappingBox->setTitle(QString("Mapping  %1 %2 %3").arg(dom, to, cod));
 		m_mappingHint->setText(QString("What is drawn in %1 appears in %2.").arg(dom, cod));
-		m_showImage->setChecked(maps->imagesVisible());
-		m_live->setChecked(maps->isLive());
-		m_imagine->setChecked(maps->imaginesPosition());
-		m_reflect->setChecked(maps->reflectsPosition());
+		m_mirror->setChecked(maps->mirrorsGeometry());
+		m_mirror->setToolTip(QString(
+			"Keep %1 and %2 in step, both ways round.\n\n"
+			"The image is on show and follows whatever is drawn or deleted in %1. Moving an object, "
+			"bending an arrow, or dragging a label clear of its node moves the matching one on the "
+			"far side BY THE SAME AMOUNT (%1 %3 %2, and %2 %3 %1) - each side keeps the arrangement "
+			"you gave it and simply travels with the other. Whichever one you drag leads, and the "
+			"other follows without answering back.\n\n"
+			"Off, the image is put away - hidden, not given up: whatever is drawn inside it comes "
+			"back untouched when this goes on again.").arg(dom, cod, to));
 		m_contravariant->setChecked(maps->isContravariant());
 		m_contravariant->setToolTip(QString(
 			"The image arrows run the other way: the image of f : X %1 Y goes from the image of Y to the "
@@ -680,30 +532,21 @@ void PropertiesDock::refresh()
 			.arg(to,
 			     MapsElements::formula(maps->arrow() != nullptr ? maps->arrow()->id() : QStringLiteral("H(.,D)")),
 			     MapsElements::applied(maps->arrow() != nullptr ? maps->arrow()->id() : QStringLiteral("H(.,D)"), "A")));
-		m_imagineBends->setChecked(maps->imaginesBends());
-		m_reflectBends->setChecked(maps->reflectsBends());
-		m_imagineBends->setToolTip(QString("An arrow bent in %1 is bent the same way in %2: the same number "
-		                                   "of control points, in the same places (%1 %3 %2).").arg(dom, cod, to));
-		m_reflectBends->setToolTip(QString("Bending an image arrow in %2 bends what it is the image of, back "
-		                                   "in %1 (%2 %3 %1).").arg(dom, cod, to));
-		m_imagine->setToolTip(QString("Moving an object in %1 moves its image in %2 BY THE SAME AMOUNT "
-		                              "(%1 %3 %2). Each still sits where you put it - the image travels with "
-		                              "the object rather than being pinned to it.").arg(dom, cod, to));
-		m_reflect->setToolTip(QString("Dragging an image in %2 moves what it is the image of, back in %1, by "
-		                              "the same amount (%2 %3 %1). With both on, whichever one you drag leads "
-		                              "and the other follows - neither answers the other back.").arg(dom, cod, to));
 	}
 
 	m_updating = false;
 }
 
-void PropertiesDock::applyId(const QString& id)
+void PropertiesDock::applyId(const QString& raw)
 {
 	if (m_updating)
 		return;
 	const QList<Node*> nodes = selection();
-	// as typed: the subscripts are put on when the label is drawn, not stored
-	const QString written = id;
+	// the same correction the label editor does, so it makes no difference
+	// which of the two the name was typed into
+	const QString written = Notation::autoCorrect(raw);
+	if (written != raw && m_id != nullptr)
+		m_id->setText(written);   // and show what was actually taken
 	if (nodes.size() != 1 || nodes.first()->id() == written)
 		return;
 	Node* node = nodes.first();
@@ -826,10 +669,7 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 	if (category == nullptr)
 		return;
 
-	const bool ambient = category->isAmbient();
-	m_categoryBox->setTitle(ambient
-		? QString("The whole diagram, drawn in %1").arg(category->id())
-		: QString("The category %1").arg(category->id()));
+	m_categoryBox->setTitle(QString("Diagram in %1").arg(category->id()));
 
 	// which category it is. A built-in answers with its own name; one the
 	// user defined is not in the list, so its label goes in before Custom...
@@ -845,6 +685,24 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 			m_categoryKind->insertItem(index, kind);
 		}
 		m_categoryKind->setCurrentIndex(index);
+
+		// SETTLED ONCE ANYTHING IS DRAWN IN IT.
+		//
+		// Everything inside a category is an object or an arrow OF it, and
+		// would mean something else - or nothing - in another. An R-module is
+		// not a group is not a topological space, so the kind can be chosen
+		// while the category is empty and not afterwards.
+		const bool settled = category->holdsAnything();
+		m_categoryKind->setEnabled(!settled);
+		const QIcon lock = settled ? Emoji::icon(Emoji::locked()) : QIcon();
+		for (int i = 0; i < m_categoryKind->count(); ++i)
+			m_categoryKind->setItemIcon(i, i == index ? lock : QIcon());
+		m_categoryKind->setToolTip(settled
+			? QString("%1 already holds something, so what kind of category it is has settled: "
+			          "what is drawn in it would mean something else in another kind. Empty it, "
+			          "or start again, to choose differently.").arg(category->id())
+			: QStringLiteral("Which category this is. It can be chosen while the category is "
+			                 "still empty."));
 	}
 
 	if (category->isSubcategory())
@@ -863,24 +721,26 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 		m_subcategoryHint->show();
 	}
 
-	m_tutor->setChecked(Tutor::isEnabled());
+	m_statementKind->setCurrentIndex(category->statementKind());
 
+	// WHAT THE DIAGRAM IN HERE CLAIMS - only once there is one.
+	//
+	// Commuting, and the two exactness claims, are about a DIAGRAM, and an
+	// empty category holds none: there is nothing there to commute. Exactness
+	// asks about images and kernels, which is not a question in Set or Top, so
+	// those two go as well where the category cannot answer them.
+	const bool drawn = category->holdsAnything();
+	const bool exact = drawn && category->exactnessDefined();
 	m_commutes->setChecked(category->commutes());
 	refreshCommutesLabel(category->commutes());
-
-	m_statementKind->setCurrentIndex(category->statementKind());
-	if (m_statementName->text() != category->statementName())
-		m_statementName->setText(category->statementName());
-
-	// the chase is the whole diagram's mode, so it reads the same on every
-	// category's page
-	const bool chasing = m_scene != nullptr && m_scene->isChasing();
-	m_mode->setText(chasing ? "Chasing" : "Let");
-	m_chase->setText(chasing ? "End the chase" : "Start diagram chase");
-	m_chase->setToolTip(chasing
-		? "Go back to a let: the diagram is what you are given again, and adding to it assumes nothing."
-		: "Start the diagram chase (Ctrl+Shift+Enter): from then on anything you draw is forced into "
-		  "the hypotheses of the statement.");
+	m_rowsExact->setChecked(category->rowsExact());
+	m_columnsExact->setChecked(category->columnsExact());
+	if (auto* form = qobject_cast<QFormLayout*>(m_categoryBox->layout()))
+	{
+		form->setRowVisible(m_commutes, drawn);
+		form->setRowVisible(m_rowsExact, exact);
+		form->setRowVisible(m_columnsExact, exact);
+	}
 }
 
 void PropertiesDock::applyExistsSuch(bool on)
@@ -917,74 +777,3 @@ void PropertiesDock::applyRounding(int radius)
 	}
 }
 
-void PropertiesDock::refreshComponents()
-{
-	m_components->clear();
-	m_componentBox->show();
-	if (m_scene == nullptr)
-		return;
-
-	const QList<DiagramScene::Component> pieces = m_scene->components();
-	m_componentBox->setTitle(pieces.size() == 1
-		? QStringLiteral("Components  (1)")
-		: QString("Components  (%1)").arg(pieces.size()));
-
-	for (const DiagramScene::Component& piece : pieces)
-	{
-		const QString detail = QString("%1 object%2, %3 arrow%4")
-			.arg(piece.objects.size()).arg(piece.objects.size() == 1 ? "" : "s")
-			.arg(piece.arrows.size()).arg(piece.arrows.size() == 1 ? "" : "s");
-
-		auto* item = new QListWidgetItem(m_components);
-		auto* row = new ComponentRow(piece.title, detail, piece.commutes,
-		                             piece.rowsExact, piece.columnsExact, m_components);
-
-		// hovering it picks it out of the diagram; double-clicking goes there
-		const QList<Node*> objects = piece.objects;
-		const QList<Arrow*> arrows = piece.arrows;
-		const QRectF bounds = piece.bounds;
-		row->onHover = [this, objects, arrows](bool on) { lightUp(objects, arrows, on); };
-		row->onActivate = [this, bounds] {
-			if (m_view != nullptr)
-				m_view->fitTo(bounds);
-		};
-		// A piece has no memory of its own - it is worked out from the arrows
-		// every time - so each claim is written onto its members.
-		auto claim = [this, objects, arrows](void (Node::*set)(bool), bool on, bool recheck) {
-			if (m_updating)
-				return;
-			for (Node* node : objects)
-				(node->*set)(on);
-			for (Arrow* arrow : arrows)
-				(arrow->*set)(on);
-			if (m_scene != nullptr)
-			{
-				if (recheck)
-					m_scene->checkDiagram();   // a ring here may just have started, or stopped, mattering
-				emit m_scene->statementChanged(m_scene->statementText());
-			}
-		};
-		connect(row->commutesSwitch, &QAbstractButton::toggled, this, [claim](bool on) {
-			claim(&Node::setCommutesInComponent, on, true);
-		});
-		connect(row->rowsSwitch, &QAbstractButton::toggled, this, [claim](bool on) {
-			claim(&Node::setRowsExactInComponent, on, false);
-		});
-		connect(row->columnsSwitch, &QAbstractButton::toggled, this, [claim](bool on) {
-			claim(&Node::setColumnsExactInComponent, on, false);
-		});
-
-		item->setSizeHint(row->sizeHint());
-		m_components->setItemWidget(item, row);
-	}
-}
-
-void PropertiesDock::lightUp(const QList<Node*>& objects, const QList<Arrow*>& arrows, bool on)
-{
-	for (Node* node : objects)
-		if (node != nullptr)
-			node->setHighlight(on);
-	for (Arrow* arrow : arrows)
-		if (arrow != nullptr)
-			arrow->setHighlight(on);
-}

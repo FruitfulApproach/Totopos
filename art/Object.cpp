@@ -1,5 +1,9 @@
 ﻿#include "art/Object.h"
 #include "art/Category.h"
+#include "art/AtomicElement.h"
+#include "core/Emoji.h"
+#include <QMenu>
+#include <QAction>
 #include "art/DiagramScene.h"
 #include <QGraphicsSceneMouseEvent>
 
@@ -29,7 +33,12 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 
 QRectF Object::boxRect() const
 {
-	const QRectF box = contentFrame().adjusted(-2.5, -2.5, 2.5, 2.5);
+	// A node that HOLDS something is a frame round what it holds, and wants
+	// air between the frame and its contents. A node that holds nothing is
+	// its label and nothing else - a module called M is the letter M - so it
+	// gets barely any: the border, where one is drawn at all, sits close in.
+	const qreal air = containedCount() == 0 ? 0.5 : 2.5;
+	const QRectF box = contentFrame().adjusted(-air, -air, air, air);
 
 	// A SINGLE LETTER IS DRAWN IN A SQUARE. A glyph's rect is taller than it
 	// is wide, so O, X, M and the rest each came out as a narrow upright
@@ -136,8 +145,109 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 }
 
 
+bool Object::holdsElements() const
+{
+	// nothing goes inside an element: it is the one node that ends the nesting
+	if (dynamic_cast<const AtomicElement*>(this) != nullptr)
+		return false;
+	Category* home = surroundingCategory();
+	return home != nullptr && home->objectsAreSets();
+}
+
+QString Object::nextElementName() const
+{
+	// x, y, z, then a, b, ..., w, then round again with a prime. Skips
+	// whatever is already in here, so deleting y and adding one gives y back
+	// rather than a fourth name nobody asked for.
+	for (int at = m_nextElementIndex; at < m_nextElementIndex + 400; ++at)
+	{
+		const QString name = Category::letterName(at, QLatin1Char('x'));
+		bool taken = false;
+		for (QGraphicsItem* child : childItems())
+			if (auto* node = dynamic_cast<Node*>(child); node != nullptr && node->id() == name)
+			{
+				taken = true;
+				break;
+			}
+		if (!taken)
+			return name;
+	}
+	return Category::letterName(m_nextElementIndex, QLatin1Char('x'));
+}
+
+void Object::noteElementNamed(const QString& name)
+{
+	const int at = Category::variableIndex(name, QLatin1Char('x'));
+	if (at >= 0)
+		m_nextElementIndex = at;   // from there, not after it: see Category::noteNamed
+}
+
+Object* Object::createNamedChild(const QString& name, const QPointF& scenePos)
+{
+	return canHoldNamedChildren() ? createElement(name, scenePos) : nullptr;
+}
+
+AtomicElement* Object::createElement(const QPointF& scenePos)
+{
+	return createElement(nextElementName(), scenePos);
+}
+
+AtomicElement* Object::createElement(const QString& name, const QPointF& scenePos)
+{
+	prepareGeometryChange();   // our frame is the union of what we hold
+	auto* made = new AtomicElement(name, this);
+	made->setPos(mapFromScene(scenePos));
+	made->setZValue(1);
+	made->refreshDepthAppearance();
+	made->refreshFrame();   // it is whole now: our frame can grow to hold it
+	return made;
+}
+
+void Object::addElementAction(QMenu& menu, const QPointF& atScene)
+{
+	auto* diagram = diagramOf(this);
+	Category* home = surroundingCategory();
+	if (diagram == nullptr || home == nullptr)
+		return;
+
+	QAction* add = menu.addAction(QString("%1  Add element").arg(Emoji::add()));
+	add->setToolTip(QString("Name an element of %1. The objects of %2 have underlying sets, so an "
+	                        "element of one is something that can be drawn and carried across an "
+	                        "arrow.").arg(id(), home->id()));
+	Object* self = this;
+	QObject::connect(add, &QAction::triggered, diagram, [diagram, self, atScene] {
+		// queued: the menu is still closing, and this puts a node in the scene
+		QMetaObject::invokeMethod(diagram, [diagram, self, atScene] {
+			if (AtomicElement* made = self->createElement(atScene))
+				diagram->recordCreation(
+					QString("Put %1 in %2").arg(made->id(), self->id()), { made });
+		}, Qt::QueuedConnection);
+	});
+	menu.addSeparator();
+}
+
 void Object::populateActions(QMenu& menu)
 {
+	// An object of a concrete category has an underlying SET, so the thing to
+	// put in it is an ELEMENT, drawn inside it. Elsewhere - an object of
+	// BigCat, say - there is no such thing, and what the menu can offer is
+	// another object beside this one.
+	if (holdsElements())
+	{
+		addElementAction(menu, mapToScene(contextPos()));
+		return;
+	}
+
+	// An element holds nothing itself, but what it IS one of can hold more:
+	// the entry offers a sibling element, put where the menu was opened.
+	if (dynamic_cast<AtomicElement*>(this) != nullptr)
+	{
+		if (auto* owner = dynamic_cast<Object*>(parentItem());
+		    owner != nullptr && owner->holdsElements())
+			owner->addElementAction(menu, mapToScene(contextPos()));
+		return;
+	}
+
 	addObjectAction(menu, surroundingCategory());
 }
 

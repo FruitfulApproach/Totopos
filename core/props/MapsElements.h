@@ -4,6 +4,7 @@
 #include "core/props/ArrowProp.h"
 
 class Category;
+class Object;
 class Node;
 
 // A functor F : C -> D maps what is drawn in C into D: an object X becomes
@@ -28,6 +29,13 @@ public:
 		ImageSourceKey  = 2,   // the KEY (Node::key) of the node it is the image of - never its label
 		MappingIdKey    = 3,   // on an ARROW: the identity of its own mapping
 		ImageMappingKey = 4,   // on an IMAGE: the mapping that drew it
+		// ON THE WAY OUT. An image is taken away with deleteLater rather than
+		// destroyed where it stands (see deleteAll), so for one turn of the
+		// event loop it is still a child of the codomain. This says not to
+		// look at it: without it the very next sync would find it, take it for
+		// an image that is still wanted, and hand back a node that is about to
+		// cease to exist.
+		DoomedKey = 5,
 	};
 
 	explicit MapsElements(Arrow* arrow = nullptr);
@@ -56,30 +64,35 @@ public:
 	// draw the image of the domain's diagram inside the codomain, once
 	int mapDiagram();
 
-	// Keep the image in step from now on. Turning this on brings D up to date
-	// at once and then follows every change in C.
-	bool isLive() const { return m_live; }
-	void setLive(bool live);
-
-	// Moving an object moves its image BY THE SAME AMOUNT: domain -> codomain.
-	// Deltas, not places - so an object and its image can each be arranged
-	// where you want them, and the image still travels with the object.
-	// This is what a drawn functor usually wants, so it is on.
-	bool imaginesPosition() const { return m_imaginesPosition; }
-	void setImaginesPosition(bool imagines);
-
-	// And the other way: dragging an image moves what it is the image of,
-	// codomain -> domain. Off, because it is the surprising direction.
+	// ONE SWITCH FOR THE WHOLE MIRROR.
 	//
-	// Both at once is a ring - each move would answer the other - so every
-	// position written by this property is written with m_syncing held, and
-	// nothing is written that is already where it should be.
-	bool reflectsPosition() const { return m_reflectsPosition; }
-	void setReflectsPosition(bool reflects);
+	// A drawn mapping either keeps its two sides in step or it does not, and
+	// in practice nobody wants half of that: an image that follows what it is
+	// the image of but not the other way round, or that carries a bend across
+	// but not the move that went with it, reads as a bug rather than as a
+	// setting. So the eight things this used to ask separately - show the
+	// image, stay live, carry object moves each way, carry bend points each
+	// way, carry label placements each way - are one answer:
+	//
+	//   * the image is on show, and kept in step with the domain;
+	//   * moving an object moves its image BY THE SAME AMOUNT, and dragging
+	//     an image moves what it is the image of, by the same amount;
+	//   * bending an arrow bends its image, either way round;
+	//   * dragging a LABEL clear of its node moves the corresponding label on
+	//     the other side by the same amount, either way round.
+	//
+	// Deltas throughout, never places, so each side keeps the arrangement it
+	// was given and simply travels with the other. Both directions at once
+	// would be a ring - each move answering the other - so every position
+	// this property writes is written with m_syncing held, and nothing is
+	// written that is already where it should be.
+	//
+	// On for a freshly placed mapping: this is what a drawn functor wants.
+	// Contravariance is NOT part of it - which way the image arrows run is
+	// what the mapping means, not how it is kept in step.
+	bool mirrorsGeometry() const { return m_mirror; }
+	void setMirrorsGeometry(bool mirror);
 
-	// The same for the shape of an arrow: how many points its line is pulled
-	// through, and where they are. An image of a bent arrow can be bent the
-	// same way - or left straight while its source curves.
 	// Contravariant: the image arrows run the OTHER WAY. Hom(-,D) is like
 	// this - a map f : X -> Y gives Hom(f,D) : Hom(Y,D) -> Hom(X,D) - while
 	// Hom(A,-) is covariant and runs the same way. Which one a formula is
@@ -87,17 +100,15 @@ public:
 	bool isContravariant() const { return m_contravariant; }
 	void setContravariant(bool contravariant);
 
-	bool imaginesBends() const { return m_imaginesBends; }
-	void setImaginesBends(bool imagines);
-	bool reflectsBends() const { return m_reflectsBends; }
-	void setReflectsBends(bool reflects);
-
 	// The two ends. Reading what is drawn in the domain needs nothing of it -
 	// any node holds its children - so the domain is a plain Node. Drawing the
 	// image needs the codomain to be able to MAKE things, which is what a
 	// Category does, so that one is asked for by kind.
 	Node* domain() const;
-	Category* codomain() const;
+	// What the images are drawn into. An OBJECT, not a category: since an
+	// object of a concrete category holds elements, a plain R-module is a
+	// perfectly good place for the image of one to go.
+	Object* codomain() const;
 
 	// This mapping's identity - what its images are stamped with. Set when a
 	// diagram is read back, because a Functor makes its mapping inside its own
@@ -106,10 +117,11 @@ public:
 	void setMappingId(const QString& id);
 
 	// Whether what this mapping drew is on show. Put away, the image nodes
-	// are HIDDEN, not destroyed - whatever is drawn inside them goes with them
-	// and comes back untouched. Double-clicking the arrow toggles it.
-	bool imagesVisible() const { return m_imagesVisible; }
-	void setImagesVisible(bool visible);
+	// are HIDDEN, not destroyed - whatever is drawn inside them goes with
+	// them and comes back untouched. This is the mirror seen from the other
+	// side: putting the image away IS switching the mirror off, which is what
+	// double-clicking the arrow does.
+	bool imagesVisible() const { return m_mirror; }
 
 	// make the image match the domain, exactly, right now
 	void sync();
@@ -128,6 +140,10 @@ private slots:
 	void onImageBends(Arrow* image);
 	void onSourceMoved(Node* source, const QPointF& delta);
 	void onImageMoved(Node* image, const QPointF& delta);
+	// a label dragged clear of its node, on one side or the other: the
+	// corresponding label on the far side is dragged the same way
+	void onSourceLabelMoved(Node* source, const QPointF& delta);
+	void onImageLabelMoved(Node* image, const QPointF& delta);
 	// what this node was the image of has gone, so the image goes too - and as
 	// it goes it says so, which is what carries the deletion along a chain of
 	// functors C -> D -> E without any of them knowing about the others
@@ -142,18 +158,13 @@ private:
 	// X and a functor must carry both of them over, to two images.
 	// the node in the domain that this key belongs to, or nullptr
 	Node* sourceWithKey(const QString& key) const;
-	Node* imageOf(Category* codomain, const QString& functor, const Node* source) const;
+	Node* imageOf(Object* codomain, const QString& functor, const Node* source) const;
 	void stamp(Node* image, const QString& functor, const Node* source) const;
 	// is that node one of ours?
 	bool isOurImage(const Node* node) const;
 
-	bool m_live = true;
-	bool m_imaginesPosition = true;
-	bool m_reflectsPosition = false;
-	bool m_imaginesBends = true;
-	bool m_reflectsBends = false;
+	bool m_mirror = true;   // the whole mirror: on show, live, and both ways
 	bool m_contravariant = false;
-	bool m_imagesVisible = true;
 	bool m_syncing = false;
 	QString m_name;        // what the functor was called when its images were drawn
 	QString m_mappingId;   // this mapping's identity, kept with the arrow and in the file

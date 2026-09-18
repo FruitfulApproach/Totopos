@@ -1,5 +1,8 @@
 ﻿#include "widget/SketchView.h"
 
+#include "core/Emoji.h"
+#include <QIcon>
+
 #include <QToolButton>
 #include <QFrame>
 #include <QComboBox>
@@ -11,6 +14,11 @@
 #include <QAbstractAnimation>
 #include <QResizeEvent>
 #include <QWheelEvent>
+#include <QMouseEvent>
+#include <QContextMenuEvent>
+#include <QScrollBar>
+#include "art/DiagramScene.h"
+#include "art/Node.h"
 #include <QtMath>
 #include "dialog/CategoryDialog.h"
 #include "art/Category.h"
@@ -94,6 +102,15 @@ void SketchView::setCategoryLocked(bool locked)
 	if (m_category == nullptr)
 		return;
 	m_category->setEnabled(!locked);
+
+	// A padlock on the entry itself, so the reason is on the face of it and
+	// not only in a tooltip nobody hovers over. A combo draws an item's icon
+	// before its text, which puts it in the leading corner without any
+	// placing by hand; cleared from every entry on the way out, since the one
+	// that carried it may not be current next time.
+	const QIcon lock = locked ? Emoji::icon(Emoji::locked()) : QIcon();
+	for (int i = 0; i < m_category->count(); ++i)
+		m_category->setItemIcon(i, i == m_category->currentIndex() ? lock : QIcon());
 	m_category->setToolTip(locked
 		? QStringLiteral("The category is settled once anything is drawn: everything here is an "
 		                 "object or an arrow OF it, and they would all mean something else in "
@@ -360,6 +377,97 @@ void SketchView::setZoom(qreal factor)
 	// scale RELATIVE to the current transform so the anchor (cursor) holds still
 	scale(factor / m_zoom, factor / m_zoom);
 	m_zoom = factor;
+}
+
+namespace
+{
+	// far enough to mean a drag rather than an unsteady hand
+	const int kDragSlack = 4;
+}
+
+void SketchView::mousePressEvent(QMouseEvent* event)
+{
+	if (event->button() != Qt::RightButton)
+	{
+		QGraphicsView::mousePressEvent(event);
+		return;
+	}
+
+	m_rightDragged = false;
+	m_panFrom = event->pos();
+	auto* diagram = dynamic_cast<DiagramScene*>(scene());
+
+	// Already carrying something by the left button? Then the right button
+	// still means what it meant - abandon it - and the scene deals with that.
+	if (diagram == nullptr || diagram->isMoving())
+	{
+		QGraphicsView::mousePressEvent(event);
+		return;
+	}
+
+	const QPointF where = mapToScene(event->pos());
+	Node* node = diagram->nodeAt(where);
+	if (node != nullptr && node != diagram->ambientCategory())
+	{
+		// a node: carry it, the same gesture the left button starts. The scene
+		// drives the rest from its own move and release handlers.
+		diagram->beginPress(node, where, DiagramScene::Gesture::Move);
+		event->accept();
+		return;
+	}
+
+	// the canvas: take hold of the view itself
+	m_panning = true;
+	viewport()->setCursor(Qt::ClosedHandCursor);
+	event->accept();
+}
+
+void SketchView::mouseMoveEvent(QMouseEvent* event)
+{
+	if (m_panning)
+	{
+		const QPoint step = event->pos() - m_panFrom;
+		m_panFrom = event->pos();
+		if (step.manhattanLength() >= kDragSlack)
+			m_rightDragged = true;
+		// scrolling the view, not moving the scene: what is drawn stays where
+		// it is and the window looks at another part of it
+		horizontalScrollBar()->setValue(horizontalScrollBar()->value() - step.x());
+		verticalScrollBar()->setValue(verticalScrollBar()->value() - step.y());
+		event->accept();
+		return;
+	}
+	if ((event->buttons() & Qt::RightButton) != 0
+	 && (event->pos() - m_panFrom).manhattanLength() >= kDragSlack)
+		m_rightDragged = true;
+
+	QGraphicsView::mouseMoveEvent(event);
+}
+
+void SketchView::mouseReleaseEvent(QMouseEvent* event)
+{
+	if (m_panning && event->button() == Qt::RightButton)
+	{
+		m_panning = false;
+		viewport()->unsetCursor();
+		event->accept();
+		return;
+	}
+	QGraphicsView::mouseReleaseEvent(event);
+}
+
+void SketchView::contextMenuEvent(QContextMenuEvent* event)
+{
+	// A drag is not a request for a menu. Windows sends this when the button
+	// comes up, so by now the drag has already happened and been acted on;
+	// all that is left is to swallow the menu it would otherwise bring.
+	if (m_rightDragged)
+	{
+		m_rightDragged = false;
+		event->accept();
+		return;
+	}
+	QGraphicsView::contextMenuEvent(event);
 }
 
 void SketchView::wheelEvent(QWheelEvent* event)

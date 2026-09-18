@@ -19,6 +19,9 @@
     <Filter Include="core\io">
       <UniqueIdentifier>{836ac8c4-ff90-58c3-a188-7bf5b9992140}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\layout">
+      <UniqueIdentifier>{8d62525b-2478-5ac9-ae0a-9bc1dd85ec21}</UniqueIdentifier>
+    </Filter>
     <Filter Include="core\props">
       <UniqueIdentifier>{e7cb080b-dbd9-54e3-be64-9d213a8c41c7}</UniqueIdentifier>
     </Filter>
@@ -129,6 +132,12 @@
     <ClCompile Include="core\io\SceneFile.cpp">
       <Filter>core\io</Filter>
     </ClCompile>
+    <ClCompile Include="core\layout\GraphLayoutThread.cpp">
+      <Filter>core\layout</Filter>
+    </ClCompile>
+    <ClCompile Include="core\layout\GridLayoutThread.cpp">
+      <Filter>core\layout</Filter>
+    </ClCompile>
     <ClCompile Include="core\props\ArrowProp.cpp">
       <Filter>core\props</Filter>
     </ClCompile>
@@ -178,6 +187,9 @@
       <Filter>dialog</Filter>
     </ClCompile>
     <ClCompile Include="tutor\ArrowTutor.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\ElementOpTutor.cpp">
       <Filter>tutor</Filter>
     </ClCompile>
     <ClCompile Include="tutor\ProofTutor.cpp">
@@ -279,6 +291,12 @@
     <QtMoc Include="core\history\SceneHistory.h">
       <Filter>core\history</Filter>
     </QtMoc>
+    <QtMoc Include="core\layout\GraphLayoutThread.h">
+      <Filter>core\layout</Filter>
+    </QtMoc>
+    <QtMoc Include="core\layout\GridLayoutThread.h">
+      <Filter>core\layout</Filter>
+    </QtMoc>
     <QtMoc Include="core\props\ArrowProp.h">
       <Filter>core\props</Filter>
     </QtMoc>
@@ -316,6 +334,9 @@
       <Filter>dialog</Filter>
     </QtMoc>
     <QtMoc Include="tutor\ArrowTutor.h">
+      <Filter>tutor</Filter>
+    </QtMoc>
+    <QtMoc Include="tutor\ElementOpTutor.h">
       <Filter>tutor</Filter>
     </QtMoc>
     <QtMoc Include="tutor\ProofTutor.h">

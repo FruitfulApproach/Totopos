@@ -85,6 +85,20 @@ public slots:
 	void carryFragment(const QByteArray& payload);
 
 protected:
+	// THE RIGHT BUTTON DRAGS.
+	//
+	// On a node it carries the node, exactly as the left button does. On the
+	// canvas it pans the view - which is what a right drag over empty space
+	// means nearly everywhere - rather than sweeping out a rubber band, which
+	// the left button is still for.
+	//
+	// Either way, a drag is not a menu: a right press that MOVED swallows the
+	// context menu that would otherwise arrive when the button comes up.
+	void mousePressEvent(QMouseEvent* event) override;
+	void mouseMoveEvent(QMouseEvent* event) override;
+	void mouseReleaseEvent(QMouseEvent* event) override;
+	void contextMenuEvent(QContextMenuEvent* event) override;
+
 	void resizeEvent(QResizeEvent* event) override;
 	// the wheel zooms about the cursor (Ctrl not needed); scrolling is by drag/scrollbars
 	void wheelEvent(QWheelEvent* event) override;
@@ -97,6 +111,14 @@ protected:
 	void dropEvent(QDropEvent* event) override;
 
 private:
+	// the right button is down and moving the view, not a node
+	bool m_panning = false;
+	// where it was last seen, in the viewport - a pan is worked out from the
+	// step, not from where it began, so it cannot drift
+	QPoint m_panFrom;
+	// it moved far enough to be a drag, so no menu when it comes up
+	bool m_rightDragged = false;
+
 	// the two states of the commuting claim, named and explained
 	void refreshCommutesLabel(bool commutes);
 	// what is drawn, in scene coordinates (not the overlays)

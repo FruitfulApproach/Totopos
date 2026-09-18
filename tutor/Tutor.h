@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <QString>
+#include <QPointF>
 
 class DiagramScene;
 class Node;
@@ -36,6 +37,14 @@ protected:
 	virtual void onBegin(TutorSession& session) = 0;
 	// a node was clicked; true takes it as a pick (it gets a numbered badge)
 	virtual bool onPick(TutorSession& session, Node* node) { Q_UNUSED(session); Q_UNUSED(node); return false; }
+
+	// A double-click on blank space inside a category while this tutor has the
+	// clicks. Whatever is returned is then offered to onPick, so a tutor can
+	// let the user MAKE the thing it is asking them to point at instead of
+	// having to break off, make it, and start again. Nothing by default: most
+	// tutors ask about what is already drawn.
+	virtual Node* onPlace(TutorSession& session, const QPointF& scenePos)
+	{ Q_UNUSED(session); Q_UNUSED(scenePos); return nullptr; }
 	// Done pressed (or Enter); true when finished, false to keep going
 	virtual bool onDone(TutorSession& session) = 0;
 	virtual void onCancel(TutorSession& session) { Q_UNUSED(session); }

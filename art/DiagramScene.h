@@ -4,6 +4,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QPointer>
+#include <QTimer>
 #include "tutor/TutorSession.h"   // QPointer needs the complete type
 #include <memory>
 #include "art/Object.h"
@@ -205,6 +206,17 @@ public:
 	// between one construction and the next.
 	void recordNote(const QString& text);
 
+	// TIDY THE DIAGRAM UP, on a thread of its own.
+	//
+	// `kindId` names one of GraphLayouts::all(). The diagram is copied, the
+	// thread works on the copy, and what comes back is applied here as one
+	// step of the history - so a tidy-up can be undone like anything else.
+	// Nothing is blocked while it runs; an answer about a diagram that has
+	// changed underneath is dropped.
+	void layOut(const QString& kindId);
+	// tidy up once a rule has finished drawing itself in
+	void layOutAfterRule();
+
 	// A rule from the library laid over the diagram. Every place its premise
 	// is found - as a subdiagram, the rule's variables standing for whatever
 	// is there - is lit up with an Apply button, and the rest is dimmed.
@@ -256,6 +268,20 @@ public:
 	// border: pressing it draws an arrow out of that node. Kept up to date as
 	// the mouse moves, and put away whenever something else is going on.
 	void refreshArrowHandle(const QPointF& scenePos);
+	// the dwell finished: put the button up where the mouse has been resting
+	void showArrowHandleNow();
+	// its time is up: take it away, and do not offer it again until the mouse
+	// has been somewhere else
+	void expireArrowHandle();
+	// +, - or draw-an-arrow: what this node can be asked to do from the
+	// button that appears at its border
+	QList<int> handleButtonsFor(const Node* node) const;
+	// begin adding or subtracting, from the element `from`
+	// What can be done with an ELEMENT, once a second one has been pointed at:
+	// x + y and x - y build a new element, x = y joins the two that are there.
+	// Started from the element's own right-click menu (AtomicElement).
+	enum class ElementOp { Plus, Minus, Equals };
+	void beginElementOp(Node* from, ElementOp operation);
 	void hideArrowHandle();
 	// the node whose border is nearest this point, within `within`, or nullptr
 	Node* nodeWithBorderNear(const QPointF& scenePos, qreal within) const;
@@ -326,6 +352,22 @@ private:
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;
 	ArrowHandle* m_arrowHandle = nullptr;
+	// ASKED FOR BY HOLDING STILL, AND IT TAKES ITSELF AWAY AGAIN.
+	//
+	// m_handleDwell runs while the mouse rests near a border and puts the
+	// button up when it finishes; any real movement away restarts or stops
+	// it. m_handleLife then runs while the button is up and takes it away, so
+	// nothing is left standing over the diagram. Both lengths are settings
+	// (AppSettings::arrowButtonDelay, arrowButtonLife).
+	QTimer* m_handleDwell = nullptr;
+	QTimer* m_handleLife = nullptr;
+	QPointer<Node> m_handleWaitingOn;   // the node the dwell is counting for
+	QPointF m_handleWaitingAt;          // and where the cursor was, in the scene
+	// The node whose button has already had its time and gone. Without this,
+	// a hand left resting on a border would have the button appear, expire,
+	// and appear again for ever. Cleared by moving off that border - which is
+	// also how it is asked for a second time.
+	QPointer<Node> m_handleSpent;
 	QPointer<Node> m_arrowFrom;
 	// The arrow being placed: a real Arrow with no codomain, running to the
 	// cursor. QPointer because it hangs off its domain and goes with it.

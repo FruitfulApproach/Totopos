@@ -52,6 +52,8 @@ template <> constexpr inline auto MapsElements::qt_create_metaobjectdata<qt_meta
         "QPointF",
         "delta",
         "onImageMoved",
+        "onSourceLabelMoved",
+        "onImageLabelMoved",
         "onSourceDeleted"
     };
 
@@ -76,8 +78,16 @@ template <> constexpr inline auto MapsElements::qt_create_metaobjectdata<qt_meta
         QtMocHelpers::SlotData<void(Node *, const QPointF &)>(13, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { 0x80000000 | 10, 8 }, { 0x80000000 | 11, 12 },
         }}),
+        // Slot 'onSourceLabelMoved'
+        QtMocHelpers::SlotData<void(Node *, const QPointF &)>(14, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 10, 6 }, { 0x80000000 | 11, 12 },
+        }}),
+        // Slot 'onImageLabelMoved'
+        QtMocHelpers::SlotData<void(Node *, const QPointF &)>(15, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 10, 8 }, { 0x80000000 | 11, 12 },
+        }}),
         // Slot 'onSourceDeleted'
-        QtMocHelpers::SlotData<void(Node *)>(14, 2, QMC::AccessPrivate, QMetaType::Void, {{
+        QtMocHelpers::SlotData<void(Node *)>(16, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { 0x80000000 | 10, 6 },
         }}),
     };
@@ -109,7 +119,9 @@ void MapsElements::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         case 3: _t->onImageBends((*reinterpret_cast<std::add_pointer_t<Arrow*>>(_a[1]))); break;
         case 4: _t->onSourceMoved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
         case 5: _t->onImageMoved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
-        case 6: _t->onSourceDeleted((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
+        case 6: _t->onSourceLabelMoved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
+        case 7: _t->onImageLabelMoved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
+        case 8: _t->onSourceDeleted((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
         default: ;
         }
     }
@@ -138,14 +150,14 @@ int MapsElements::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 7)
+        if (_id < 9)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 7;
+        _id -= 9;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 7)
+        if (_id < 9)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 7;
+        _id -= 9;
     }
     return _id;
 }

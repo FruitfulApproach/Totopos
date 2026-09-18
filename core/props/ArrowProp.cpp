@@ -17,6 +17,8 @@ QStringList ArrowProp::keys()
 ArrowProp* ArrowProp::create(const QString& key, Arrow* arrow)
 {
 	if (key == MapsElements::Key()) return new MapsElements(arrow);
+	// before its base: an inclusion answers to its own key, not to monomorphism's
+	if (key == Inclusion::Key()) return new Inclusion(arrow);
 	if (key == Monomorphism::Key()) return new Monomorphism(arrow);
 	if (key == Epimorphism::Key()) return new Epimorphism(arrow);
 	return nullptr;

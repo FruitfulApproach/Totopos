@@ -27,6 +27,30 @@ namespace Notation
 	// character comes out, not a mangled tag.
 	QString toHtml(const QString& text);
 
+	// g\circ f -> g ∘ f, \mathcal{C} -> a script C: what a person who
+	// writes mathematics already has in their fingers, turned into the
+	// character it stands for, at the moment a label is finished.
+	//
+	// Unlike the scripts, this one DOES change the source: the corrected text
+	// is what gets saved, matched and edited from then on. That is the point -
+	// there is one spelling of composition in a file, not two, so a rule
+	// written with \circ and a diagram drawn with the character still match.
+	//
+	// A command that is not in the table is left exactly as typed, so a name
+	// that happens to contain a backslash survives being edited.
+	QString autoCorrect(const QString& text);
+
+	// The way back: the ring operator -> "\circ", the double-struck Z ->
+	// "\mathbb{Z}", and anything with no command of its own left alone.
+	//
+	// Where a symbol has more than one spelling the ordinary one is given, so
+	// an arrow comes back as \to rather than \rightarrow. It is a left
+	// inverse of autoCorrect() and not a right one: every symbol survives
+	// the round trip, but the spelling \le does not.
+	QString toCommands(const QString& text);
+	// one character's worth of the same, by code point
+	QString toCommand(uint codePoint);
+
 	// Whether toHtml() would do anything here. Text without a marker can be
 	// set as plain text, which is cheaper and leaves the document's own
 	// formatting alone.

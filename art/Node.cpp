@@ -98,6 +98,11 @@ Node::~Node()
 
 	if (m_idText != nullptr)
 	{
+		// Before it is destroyed, and before anything else: a label with the
+		// keyboard in it answers its own destruction by committing the edit,
+		// which calls back into this node - and this node is already half
+		// unmade. See NodeLabel::abandonEdit.
+		m_idText->abandonEdit();
 		delete m_idText;
 		m_idText = nullptr;
 	}
@@ -416,12 +421,15 @@ void Node::labelMoved(const QPointF& pos)
 	// what the user dragged is remembered as a displacement from where the
 	// label would otherwise sit, so it travels with the node
 	const QRectF r = m_idText->boundingRect();
+	const QPointF was = m_labelOffset;
 	prepareGeometryChange();
 	ancestorsPrepareGeometryChange();
 	m_labelOffset = pos - QPointF(-r.width() / 2.0, -r.height() / 2.0);
 	rememberLabelBox();   // dragged here against the frame as it stands
 	update();
 	ancestorsUpdate();
+	if (m_labelOffset != was)
+		emit labelDragged(this, m_labelOffset - was);
 }
 
 void Node::labelDragFinished(const QPointF& fromPos)
@@ -442,14 +450,17 @@ bool Node::labelIsLocked() const
 	return !data(MapsElements::ImageSourceKey).toString().isEmpty();
 }
 
+QString Node::labelLockTip() const
+{
+	return QStringLiteral("This name is made from the functor's name and the name of what it is the "
+	                      "image of. Change it by renaming either of those.");
+}
+
 void Node::refreshLabelMovability()
 {
 	if (m_idText == nullptr)
 		return;
-	m_idText->setToolTip(labelIsLocked()
-		? QStringLiteral("This name is made from the functor's name and the name of what it is the "
-		                 "image of. Change it by renaming either of those.")
-		: QString());
+	m_idText->setToolTip(labelIsLocked() ? labelLockTip() : QString());
 	const bool movable = labelIsMovable();
 	if (((m_idText->flags() & QGraphicsItem::ItemIsMovable) != 0) == movable)
 		return;
@@ -842,7 +853,49 @@ void Node::populateContextMenu(QMenu& menu)
 	menu.addAction(contextTitle())->setEnabled(false);
 	menu.addSeparator();
 
-	// 2. what it can do: each kind of node fills this in with submenus
+	// 1b. the name: the same editor a double-click on the label opens, for
+	// anyone who reaches for the right button instead. A locked name keeps
+	// the entry - taking it away would leave no answer to "why can't I?" -
+	// and says so with a padlock; editLabel() then pulses the label's own
+	// lock hint rather than opening the editor.
+	if (m_idText != nullptr)
+	{
+		const bool locked = labelIsLocked();
+		QAction* edit = menu.addAction(QString("%1  Edit main label")
+			.arg(locked ? Emoji::locked() : Emoji::rename()));
+		edit->setToolTip(locked ? labelLockTip()
+		                        : QStringLiteral("Type a new name for this. Escape puts back the old one."));
+		QObject::connect(edit, &QAction::triggered, this, [this] {
+			// queued: the menu is still closing, and this puts the keyboard
+			// into an item of the scene underneath it
+			QMetaObject::invokeMethod(this, [this] { editLabel(); }, Qt::QueuedConnection);
+		});
+		menu.addSeparator();
+	}
+
+	// 2. drawing an arrow out of this one. It used to be a button that
+	// appeared beside whatever the mouse passed near, which put an icon over
+	// the diagram nearly all the time for a gesture wanted once an arrow;
+	// here it is asked for instead, and can say what it is.
+	if (canStartArrow())
+	{
+		if (auto* diagram = diagramOf(this))
+		{
+			QAction* draw = menu.addAction(QString("%1  Draw an arrow from here").arg(Emoji::to()));
+			draw->setToolTip(QString("Start an arrow at %1: click what it goes to. Esc cancels.")
+				.arg(contextTitle()));
+			QObject::connect(draw, &QAction::triggered, diagram, [diagram, this] {
+				// queued: the menu is still closing, and this hands the clicks
+				// to a tutor working in the scene the menu belongs to
+				QMetaObject::invokeMethod(diagram, [diagram, this] {
+					diagram->beginArrow(const_cast<Node*>(this));
+				}, Qt::QueuedConnection);
+			});
+			menu.addSeparator();
+		}
+	}
+
+	// 3. what it can do: each kind of node fills this in with submenus
 	populateActions(menu);
 
 	// 3. how it is drawn
@@ -977,6 +1030,15 @@ void Node::finishLabelEdit(const QString& before, const QString& typed)
 	emit idChanged(this, after);   // after a cancel this puts the watchers back
 	if (before == after)
 		return;
+
+	// The auto-naming picks up from whatever was typed, when it is a plain
+	// variable: rename X to S and the next object is T. Category first -
+	// a Category IS an Object, and its children are counted differently
+	// from an object's elements.
+	if (auto* home = dynamic_cast<Category*>(parentItem()); home != nullptr)
+		home->noteNamed(this, after);
+	else if (auto* holder = dynamic_cast<Object*>(parentItem()); holder != nullptr)
+		holder->noteElementNamed(after);
 
 	// what was typed may name other nodes: Hom(X,B) follows X and B from here on
 	bindLabelReferences();

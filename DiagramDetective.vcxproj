@@ -141,6 +141,8 @@
     <ClCompile Include="core\history\Mementos.cpp" />
     <ClCompile Include="core\history\SceneHistory.cpp" />
     <ClCompile Include="core\io\SceneFile.cpp" />
+    <ClCompile Include="core\layout\GraphLayoutThread.cpp" />
+    <ClCompile Include="core\layout\GridLayoutThread.cpp" />
     <ClCompile Include="core\props\ArrowProp.cpp" />
     <ClCompile Include="core\props\CategoryProp.cpp" />
     <ClCompile Include="core\props\CategoryProps.cpp" />
@@ -158,6 +160,7 @@
     <ClCompile Include="dialog\RenameSceneDialog.cpp" />
     <ClCompile Include="dialog\SettingsDialog.cpp" />
     <ClCompile Include="tutor\ArrowTutor.cpp" />
+    <ClCompile Include="tutor\ElementOpTutor.cpp" />
     <ClCompile Include="tutor\ProofTutor.cpp" />
     <ClCompile Include="tutor\SetupTutor.cpp" />
     <ClCompile Include="tutor\Tutor.cpp" />
@@ -193,6 +196,8 @@
     <QtMoc Include="core\categories\Top.h" />
     <QtMoc Include="core\categories\Vect.h" />
     <QtMoc Include="core\history\SceneHistory.h" />
+    <QtMoc Include="core\layout\GraphLayoutThread.h" />
+    <QtMoc Include="core\layout\GridLayoutThread.h" />
     <QtMoc Include="core\props\ArrowProp.h" />
     <QtMoc Include="core\props\ArrowProps.h" />
     <QtMoc Include="core\props\CategoryProp.h" />
@@ -206,6 +211,7 @@
     <QtMoc Include="dialog\RenameSceneDialog.h" />
     <QtMoc Include="dialog\SettingsDialog.h" />
     <QtMoc Include="tutor\ArrowTutor.h" />
+    <QtMoc Include="tutor\ElementOpTutor.h" />
     <QtMoc Include="tutor\ProofTutor.h" />
     <QtMoc Include="tutor\SetupTutor.h" />
     <QtMoc Include="tutor\TutorSession.h" />

@@ -129,6 +129,8 @@ NodesCreated::~NodesCreated()
 
 void NodesCreated::detachAll()
 {
+	QGraphicsScene* was = nullptr;
+
 	// arrows first: they are last in the list
 	for (int i = m_held.size() - 1; i >= 0; --i)
 	{
@@ -138,11 +140,21 @@ void NodesCreated::detachAll()
 		held.parent = dynamic_cast<QGraphicsObject*>(held.node->parentItem());
 		held.scene = held.node->scene();
 		held.pos = held.node->pos();
+		if (held.scene != nullptr)
+			was = held.scene;
 		held.node->setParentItem(nullptr);
 		if (held.node->scene() != nullptr)
 			held.node->scene()->removeItem(held.node.data());
 		held.owned = true;
 	}
+
+	// And repaint the whole of it. Node::ancestorsUpdate does this whenever a
+	// frame shrinks, for the same reason - update() only ever repaints the rect
+	// an item has NOW, and these items no longer have one, nor a scene to ask.
+	// Without this the pixels of a deleted arrow stay on the canvas, coming and
+	// going as other things happen to repaint over them.
+	if (was != nullptr)
+		was->update();
 }
 
 void NodesCreated::attachAll()

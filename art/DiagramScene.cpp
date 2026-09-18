@@ -4,6 +4,10 @@
 #include "core/AppSettings.h"
 #include "art/NodeHandles.h"
 #include "art/ArrowHandle.h"
+#include "art/AtomicElement.h"
+#include "tutor/ElementOpTutor.h"
+#include "core/layout/GraphLayoutThread.h"
+#include "core/props/Constructions.h"
 #include "art/NodeLabel.h"
 #include "tutor/ArrowTutor.h"
 #include "core/history/SceneHistory.h"
@@ -212,8 +216,8 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	{
 		if (auto* maps = dynamic_cast<MapsElements*>(arrow->prop(MapsElements::Key())))
 		{
-			const bool show = !maps->imagesVisible();
-			maps->setImagesVisible(show);
+			const bool show = !maps->mirrorsGeometry();
+			maps->setMirrorsGeometry(show);
 			auto* cod = maps->codomain();
 			emit message(show
 				? QString("The image of %1 is back in %2.").arg(arrow->id(), cod != nullptr ? cod->id() : QString())
@@ -226,24 +230,41 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	// let items under the cursor take the double-click first
 	QGraphicsScene::mouseDoubleClickEvent(event);
 
-	// a double-click is not the second click of an arrow
-	if (arrowPending())
-		cancelArrow();
-
 	// A double-click puts a new object in. Which category it goes into is the
 	// nearest one AT the cursor, so double-clicking the canvas places into the
 	// canvas, and double-clicking something drawn inside a category places
 	// beside it, in that category. Arrows are drawn from the border button
 	// instead, and the label has already been dealt with above - a
 	// double-click there opens the editor.
-	Category* category = categoryAt(hitItem(event->scenePos()));
+	//
+	// WHILE AN ARROW IS BEING PLACED a double-click is not a cancel: it says
+	// the other end goes HERE. Anywhere here - over the domain's category or
+	// well outside it, because the new object goes into the domain's category
+	// whatever lies under the cursor. An arrow joins two objects of one
+	// category, so there is nowhere else it could go, and that category's
+	// frame simply grows to reach the object just put down.
+	Node* from = m_arrowFrom.data();
+	const bool finishing = arrowPending() && from != nullptr;
+	Category* category = finishing ? from->surroundingCategory()
+							  : categoryAt(hitItem(event->scenePos()));
 	if (category == nullptr)
+	{
+		if (arrowPending())
+			cancelArrow();   // nowhere to put the other end
 		return;
+	}
 
 	// the category decides what it is made of: a category in BigCat, a set in Set, ...
 	Object* placed = category->createCanvasObject(event->scenePos());
-	if (placed != nullptr)
-		recordCreation(QString("Placed %1 in %2").arg(placed->id(), category->id()), { placed });
+	if (placed == nullptr)
+	{
+		if (arrowPending())
+			cancelArrow();
+		return;
+	}
+	recordCreation(QString("Placed %1 in %2").arg(placed->id(), category->id()), { placed });
+	if (finishing)
+		finishArrow(placed);   // and the arrow that was waiting now has an end
 	event->accept();
 }
 
@@ -294,11 +315,11 @@ void DiagramScene::showHandles(Node* node, const QPointF& itemPos)
 				return;
 			// carried across, shown, and KEPT carried: from here the codomain
 			// follows the domain
-			maps->setImagesVisible(true);
-			if (maps->isLive())
+			// one switch does all of it: on show, and kept in step from here
+			if (maps->mirrorsGeometry())
 				maps->sync();
 			else
-				maps->setLive(true);
+				maps->setMirrorsGeometry(true);
 			emit message(QString("Chasing the elements of %1 into %2, and keeping them there.")
 				.arg(arrow->domain() != nullptr ? arrow->domain()->id() : QString(), maps->codomain()->id()));
 		});
@@ -1017,16 +1038,19 @@ void DiagramScene::hideArrowPreview()
 
 namespace
 {
-	// How far a point is from a rectangle's BORDER - not from the rectangle.
-	// A point well inside a big category is far from its border, which is the
-	// whole reason the button does not appear over its middle.
-	qreal distanceToBorder(const QRectF& r, const QPointF& p)
+	// How far OUTSIDE a rectangle a point is: zero on the outline, positive
+	// beyond it, and NEGATIVE inside - the depth in.
+	//
+	// The sign is what matters. The button appears from the outline outwards
+	// and never over the inside of a node, so that the whole face of a node
+	// stays a place to pick it up and carry it, and the button is something
+	// aimed at rather than something met on the way across.
+	qreal distanceOutside(const QRectF& r, const QPointF& p)
 	{
 		const qreal outX = qMax(r.left() - p.x(), p.x() - r.right());
 		const qreal outY = qMax(r.top() - p.y(), p.y() - r.bottom());
 		if (outX <= 0 && outY <= 0)
-			return qMin(qMin(p.x() - r.left(), r.right() - p.x()),
-			            qMin(p.y() - r.top(), r.bottom() - p.y()));
+			return qMax(outX, outY);   // inside: how deep, as a negative number
 		const qreal dx = qMax(qreal(0), outX);
 		const qreal dy = qMax(qreal(0), outY);
 		return qSqrt(dx * dx + dy * dy);
@@ -1050,18 +1074,75 @@ Node* DiagramScene::nodeWithBorderNear(const QPointF& scenePos, qreal within) co
 			continue;
 		if (!node->isVisible())
 			continue;
-		const qreal d = distanceToBorder(node->mapRectToScene(node->boxRect()), scenePos);
-		if (d <= best)
+		const qreal d = distanceOutside(node->mapRectToScene(node->boxRect()), scenePos);
+		// The drawn border straddles the rectangle - a pen of width w puts
+		// half of itself inside - so being ON the line the user can see counts
+		// as being at the outline, and nothing further in does.
+		const qreal onTheLine = node->border().style() == Qt::NoPen
+			? 0.0 : node->border().widthF() / 2.0;
+		if (d >= -onTheLine && d <= best)
 		{
-			best = d;
+			best = qMax(qreal(0), d);
 			nearest = node;
 		}
 	}
 	return nearest;
 }
 
+QList<int> DiagramScene::handleButtonsFor(const Node* node) const
+{
+	QList<int> buttons;
+	if (node == nullptr)
+		return buttons;
+
+	if (dynamic_cast<const AtomicElement*>(node) != nullptr)
+	{
+		// An element is not something an arrow comes out of - an arrow joins
+		// two OBJECTS - so the handle has nothing to offer it. What CAN be
+		// done with an element (+, -, =) is on its right-click menu, where
+		// there is room to say what each one means.
+		return buttons;
+	}
+
+	buttons << int(ArrowHandle::Button::DrawArrow);
+	return buttons;
+}
+
+void DiagramScene::beginElementOp(Node* from, ElementOp operation)
+{
+	if (from == nullptr)
+		return;
+	hideArrowHandle();
+	const ElementOpTutor::Operation which =
+		  operation == ElementOp::Plus   ? ElementOpTutor::Operation::Plus
+		: operation == ElementOp::Equals ? ElementOpTutor::Operation::Equals
+		                                 : ElementOpTutor::Operation::Minus;
+	auto* tutor = new ElementOpTutor(this, from, which);
+	if (TutorSession* session = tutor->teach(this))
+		connect(session, &TutorSession::ended, tutor, &QObject::deleteLater);
+	else
+		tutor->deleteLater();
+}
+
 void DiagramScene::refreshArrowHandle(const QPointF& scenePos)
 {
+	// A BUTTON THAT ANSWERS A PAUSE, NOT A PASSING CURSOR.
+	//
+	// It used to appear the instant the mouse came within reach of any
+	// border, which put an icon over the diagram nearly all the time. Now the
+	// mouse has to REST near a border for arrowButtonDelay before it shows,
+	// and it takes itself away after arrowButtonLife. Moving on before the
+	// dwell is up costs nothing and shows nothing.
+	if (m_handleDwell == nullptr)
+	{
+		m_handleDwell = new QTimer(this);
+		m_handleDwell->setSingleShot(true);
+		connect(m_handleDwell, &QTimer::timeout, this, &DiagramScene::showArrowHandleNow);
+		m_handleLife = new QTimer(this);
+		m_handleLife->setSingleShot(true);
+		connect(m_handleLife, &QTimer::timeout, this, &DiagramScene::expireArrowHandle);
+	}
+
 	// Not while something else has the mouse: drawing an arrow already,
 	// carrying a node about, or a tutor taking the clicks.
 	if (arrowPending() || isMoving() || Node::userDragging() || !m_session.isNull() || isEditingLabel())
@@ -1070,22 +1151,88 @@ void DiagramScene::refreshArrowHandle(const QPointF& scenePos)
 		return;
 	}
 
-	Node* from = nodeWithBorderNear(scenePos, ArrowHandle::reach());
-	if (from == nullptr)
+	if (m_arrowHandle != nullptr && m_arrowHandle->isVisible())
 	{
-		hideArrowHandle();
+		// On the button itself: it waits, however long that takes. Reaching
+		// for it is exactly the gesture that would otherwise run its time out
+		// from under the hand.
+		if (m_arrowHandle->coversScenePos(scenePos, 12.0))
+		{
+			m_handleLife->stop();
+			return;
+		}
+		// moved off it again: let it have the rest of its life and go
+		if (!m_handleLife->isActive())
+			m_handleLife->start(qMax(200, AppSettings::instance().arrowButtonLife()));
 		return;
 	}
+
+	Node* from = nodeWithBorderNear(scenePos, ArrowHandle::reach());
+	// nothing there, or nothing this node can be asked to do: no dwell at all
+	if (from == nullptr || handleButtonsFor(from).isEmpty())
+	{
+		m_handleDwell->stop();
+		m_handleWaitingOn = nullptr;
+		m_handleSpent = nullptr;   // away from the border: it may be asked for again
+		return;
+	}
+	if (from != m_handleSpent.data())
+		m_handleSpent = nullptr;   // a different border is a different question
+	else
+		return;                    // this one has had its turn; move off and back for another
+
+	// Still resting in the same spot, on the same border: let the count run
+	// rather than starting it again, or it would never finish.
+	const QPointF drift = scenePos - m_handleWaitingAt;
+	const bool held = m_handleWaitingOn == from && m_handleDwell->isActive()
+	               && (drift.x() * drift.x() + drift.y() * drift.y()) < 9.0;
+	if (held)
+		return;
+
+	m_handleWaitingOn = from;
+	m_handleWaitingAt = scenePos;
+	m_handleDwell->start(qMax(0, AppSettings::instance().arrowButtonDelay()));
+}
+
+void DiagramScene::showArrowHandleNow()
+{
+	Node* from = m_handleWaitingOn.data();
+	m_handleWaitingOn = nullptr;
+	if (from == nullptr || from->scene() != this)
+		return;
+	QList<ArrowHandle::Button> buttons;
+	for (int b : handleButtonsFor(from))
+		buttons << ArrowHandle::Button(b);
+	if (buttons.isEmpty())
+		return;
+
 	if (m_arrowHandle == nullptr)
 	{
 		m_arrowHandle = new ArrowHandle();
 		addItem(m_arrowHandle);
 	}
-	m_arrowHandle->showFor(from, scenePos);
+	// where the mouse came to rest: the button appears under the hand rather
+	// than beside the node, so it is already where it is being reached for
+	m_arrowHandle->showFor(from, buttons, m_handleWaitingAt);
+	m_handleLife->start(qMax(200, AppSettings::instance().arrowButtonLife()));
+}
+
+void DiagramScene::expireArrowHandle()
+{
+	// Remember whose it was BEFORE hiding, so a hand left where it is does
+	// not have the button flash up again every delay + life.
+	Node* was = m_arrowHandle != nullptr ? m_arrowHandle->node() : nullptr;
+	hideArrowHandle();
+	m_handleSpent = was;
 }
 
 void DiagramScene::hideArrowHandle()
 {
+	if (m_handleDwell != nullptr)
+		m_handleDwell->stop();
+	if (m_handleLife != nullptr)
+		m_handleLife->stop();
+	m_handleWaitingOn = nullptr;
 	if (m_arrowHandle != nullptr)
 		m_arrowHandle->hideHandle();
 }
@@ -1145,8 +1292,9 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 	if (event->button() == Qt::LeftButton && m_arrowHandle != nullptr && m_arrowHandle->isVisible())
 	{
 		Node* from = m_arrowHandle->node();
+		const bool onOne = m_arrowHandle->coversScenePos(event->scenePos());
 		hideArrowHandle();
-		if (from != nullptr)
+		if (from != nullptr && onOne)
 		{
 			beginArrow(from);
 			event->accept();
@@ -1573,6 +1721,14 @@ void DiagramScene::setDefines(const QString& term)
 	emit statementChanged(statementText());
 }
 
+void DiagramScene::layOutAfterRule()
+{
+	// Queued: a rule draws its conclusion in and then takes its deletions out,
+	// and the tidy-up wants the diagram as it ends up, not half way through.
+	QMetaObject::invokeMethod(this, [this] { layOut(QStringLiteral("grid")); },
+	                          Qt::QueuedConnection);
+}
+
 void DiagramScene::recordRuleApplication(const QString& description, const QList<Node*>& made,
                                          const QString& rulePath, const QString& ruleName,
                                          const QStringList& variables, const QStringList& values)
@@ -1586,6 +1742,7 @@ void DiagramScene::recordRuleApplication(const QString& description, const QList
 	if (!made.isEmpty())
 		emit nodesAdded(made);
 	emit statementChanged(statementText());
+	layOutAfterRule();   // a rule draws where the rule was drawn; tidy it into place
 }
 
 QList<DiagramScene::ProofStep> DiagramScene::proofSteps() const
@@ -1712,6 +1869,120 @@ QList<DiagramScene::Component> DiagramScene::components() const
 		found << piece;
 	}
 	return found;
+}
+
+void DiagramScene::layOut(const QString& kindId)
+{
+	if (m_ambientCategory == nullptr)
+		return;
+	// not called `thread`: QObject has a thread() of its own, and a local of
+	// that name reads as a call to it at a glance
+	GraphLayoutThread* worker = GraphLayouts::make(kindId, nullptr);
+	if (worker == nullptr)
+		return;
+
+	// The one moment the live diagram is read. Parents come before children,
+	// so a node's parent index is always already known.
+	QList<QPointer<Node>> order;
+	LayoutGraph graph;
+	graph.gridUnit = Node::snapEnabled() ? Node::snapUnit() : 0.0;
+
+	QList<Node*> walk;
+	walk << m_ambientCategory;
+	QHash<Node*, int> indexOf;
+	indexOf.insert(m_ambientCategory, 0);
+	for (int at = 0; at < walk.size(); ++at)
+		for (QGraphicsItem* child : walk.at(at)->childItems())
+			if (auto* node = dynamic_cast<Node*>(child))
+			{
+				indexOf.insert(node, int(walk.size()));
+				walk << node;
+			}
+
+	graph.nodes.reserve(walk.size());
+	for (int i = 0; i < walk.size(); ++i)
+	{
+		Node* node = walk.at(i);
+		LayoutNode record;
+		record.parent = i == 0 ? -1 : indexOf.value(dynamic_cast<Node*>(node->parentItem()), -1);
+		record.pos = node->pos();
+		record.box = node->boxRect();
+		if (auto* arrow = dynamic_cast<Arrow*>(node))
+		{
+			record.isArrow = true;
+			record.domain = indexOf.value(arrow->domain(), -1);
+			record.codomain = indexOf.value(arrow->codomain(), -1);
+		}
+		graph.nodes << record;
+		order << QPointer<Node>(node);
+	}
+
+	connect(worker, &GraphLayoutThread::laidOut, this,
+	        [this, order](const LayoutPlaces& places, const LayoutBends& bends) {
+		QList<ItemsMoved::Move> moves;
+		for (auto it = places.constBegin(); it != places.constEnd(); ++it)
+		{
+			if (it.key() < 0 || it.key() >= order.size())
+				continue;
+			Node* node = order.at(it.key()).data();
+			// gone while the thread was thinking: leave it out rather than
+			// putting a hole in the step
+			if (node == nullptr || node->pos() == it.value())
+				continue;
+			moves.append(ItemsMoved::Move{ QPointer<Node>(node), node->pos(), it.value() });
+		}
+
+		// The shapes the layout asked for, in the arrows' own coordinates:
+		// what came back is in the PARENT's frame, the one the positions are
+		// in, and an arrow's bends are read in its own.
+		struct Bending { QPointer<Arrow> arrow; QList<QPointF> before, after; };
+		QList<Bending> bendings;
+		for (auto it = bends.constBegin(); it != bends.constEnd(); ++it)
+		{
+			if (it.key() < 0 || it.key() >= order.size())
+				continue;
+			auto* arrow = dynamic_cast<Arrow*>(order.at(it.key()).data());
+			if (arrow == nullptr)
+				continue;
+			QList<QPointF> want;
+			want.reserve(it.value().size());
+			for (const QPointF& point : it.value())
+				want << arrow->mapFromParent(point);
+			if (want == arrow->bends())
+				continue;
+			bendings.append(Bending{ QPointer<Arrow>(arrow), arrow->bends(), want });
+		}
+
+		if (moves.isEmpty() && bendings.isEmpty())
+		{
+			emit message(QStringLiteral("Already as tidy as that will make it."));
+			return;
+		}
+		for (const ItemsMoved::Move& move : moves)
+			if (!move.node.isNull())
+				move.node->setPos(move.after);
+		// after the moves: an arrow is bowed off the line between where its
+		// ends have ENDED UP
+		for (const Bending& bending : bendings)
+			if (!bending.arrow.isNull())
+				bending.arrow->setBends(bending.after);
+		if (m_ambientCategory != nullptr)
+		{
+			m_ambientCategory->refreshDepthAppearance();
+			m_ambientCategory->refreshFrame();
+		}
+		if (m_history != nullptr)
+		{
+			if (!moves.isEmpty())
+				m_history->record(new ItemsMoved(QString("Tidied %1 items").arg(moves.size()), moves));
+			for (const Bending& bending : bendings)
+				if (!bending.arrow.isNull())
+					m_history->record(new ArrowBent(QString("Bowed %1 clear").arg(bending.arrow->id()),
+					                                bending.arrow.data(), bending.before, bending.after));
+		}
+	});
+	connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+	worker->layOut(graph);
 }
 
 void DiagramScene::recordNote(const QString& text)

@@ -29,6 +29,8 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\english\Translation.cpp
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\history\Mementos.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\Mementos.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\history\SceneHistory.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\SceneHistory.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\io\SceneFile.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\SceneFile.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\layout\GraphLayoutThread.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\GraphLayoutThread.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\layout\GridLayoutThread.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\GridLayoutThread.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\props\ArrowProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\ArrowProp.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\props\CategoryProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\CategoryProp.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\props\CategoryProps.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\CategoryProps.obj
@@ -46,6 +48,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\dialog\CategoryDialog.cpp;C:
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\dialog\RenameSceneDialog.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\RenameSceneDialog.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\dialog\SettingsDialog.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\SettingsDialog.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\ArrowTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\ArrowTutor.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\ElementOpTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\ElementOpTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\ProofTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\ProofTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\SetupTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\SetupTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\Tutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\Tutor.obj
@@ -67,6 +70,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\q
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Functor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Functor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Node.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Node.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_NodeHandles.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_NodeHandles.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Object.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Object.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_AppSettings.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_AppSettings.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Ab.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Ab.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_BigCat.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_BigCat.obj
@@ -79,6 +83,8 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\q
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Top.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Top.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Vect.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Vect.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_SceneHistory.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_SceneHistory.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_GraphLayoutThread.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_GraphLayoutThread.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_GridLayoutThread.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_GridLayoutThread.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ArrowProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ArrowProp.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ArrowProps.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ArrowProps.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_CategoryProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_CategoryProp.obj
@@ -92,6 +98,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\q
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_RenameSceneDialog.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_RenameSceneDialog.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_SettingsDialog.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_SettingsDialog.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ArrowTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ArrowTutor.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ElementOpTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ElementOpTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ProofTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ProofTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_SetupTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_SetupTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_TutorSession.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_TutorSession.obj
@@ -102,4 +109,3 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\q
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_PropertiesDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_PropertiesDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_SketchView.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_SketchView.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_ToggleSwitch.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_ToggleSwitch.obj
-C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\qt\moc\moc_Object.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Debug\moc_Object.obj

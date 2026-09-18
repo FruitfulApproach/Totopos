@@ -5,6 +5,7 @@
 #include <QTextDocument>
 #include <QTextCursor>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsScene>
 #include "art/DiagramScene.h"
 #include "core/Notation.h"
 #include "core/Emoji.h"
@@ -16,6 +17,15 @@ NodeLabel::NodeLabel(const QString& text, Node* node)
 	, m_node(node)
 	, m_source(text)
 {
+	// A TEXT ITEM'S OWN MARGIN IS NOT THIS DIAGRAM'S PADDING.
+	//
+	// QGraphicsTextItem leaves 4 units of air on every side by default, for a
+	// document laid out in a page. Here a label is a NAME, and for a node
+	// that holds nothing the label IS the node - so that margin came out as a
+	// wide empty border round a lone M, and squaring the box for a single
+	// letter (Object::boxRect) multiplied it. One unit is enough to keep the
+	// glyph off its own frame.
+	document()->setDocumentMargin(1.0);
 	renderSource();
 	// ItemIsMovable is set by the node that wants it (an arrow does), once its
 	// own constructor has run - labelIsMovable() cannot be asked from in here,
@@ -160,6 +170,21 @@ void NodeLabel::beginEdit()
 		showLockedHint();
 		return;
 	}
+	// NOTHING ELSE IS SELECTED WHILE A NAME IS BEING TYPED.
+	//
+	// Editing a label is about ONE node, and a selection left over from
+	// before says otherwise: the dashed selection frames of everything else
+	// stay drawn round the editor (and any keystroke meant for the text that
+	// the scene takes as a shortcut would land on all of them). So the
+	// selection is narrowed to the node whose name this is, which is also
+	// what a click on the label would have done had the editor not opened.
+	if (QGraphicsScene* board = scene(); board != nullptr)
+	{
+		board->clearSelection();
+		if (m_node != nullptr)
+			m_node->setSelected(true);
+	}
+
 	m_editing = true;
 	m_before = m_source;
 	// the editor shows the SOURCE: v_{x}, not v with a subscript. The markers
@@ -192,7 +217,10 @@ void NodeLabel::commitEdit()
 		return;
 	m_editing = false;
 	disconnect(m_live);
-	m_source = toPlainText();
+	// the moment the editor closes is the moment \circ becomes the character
+	// it stands for - not while typing, where it would rewrite the text under
+	// the cursor mid-word
+	m_source = Notation::autoCorrect(toPlainText());
 	dropSelection();
 	setTextInteractionFlags(Qt::NoTextInteraction);
 	setFlag(ItemIsMovable, m_wasMovable);
@@ -216,6 +244,16 @@ void NodeLabel::cancelEdit()
 	renderSource();
 	if (m_node != nullptr)
 		m_node->finishLabelEdit(m_before, m_before);
+}
+
+void NodeLabel::abandonEdit()
+{
+	m_editing = false;
+	disconnect(m_live);
+	m_node = nullptr;   // whatever happens from here reports to nobody
+	setTextInteractionFlags(Qt::NoTextInteraction);
+	if (hasFocus())
+		clearFocus();   // give the keyboard up NOW, while this is still whole
 }
 
 void NodeLabel::dropSelection()

@@ -45,4 +45,6 @@ namespace Emoji
 	inline QString to()          { return QStringLiteral("→"); }       // rightwards arrow
 	inline QString monomorphism(){ return QStringLiteral("↣"); }       // rightwards arrow with tail
 	inline QString epimorphism() { return QStringLiteral("↠"); }       // rightwards two-headed arrow
+	inline QString rename()      { return QStringLiteral("✏️"); } // pencil: type a new name
+	inline QString locked()      { return QStringLiteral("🔒"); }   // padlock: settled, not to be changed
 }

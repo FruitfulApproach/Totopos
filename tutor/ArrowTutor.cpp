@@ -4,6 +4,7 @@
 #include "tutor/TutorSession.h"
 #include "art/Arrow.h"
 #include "art/Category.h"
+#include "art/Object.h"
 
 ArrowTutor::ArrowTutor(DiagramScene* scene, Node* from)
 	: QObject(scene)
@@ -63,6 +64,30 @@ bool ArrowTutor::onPick(TutorSession& session, Node* node)
 	// that is everything: finish without making the user press Done
 	QMetaObject::invokeMethod(&session, "done", Qt::QueuedConnection);
 	return true;
+}
+
+Node* ArrowTutor::onPlace(TutorSession& session, const QPointF& scenePos)
+{
+	if (m_from.isNull())
+		return nullptr;   // nothing to run an arrow from yet
+
+	// It goes in the category the arrow STARTS in - the two ends of an arrow
+	// belong to one category, so there is only one place a new end could go.
+	Category* home = m_from->surroundingCategory();
+	if (home == nullptr)
+		return nullptr;
+	if (!home->mapRectToScene(home->boxRect()).contains(scenePos))
+	{
+		session.say(QString("An arrow joins two objects of one category. Put it down inside %1, "
+		                    "where %2 is.").arg(home->id(), m_from->id()), home);
+		return nullptr;
+	}
+
+	Object* made = home->createCanvasObject(scenePos);
+	if (made == nullptr)
+		return nullptr;
+	m_scene->recordCreation(QString("Placed %1 in %2").arg(made->id(), home->id()), { made });
+	return made;
 }
 
 bool ArrowTutor::onDone(TutorSession& session)

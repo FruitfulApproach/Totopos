@@ -6,11 +6,58 @@
 #include <utility>
 #include "art/Arrow.h"
 #include "art/Category.h"
+#include "art/Object.h"
 #include "core/AppSettings.h"
 #include "core/Emoji.h"
 #include "art/DiagramScene.h"
 #include "art/Functor.h"
 #include "core/history/SceneHistory.h"
+#include <QPointer>
+
+namespace
+{
+	// Delete every one of these, and survive one of them taking another with
+	// it. Deleting a node announces itself (Node::deleted), and what listens
+	// may delete further nodes - an arrow whose end has just gone, an image
+	// of an image. If one of THOSE is also in this list, the plain pointer
+	// left behind here would be deleted a second time, and what the scene
+	// would be left holding is not a node at all. A guarded pointer simply
+	// goes null and the second delete never happens.
+	void deleteAll(const QList<Node*>& nodes)
+	{
+		QList<QPointer<Node>> safe;
+		safe.reserve(nodes.size());
+		for (Node* node : nodes)
+			safe << QPointer<Node>(node);
+		for (QPointer<Node>& node : safe)
+		{
+			if (node.isNull())
+				continue;
+
+			// OUT OF SIGHT AT ONCE, DESTROYED ON THE NEXT TURN OF THE LOOP.
+			//
+			// This runs from inside a signal, and the signal is often the
+			// KEYBOARD: typing in a label emits idChanged on every keystroke
+			// (Node::labelBeingEdited), which lands here through sync(). A
+			// scene item destroyed in the middle of that is destroyed in the
+			// middle of Qt's own update of it - the scene is left holding a
+			// pointer it no longer owns, and the crash comes later, in the
+			// next repaint, walking the index. Arrow::onObjectDeleted hides
+			// and defers for exactly this reason; so does this.
+			//
+			// The stamps go FIRST: until it is really gone it is still a
+			// child of the codomain, and the next sync would find it by them
+			// and take it for an image that is still wanted.
+			node->setData(MapsElements::DoomedKey, true);
+			node->setData(MapsElements::ImageSourceKey, QString());
+			node->setData(MapsElements::ImageMappingKey, QString());
+			node->setData(MapsElements::ImageFunctorKey, QString());
+			node->setVisible(false);
+			node->setAcceptedMouseButtons(Qt::NoButton);
+			node->deleteLater();
+		}
+	}
+}
 
 MapsElements::MapsElements(Arrow* arrow)
 	: ArrowProp(arrow)
@@ -19,7 +66,7 @@ MapsElements::MapsElements(Arrow* arrow)
 	// categories drawn on the canvas mean? An ordinary morphism - an R-linear
 	// map, a homomorphism - waits to be asked, because its domain usually
 	// holds only the few elements the chase is about.
-	m_live = dynamic_cast<Functor*>(arrow) != nullptr;
+	m_mirror = dynamic_cast<Functor*>(arrow) != nullptr;
 	if (arrow != nullptr)
 	{
 		m_name = arrow->id();
@@ -34,7 +81,7 @@ MapsElements::MapsElements(Arrow* arrow)
 		// arrow, and must follow it when it is relabelled
 		connect(arrow, &Node::idChanged, this, &MapsElements::onFunctorRenamed);
 	}
-	if (m_live)
+	if (m_mirror)
 		listen(true);
 }
 
@@ -42,7 +89,7 @@ MapsElements::MapsElements(Arrow* arrow)
 void MapsElements::onFunctorRenamed()
 {
 	Arrow* F = arrow();
-	Category* cod = codomain();
+	Object* cod = codomain();
 	if (F == nullptr || cod == nullptr)
 		return;
 
@@ -73,13 +120,13 @@ void MapsElements::onFunctorRenamed()
 	}
 	m_syncing = false;
 
-	if (m_live)
+	if (m_mirror)
 		sync();
 }
 void MapsElements::removeImages()
 {
 	Arrow* F = arrow();
-	Category* cod = codomain();
+	Object* cod = codomain();
 	if (F == nullptr || cod == nullptr)
 		return;
 	const QString name = m_name.isEmpty() ? F->id() : m_name;
@@ -95,11 +142,12 @@ void MapsElements::removeImages()
 
 	// arrows first, so none is left pointing at an object that has gone
 	m_syncing = true;
-	for (Node* node : arrows)
-		delete node;
-	for (Node* node : objects)
-		delete node;
+	deleteAll(arrows);
+	deleteAll(objects);
 	m_syncing = false;
+	// they are hidden now and destroyed on the next turn of the loop, so the
+	// frame that was held open by them has to be taken in here
+	cod->refreshFrame();
 }
 
 
@@ -134,9 +182,12 @@ Node* MapsElements::domain() const
 {
 	return arrow() != nullptr ? arrow()->domain() : nullptr;
 }
-Category* MapsElements::codomain() const
+Object* MapsElements::codomain() const
 {
-	return arrow() != nullptr ? dynamic_cast<Category*>(arrow()->codomain()) : nullptr;
+	// An object will do, so long as things can be drawn in it: an R-module
+	// holds elements, and the image of an element is one.
+	auto* cod = arrow() != nullptr ? dynamic_cast<Object*>(arrow()->codomain()) : nullptr;
+	return cod != nullptr && cod->canHoldNamedChildren() ? cod : nullptr;
 }
 
 void MapsElements::stamp(Node* image, const QString& functor, const Node* source) const
@@ -150,6 +201,8 @@ bool MapsElements::isOurImage(const Node* node) const
 {
 	if (node == nullptr)
 		return false;
+	if (node->data(DoomedKey).toBool())
+		return false;   // already on its way out: not ours any more
 	if (!m_mappingId.isEmpty() && node->data(ImageMappingKey).toString() == m_mappingId)
 		return true;
 	// drawn before this mapping had an identity, or read from an older file
@@ -170,7 +223,7 @@ Node* MapsElements::sourceWithKey(const QString& key) const
 	return nullptr;
 }
 
-Node* MapsElements::imageOf(Category* cod, const QString& functor, const Node* source) const
+Node* MapsElements::imageOf(Object* cod, const QString& functor, const Node* source) const
 {
 	if (cod == nullptr || source == nullptr)
 		return nullptr;
@@ -193,7 +246,7 @@ Node* MapsElements::imageOf(Category* cod, const QString& functor, const Node* s
 		// the key, so the migration happens once and the SECOND object of the
 		// same name no longer matches and gets an image of its own.
 		const QString stamped = node->data(ImageSourceKey).toString();
-		if (byName == nullptr && node->id() == name
+		if (byName == nullptr && !node->data(DoomedKey).toBool() && node->id() == name
 		 && (stamped.isEmpty() || stamped == source->id()))
 			byName = node;
 	}
@@ -221,34 +274,31 @@ void MapsElements::listen(bool on)
 	}
 }
 
-void MapsElements::setLive(bool live)
+void MapsElements::setMirrorsGeometry(bool mirror)
 {
-	if (m_live == live)
+	if (m_mirror == mirror)
 		return;
-	m_live = live;
-	listen(live);
-	if (live)
+	m_mirror = mirror;
+
+	// Off, the image is put AWAY, not given up: the nodes are hidden, and
+	// whatever is drawn inside them is hidden with them and comes back
+	// untouched. On, they are shown again and brought up to date at once.
+	if (Object* cod = codomain())
+	{
+		for (QGraphicsItem* child : cod->childItems())
+		{
+			auto* node = dynamic_cast<Node*>(child);
+			if (node != nullptr && isOurImage(node))
+				node->setVisible(mirror);
+		}
+		// the codomain's frame is the union of what it HOLDS AND SHOWS
+		cod->refreshFrame();
+	}
+
+	listen(mirror);
+	if (mirror)
 		sync();
 	emit settingsChanged();
-}
-
-void MapsElements::setImaginesPosition(bool imagines)
-{
-	if (m_imaginesPosition == imagines)
-		return;
-	m_imaginesPosition = imagines;
-	if (m_live)
-		sync();
-	emit settingsChanged();
-}
-
-void MapsElements::setReflectsPosition(bool reflects)
-{
-	if (m_reflectsPosition == reflects)
-		return;
-	m_reflectsPosition = reflects;
-	emit settingsChanged();
-	// nothing to sync: this one only says what a DRAG of an image does
 }
 
 void MapsElements::setContravariant(bool contravariant)
@@ -256,35 +306,17 @@ void MapsElements::setContravariant(bool contravariant)
 	if (m_contravariant == contravariant)
 		return;
 	m_contravariant = contravariant;
-	if (m_live)
+	if (m_mirror)
 		sync();   // the image arrows turn round
-	emit settingsChanged();
-}
-
-void MapsElements::setImaginesBends(bool imagines)
-{
-	if (m_imaginesBends == imagines)
-		return;
-	m_imaginesBends = imagines;
-	if (m_live)
-		sync();   // bring the images' shapes into line at once
-	emit settingsChanged();
-}
-
-void MapsElements::setReflectsBends(bool reflects)
-{
-	if (m_reflectsBends == reflects)
-		return;
-	m_reflectsBends = reflects;
 	emit settingsChanged();
 }
 
 void MapsElements::onSourceBends(Arrow* source)
 {
-	if (m_syncing || !m_live || !m_imaginesBends || source == nullptr)
+	if (m_syncing || !m_mirror || source == nullptr)
 		return;
 	Arrow* F = arrow();
-	Category* cod = codomain();
+	Object* cod = codomain();
 	if (F == nullptr || cod == nullptr)
 		return;
 	auto* image = dynamic_cast<Arrow*>(imageOf(cod, F->id(), source));
@@ -297,7 +329,7 @@ void MapsElements::onSourceBends(Arrow* source)
 
 void MapsElements::onImageBends(Arrow* image)
 {
-	if (m_syncing || !m_live || !m_reflectsBends || image == nullptr)
+	if (m_syncing || !m_mirror || image == nullptr)
 		return;
 	Node* dom = domain();
 	if (dom == nullptr)
@@ -321,10 +353,10 @@ void MapsElements::onSourceMoved(Node* source, const QPointF& delta)
 {
 	// m_syncing is held by whichever side is writing, so the answering move
 	// never comes back round
-	if (m_syncing || !m_live || !m_imaginesPosition || source == nullptr || delta.isNull())
+	if (m_syncing || !m_mirror || source == nullptr || delta.isNull())
 		return;
 	Arrow* F = arrow();
-	Category* cod = codomain();
+	Object* cod = codomain();
 	if (F == nullptr || cod == nullptr)
 		return;
 	Node* image = imageOf(cod, F->id(), source);
@@ -340,7 +372,7 @@ void MapsElements::onSourceMoved(Node* source, const QPointF& delta)
 
 void MapsElements::onImageMoved(Node* image, const QPointF& delta)
 {
-	if (m_syncing || !m_live || !m_reflectsPosition || image == nullptr || delta.isNull())
+	if (m_syncing || !m_mirror || image == nullptr || delta.isNull())
 		return;
 	Node* dom = domain();
 	if (dom == nullptr)
@@ -356,12 +388,56 @@ void MapsElements::onImageMoved(Node* image, const QPointF& delta)
 		m_syncing = false;
 		return;
 	}
-}void MapsElements::onSourceDeleted(Node* source)
+}
+
+void MapsElements::onSourceLabelMoved(Node* source, const QPointF& delta)
 {
-	if (!m_live || source == nullptr)
+	// A label dragged clear of its node is part of how the diagram is laid
+	// out, so it crosses like a position does: BY THE SAME AMOUNT, so the
+	// image label keeps whatever placement it was given and simply travels
+	// with the one it answers to.
+	if (m_syncing || !m_mirror || source == nullptr || delta.isNull())
 		return;
 	Arrow* F = arrow();
-	Category* cod = codomain();
+	Object* cod = codomain();
+	if (F == nullptr || cod == nullptr)
+		return;
+	Node* image = imageOf(cod, F->id(), source);
+	if (image == nullptr)
+		return;
+	m_syncing = true;
+	image->setLabelOffset(image->labelOffset() + delta);
+	m_syncing = false;
+}
+
+void MapsElements::onImageLabelMoved(Node* image, const QPointF& delta)
+{
+	if (m_syncing || !m_mirror || image == nullptr || delta.isNull())
+		return;
+	Node* dom = domain();
+	if (dom == nullptr)
+		return;
+	const QString key = image->data(ImageSourceKey).toString();
+	if (key.isEmpty())
+		return;
+	for (QGraphicsItem* child : dom->childItems())
+	{
+		auto* node = dynamic_cast<Node*>(child);
+		if (node == nullptr || node->key() != key)
+			continue;
+		m_syncing = true;
+		node->setLabelOffset(node->labelOffset() + delta);
+		m_syncing = false;
+		return;
+	}
+}
+
+void MapsElements::onSourceDeleted(Node* source)
+{
+	if (!m_mirror || source == nullptr)
+		return;
+	Arrow* F = arrow();
+	Object* cod = codomain();
 	if (F == nullptr || cod == nullptr)
 		return;
 
@@ -381,8 +457,8 @@ void MapsElements::sync()
 {
 	Arrow* F = arrow();
 	Node* dom = domain();
-	Category* cod = codomain();
-	if (!m_live || F == nullptr || dom == nullptr || cod == nullptr || dom == cod || m_syncing)
+	Object* cod = codomain();
+	if (!m_mirror || F == nullptr || dom == nullptr || cod == nullptr || dom == cod || m_syncing)
 		return;
 
 	// The functor itself may have been taken out of the diagram - deleted, or
@@ -408,8 +484,23 @@ void MapsElements::sync()
 	for (QGraphicsItem* child : dom->childItems())
 	{
 		auto* source = dynamic_cast<Node*>(child);
-		if (source == nullptr || dynamic_cast<Arrow*>(source) != nullptr || source->id().isEmpty())
+		if (source == nullptr || dynamic_cast<Arrow*>(source) != nullptr)
 			continue;
+		if (source->id().isEmpty())
+		{
+			// MID-EDIT IS NOT GONE.
+			//
+			// Opening the editor selects the whole name, so the first
+			// keystroke empties it for an instant. Read as a source that no
+			// longer has a name, its image counted as stale and was taken
+			// away and drawn again on every keypress - which is both a great
+			// deal of work for nothing and the way items came to be deleted
+			// from inside the keyboard handler. It keeps its image, and its
+			// old name, until the editor closes.
+			if (source->isEditingLabel())
+				live << source->key();
+			continue;
+		}
 		live << source->key();
 		Node* img = imageOf(cod, name, source);
 		if (img == nullptr)
@@ -417,9 +508,9 @@ void MapsElements::sync()
 			// where it first appears: at the same offset as its source. From
 			// then on its position is ITS OWN - it moves when the source
 			// moves, by the same amount, but it can be put wherever you like.
-			img = cod->createObject(applied(name, source->id()), cod->mapToScene(source->pos()));
+			img = cod->createNamedChild(applied(name, source->id()), cod->mapToScene(source->pos()));
 			stamp(img, name, source);
-			img->setVisible(m_imagesVisible);
+			img->setVisible(m_mirror);
 		}
 		else if (img->id() != applied(name, source->id()))
 		{
@@ -430,14 +521,22 @@ void MapsElements::sync()
 		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
 		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
 		connect(img, &Node::moved, this, &MapsElements::onImageMoved, Qt::UniqueConnection);
+		connect(source, &Node::labelDragged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+		connect(img, &Node::labelDragged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
 	}
 
 	// the arrows, between the images of their ends
 	for (QGraphicsItem* child : dom->childItems())
 	{
 		auto* source = dynamic_cast<Arrow*>(child);
-		if (source == nullptr || source->id().isEmpty())
+		if (source == nullptr)
 			continue;
+		if (source->id().isEmpty())
+		{
+			if (source->isEditingLabel())
+				live << source->key();   // being typed into: not gone (see above)
+			continue;
+		}
 		Node* from = image.value(source->domain());
 		Node* to = image.value(source->codomain());
 		if (from == nullptr || to == nullptr)
@@ -449,9 +548,12 @@ void MapsElements::sync()
 		Node* img = imageOf(cod, name, source);
 		if (img == nullptr)
 		{
-			img = cod->createArrow(applied(name, source->id()), from, to);
+			auto* codCat = dynamic_cast<Category*>(cod);
+			if (codCat == nullptr)
+				continue;   // elements of a module have no arrows between them
+			img = codCat->createArrow(applied(name, source->id()), from, to);
 			stamp(img, name, source);
-			img->setVisible(m_imagesVisible);
+			img->setVisible(m_mirror);
 		}
 		else if (img->id() != applied(name, source->id()))
 		{
@@ -468,7 +570,9 @@ void MapsElements::sync()
 			if (imageArrow->codomain() != to)
 				imageArrow->setCodomain(to);
 			connect(imageArrow, &Arrow::bendsChanged, this, &MapsElements::onImageBends, Qt::UniqueConnection);
-			if (m_imaginesBends && imageArrow->bends() != source->bends())
+			connect(source, &Node::labelDragged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+			connect(imageArrow, &Node::labelDragged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
+			if (imageArrow->bends() != source->bends())
 				imageArrow->setBends(source->bends());
 		}
 	}
@@ -485,10 +589,10 @@ void MapsElements::sync()
 			continue;
 		(dynamic_cast<Arrow*>(node) != nullptr ? staleArrows : staleObjects) << node;
 	}
-	for (Node* node : staleArrows)
-		delete node;
-	for (Node* node : staleObjects)
-		delete node;
+	deleteAll(staleArrows);
+	deleteAll(staleObjects);
+	if (!staleArrows.isEmpty() || !staleObjects.isEmpty())
+		cod->refreshFrame();   // hidden already; the frame no longer holds them
 
 	if (scene != nullptr)
 		scene->history()->suspend(false);
@@ -501,15 +605,16 @@ void MapsElements::sync()
 void MapsElements::arrowContextMenu(QMenu& menu, Arrow* arrow)
 {
 	Node* dom = arrow->domain();
-	auto* cod = dynamic_cast<Category*>(arrow->codomain());
+	Object* cod = codomain();
 	if (dom == nullptr || cod == nullptr)
 	{
 		// Shown greyed rather than left out: a missing entry looks like a bug,
 		// and the reason is worth knowing.
 		QAction* why = menu.addAction("Map the elements");
 		why->setEnabled(false);
-		why->setToolTip(QString("Nothing to map into: %1 cannot hold anything drawn in it, so there is "
-		                        "nowhere for the image to go.")
+		why->setToolTip(QString("Nothing to map into: nothing can be drawn inside %1, so there is "
+		                        "nowhere for the image to go. An object holds elements only when "
+		                        "its category is concrete - when its objects have underlying sets.")
 			.arg(arrow->codomain() != nullptr ? arrow->codomain()->id() : QStringLiteral("the far end")));
 		return;
 	}
@@ -533,31 +638,11 @@ void MapsElements::setMappingId(const QString& id)
 		F->setData(MappingIdKey, id);
 }
 
-void MapsElements::setImagesVisible(bool visible)
-{
-	if (m_imagesVisible == visible)
-		return;
-	m_imagesVisible = visible;
-
-	Category* cod = codomain();
-	if (cod == nullptr)
-		return;
-	for (QGraphicsItem* child : cod->childItems())
-	{
-		auto* node = dynamic_cast<Node*>(child);
-		if (node != nullptr && isOurImage(node))
-			node->setVisible(visible);   // and everything drawn inside it
-	}
-	// the codomain's frame is the union of what it HOLDS AND SHOWS
-	cod->refreshFrame();
-	emit settingsChanged();
-}
-
 int MapsElements::mapDiagram()
 {
 	Arrow* F = arrow();
 	Node* dom = domain();
-	Category* cod = codomain();
+	Object* cod = codomain();
 	if (F == nullptr || dom == nullptr || cod == nullptr)
 		return 0;
 
@@ -576,9 +661,9 @@ int MapsElements::mapDiagram()
 		Node* already = imageOf(cod, name, object);
 		if (already == nullptr)
 		{
-			already = cod->createObject(applied(name, object->id()), cod->mapToScene(object->pos()));
+			already = cod->createNamedChild(applied(name, object->id()), cod->mapToScene(object->pos()));
 			stamp(already, name, object);
-			already->setVisible(m_imagesVisible);
+			already->setVisible(true);   // asked for by hand: shown
 			made << already;
 			++drawn;
 		}
@@ -599,9 +684,12 @@ int MapsElements::mapDiagram()
 			std::swap(from, to);
 		if (imageOf(cod, name, a) != nullptr)
 			continue;   // already drawn
-		Node* drawnArrow = cod->createArrow(applied(name, a->id()), from, to);
+		auto* codCat = dynamic_cast<Category*>(cod);
+		if (codCat == nullptr)
+			continue;   // elements of a module have no arrows between them
+		Node* drawnArrow = codCat->createArrow(applied(name, a->id()), from, to);
 		stamp(drawnArrow, name, a);
-		drawnArrow->setVisible(m_imagesVisible);
+		drawnArrow->setVisible(true);
 		made << drawnArrow;
 		++drawn;
 	}

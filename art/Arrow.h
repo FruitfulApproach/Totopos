@@ -44,6 +44,24 @@ public:
 	QPointF labelAnchor() const;
 	void setLabelOffset(const QPointF& offset) override;
 
+	// A LABEL THAT HAS BEEN DRAGGED TRAVELS WITH THE LINE, IN PROPORTION.
+	//
+	// The offset alone is a number of pixels, and pixels stop meaning the same
+	// thing the moment the arrow does: a label put a comfortable distance from
+	// the middle of a long arrow is stranded halfway across the diagram once a
+	// tidy-up makes that arrow short, which is how "m" came to be sitting in
+	// the empty top half of its category with its arrow down in the corner.
+	//
+	// So what is REMEMBERED is not the offset but where it puts the label in
+	// the arrow's own frame: how far along the line, and how far off to the
+	// side, each as a fraction of the line's length. The offset is worked out
+	// again from those whenever the line moves, turns or changes length, so a
+	// label keeps the place it was given however the arrow is redrawn.
+	void rememberLabelPlacement();
+	// the line as a frame to measure in: its middle, the way it points, and
+	// how long it is. False when there is no line yet to measure.
+	bool labelFrame(QPointF& along, QPointF& across, qreal& length) const;
+
 	// beside the middle of the line, plus wherever it has been dragged to -
 	// NOT centred on the arrow's origin, which is the category's own corner
 	void placeLabel() override;
@@ -111,6 +129,14 @@ public:
 		Mono,        // barbed tail: monic, left-cancellable
 		Epi,         // two heads: epic, right-cancellable
 		Iso,         // a tilde over the line: invertible
+
+		// TWO LINES AND NO HEAD: these two are the same thing.
+		//
+		// Not a morphism at all, which is why it has no head to point with:
+		// an equals joins two ELEMENTS that have turned out to be equal - x
+		// and y, or x + 0 and x - and says only that. Drawn the way equality
+		// is written, as a double line, and read in either direction.
+		Equals,
 	};
 
 	Style style() const { return m_style; }
@@ -133,8 +159,24 @@ public:
 	// enough (paint, the context menu) to be worth their own bool, like
 	// existsSuch() is on Node - the underlying fact still lives as a Prop, so
 	// it saves, loads and lists itself the same way every other one does.
+	// Whether this arrow carries a property of that kind, by TYPE rather than
+	// by key: an Inclusion is a Monomorphism, so propOfType<Monomorphism>()
+	// finds it. Asking by key would not - the keys differ - and every place
+	// that wanted "is this monic?" would have to list the subclasses.
+	template <typename P> P* propOfType() const
+	{
+		for (ArrowProp* p : m_props)
+			if (auto* found = dynamic_cast<P*>(p))
+				return found;
+		return nullptr;
+	}
+
 	bool isMonic() const;
 	bool isEpic() const;
+	// the narrower claim: monic AND drawn as a hook
+	bool isInclusion() const;
+	void setInclusion(bool inclusion);
+	void setInclusionRecorded(bool inclusion);
 	// the plain setters: undo/redo call these, so putting a change back never
 	// records a second one
 	void setMonic(bool monic);
@@ -197,6 +239,12 @@ private:
 	bool m_hasLooseEnd = false;
 	QList<ArrowProp*> m_props;
 	Style m_style = Style::Plain;
+
+	// where the label was put, in the arrow's own frame: along the line and
+	// off to the side, as fractions of its length (see rememberLabelPlacement)
+	qreal m_labelAlong = 0.0;
+	qreal m_labelAcross = 0.0;
+	bool m_labelPlacedByHand = false;
 
 	QList<QPointF> m_bends;
 	QList<QPointF> m_bendsAtPress;
