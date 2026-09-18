@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
-     <widget class="SketchView" name="graphicsView"/>
+     <widget class="QTabWidget" name="tabs"/>
     </item>
    </layout>
   </widget>
@@ -45,7 +45,7 @@
   <customwidget>
    <class>SketchView</class>
    <extends>QGraphicsView</extends>
-   <header>SketchView.h</header>
+   <header>widget/SketchView.h</header>
   </customwidget>
  </customwidgets>
  <resources>

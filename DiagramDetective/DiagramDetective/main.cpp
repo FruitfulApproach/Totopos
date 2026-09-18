@@ -1,5 +1,5 @@
 ﻿#include "DiagramDetective.h"
-#include "Emoji.h"
+#include "core/Emoji.h"
 #include <QtWidgets/QApplication>
 
 int main(int argc, char *argv[])

@@ -1,70 +1,402 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>qml;cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="art">
+      <UniqueIdentifier>{e43e3ce5-df5e-5499-8b25-8b9b2efd8648}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    <Filter Include="core">
+      <UniqueIdentifier>{98d31508-e676-5c1c-ad0d-cf2e3405f17b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\categories">
+      <UniqueIdentifier>{7fab2b45-dfcd-55d0-b18e-4c9aea681b56}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\english">
+      <UniqueIdentifier>{8e6f58f6-0e77-55f2-ba3c-ee9302c604de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\history">
+      <UniqueIdentifier>{dc35b076-eb8e-577f-a0d1-ff47a59ee0bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\io">
+      <UniqueIdentifier>{836ac8c4-ff90-58c3-a188-7bf5b9992140}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\props">
+      <UniqueIdentifier>{e7cb080b-dbd9-54e3-be64-9d213a8c41c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\rules">
+      <UniqueIdentifier>{56bc27f4-d712-5d23-8122-f36f398219b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="dialog">
+      <UniqueIdentifier>{77ece2b2-6bde-5379-af55-02db81409e24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tutor">
+      <UniqueIdentifier>{bae6e63f-f892-53c4-b1d4-dcb23e5afb96}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="widget">
+      <UniqueIdentifier>{87750bfb-07c7-5816-b0cf-be67c5e55211}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>qrc;rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+      <UniqueIdentifier>{1fe5ce00-c956-54cd-b8e5-34449dd5b08b}</UniqueIdentifier>
+      <Extensions>qrc;rc;ico</Extensions>
     </Filter>
-    <Filter Include="Form Files">
-      <UniqueIdentifier>{99349809-55BA-4b9d-BF79-8FDBB0286EB3}</UniqueIdentifier>
-      <Extensions>ui</Extensions>
-    </Filter>
-    <Filter Include="Translation Files">
-      <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
-      <Extensions>ts</Extensions>
-    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DiagramDetective.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="art\Arrow.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\ArrowHandle.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\Category.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\DiagramScene.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\Functor.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\Node.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\NodeHandles.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\NodeLabel.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\Object.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="core\AppSettings.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\Emoji.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\Notation.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Ab.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\BigCat.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\BuiltInCategories.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Cat.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Grp.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\ModR.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\RMod.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Ring.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Set.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Top.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\categories\Vect.cpp">
+      <Filter>core\categories</Filter>
+    </ClCompile>
+    <ClCompile Include="core\english\Translation.cpp">
+      <Filter>core\english</Filter>
+    </ClCompile>
+    <ClCompile Include="core\history\Mementos.cpp">
+      <Filter>core\history</Filter>
+    </ClCompile>
+    <ClCompile Include="core\history\SceneHistory.cpp">
+      <Filter>core\history</Filter>
+    </ClCompile>
+    <ClCompile Include="core\io\SceneFile.cpp">
+      <Filter>core\io</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\ArrowProp.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\CategoryProp.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\CategoryProps.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\Constructions.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\MapsElements.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\Prop.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\props\SketchProp.cpp">
+      <Filter>core\props</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\Library.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\Pattern.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\Rule.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\RuleBuilder.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\RuleSearch.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="core\rules\StandardRules.cpp">
+      <Filter>core\rules</Filter>
+    </ClCompile>
+    <ClCompile Include="dialog\CategoryDialog.cpp">
+      <Filter>dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="dialog\RenameSceneDialog.cpp">
+      <Filter>dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="dialog\SettingsDialog.cpp">
+      <Filter>dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\ArrowTutor.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\ProofTutor.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\SetupTutor.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\Tutor.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="tutor\TutorSession.cpp">
+      <Filter>tutor</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\ApplicableRulesDock.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\CommutativeEquationsDock.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\EnglishDock.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\LibraryDock.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\PropertiesDock.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\SketchView.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\ToggleSwitch.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="DiagramDetective.h" />
+    <QtMoc Include="art\Arrow.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\ArrowHandle.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\Category.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\DiagramScene.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\Functor.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\Node.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\NodeHandles.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\Object.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="core\AppSettings.h">
+      <Filter>core</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Ab.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\BigCat.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Cat.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Grp.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\ModR.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\RMod.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Ring.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Set.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Top.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\categories\Vect.h">
+      <Filter>core\categories</Filter>
+    </QtMoc>
+    <QtMoc Include="core\history\SceneHistory.h">
+      <Filter>core\history</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\ArrowProp.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\CategoryProp.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\CategoryProps.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\Constructions.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\MapsElements.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\Prop.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\props\SketchProp.h">
+      <Filter>core\props</Filter>
+    </QtMoc>
+    <QtMoc Include="core\rules\RuleSearch.h">
+      <Filter>core\rules</Filter>
+    </QtMoc>
+    <QtMoc Include="dialog\CategoryDialog.h">
+      <Filter>dialog</Filter>
+    </QtMoc>
+    <QtMoc Include="dialog\RenameSceneDialog.h">
+      <Filter>dialog</Filter>
+    </QtMoc>
+    <QtMoc Include="dialog\SettingsDialog.h">
+      <Filter>dialog</Filter>
+    </QtMoc>
+    <QtMoc Include="tutor\ArrowTutor.h">
+      <Filter>tutor</Filter>
+    </QtMoc>
+    <QtMoc Include="tutor\ProofTutor.h">
+      <Filter>tutor</Filter>
+    </QtMoc>
+    <QtMoc Include="tutor\SetupTutor.h">
+      <Filter>tutor</Filter>
+    </QtMoc>
+    <QtMoc Include="tutor\TutorSession.h">
+      <Filter>tutor</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\ApplicableRulesDock.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\CommutativeEquationsDock.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\EnglishDock.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\LibraryDock.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\PropertiesDock.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\SketchView.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\ToggleSwitch.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="art\NodeLabel.h">
+      <Filter>art</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Emoji.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Notation.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\categories\BuiltInCategories.h">
+      <Filter>core\categories</Filter>
+    </ClInclude>
+    <ClInclude Include="core\english\Translation.h">
+      <Filter>core\english</Filter>
+    </ClInclude>
+    <ClInclude Include="core\history\Memento.h">
+      <Filter>core\history</Filter>
+    </ClInclude>
+    <ClInclude Include="core\history\Mementos.h">
+      <Filter>core\history</Filter>
+    </ClInclude>
+    <ClInclude Include="core\io\SceneFile.h">
+      <Filter>core\io</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rules\Library.h">
+      <Filter>core\rules</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rules\Pattern.h">
+      <Filter>core\rules</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rules\Rule.h">
+      <Filter>core\rules</Filter>
+    </ClInclude>
+    <ClInclude Include="core\rules\RuleBuilder.h">
+      <Filter>core\rules</Filter>
+    </ClInclude>
+    <ClInclude Include="tutor\Tutor.h">
+      <Filter>tutor</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="DiagramDetective.ui" />
+    <QtUic Include="dialog\CategoryDialog.ui">
+      <Filter>dialog</Filter>
+    </QtUic>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="DiagramDetective.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
-    <QtUic Include="DiagramDetective.ui">
-      <Filter>Form Files</Filter>
-    </QtUic>
-    <QtMoc Include="DiagramDetective.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <ClCompile Include="DiagramDetective.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <None Include="DiagramDetective.ico">
-      <Filter>Resource Files</Filter>
-    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ResourceCompile Include="DiagramDetective.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Node.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Object.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Arrow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="Node.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Object.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="Arrow.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
+    <None Include="DiagramDetective.ico">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
