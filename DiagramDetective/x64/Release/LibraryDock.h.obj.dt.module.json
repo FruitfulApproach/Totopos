@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "DiagramDetective\\x64\\Release\\LibraryDock.obj",
+            "outputs": [
+                "DiagramDetective\\x64\\Release\\LibraryDock.h.obj.dt.module.json",
+                "DiagramDetective\\x64\\Release\\LibraryDock.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

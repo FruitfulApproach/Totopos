@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "DiagramDetective\\x64\\Release\\Category.obj",
+            "outputs": [
+                "DiagramDetective\\x64\\Release\\Category.h.obj.dt.module.json",
+                "DiagramDetective\\x64\\Release\\Category.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

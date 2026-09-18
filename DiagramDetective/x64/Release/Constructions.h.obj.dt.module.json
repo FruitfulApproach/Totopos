@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "DiagramDetective\\x64\\Release\\Constructions.obj",
+            "outputs": [
+                "DiagramDetective\\x64\\Release\\Constructions.h.obj.dt.module.json",
+                "DiagramDetective\\x64\\Release\\Constructions.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

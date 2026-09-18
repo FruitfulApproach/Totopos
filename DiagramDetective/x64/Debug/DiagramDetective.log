@@ -1,0 +1,1145 @@
+﻿Build started 9/5/2026 7:43:51 PM.
+Environment at start of build:
+MSBuildLoadMicrosoftTargetsReadOnly = true
+
+Logging verbosity is set to: Diagnostic.19:43:51.642     1>Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" on node 2 (Build target(s)).
+19:43:51.645     1>Target "_CheckForInvalidConfigurationAndPlatform: (TargetId:2)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "SetTelemetryEnvironmentVariables" depends on it):
+19:43:51.648     1>Task "Message" (TaskId:2)
+                   Done executing task "Message". (TaskId:2)
+                   Task "Message" (TaskId:3)
+                   Done executing task "Message". (TaskId:3)
+19:43:51.650     1>Done building target "_CheckForInvalidConfigurationAndPlatform" in project "DiagramDetective.vcxproj".: (TargetId:2)
+19:43:51.650     1>Target "SetTelemetryEnvironmentVariables: (TargetId:3)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.Cpp.DesignTime.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "Build" depends on it):
+                   Task "SetEnv" (TaskId:4)
+                   Done executing task "SetEnv". (TaskId:4)
+                   Task "SetEnv" (TaskId:5)
+                   Done executing task "SetEnv". (TaskId:5)
+                   Task "SetEnv" (TaskId:6)
+                   Done executing task "SetEnv". (TaskId:6)
+                   Task "SetEnv" (TaskId:7)
+                   Done executing task "SetEnv". (TaskId:7)
+                   Task "SetEnv" (TaskId:8)
+                   Done executing task "SetEnv". (TaskId:8)
+19:43:51.661     1>Done building target "SetTelemetryEnvironmentVariables" in project "DiagramDetective.vcxproj".: (TargetId:3)
+19:43:51.661     1>Target "_PrepareForBuild: (TargetId:4)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.BuildSteps.Targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "Build" depends on it):
+19:43:51.663     1>Done building target "_PrepareForBuild" in project "DiagramDetective.vcxproj".: (TargetId:4)
+19:43:51.663     1>Target "_PrepareForReferenceResolution: (TargetId:5)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+19:43:51.663     1>Done building target "_PrepareForReferenceResolution" in project "DiagramDetective.vcxproj".: (TargetId:5)
+19:43:51.663     1>Target "BeforeResolveReferences: (TargetId:6)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+19:43:51.663     1>Done building target "BeforeResolveReferences" in project "DiagramDetective.vcxproj".: (TargetId:6)
+19:43:51.663     1>Target "IgnoreJavaScriptOutputAssembly: (TargetId:7)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "AssignProjectConfiguration" depends on it):
+19:43:51.663     1>Done building target "IgnoreJavaScriptOutputAssembly" in project "DiagramDetective.vcxproj".: (TargetId:7)
+19:43:51.663     1>Target "AssignProjectConfiguration: (TargetId:8)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+                   Task "AssignProjectConfiguration" (TaskId:9)
+                   Done executing task "AssignProjectConfiguration". (TaskId:9)
+19:43:51.664     1>Done building target "AssignProjectConfiguration" in project "DiagramDetective.vcxproj".: (TargetId:8)
+19:43:51.664     1>Target "_SplitProjectReferencesByFileExistence: (TargetId:9)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareProjectReferences" depends on it):
+19:43:51.664     1>Done building target "_SplitProjectReferencesByFileExistence" in project "DiagramDetective.vcxproj".: (TargetId:9)
+19:43:51.664     1>Target "_AddOutputPathToGlobalPropertiesToRemove: (TargetId:10)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_GetProjectReferenceTargetFrameworkProperties" depends on it):
+19:43:51.664     1>Done building target "_AddOutputPathToGlobalPropertiesToRemove" in project "DiagramDetective.vcxproj".: (TargetId:10)
+19:43:51.664     1>Target "_GetProjectReferenceTargetFrameworkProperties: (TargetId:11)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareProjectReferences" depends on it):
+                   Task "MSBuild" (TaskId:10)
+                   Done executing task "MSBuild". (TaskId:10)
+                   Task "SetRidAgnosticValueForProjects" (TaskId:11)
+                   Done executing task "SetRidAgnosticValueForProjects". (TaskId:11)
+19:43:51.665     1>Done building target "_GetProjectReferenceTargetFrameworkProperties" in project "DiagramDetective.vcxproj".: (TargetId:11)
+19:43:51.665     1>Target "PrepareProjectReferences: (TargetId:12)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveProjectReferences" depends on it):
+19:43:51.665     1>Done building target "PrepareProjectReferences" in project "DiagramDetective.vcxproj".: (TargetId:12)
+19:43:51.665     1>Target "ResolveProjectReferences: (TargetId:13)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+19:43:51.667     1>Done building target "ResolveProjectReferences" in project "DiagramDetective.vcxproj".: (TargetId:13)
+19:43:51.667     1>Target "GetFrameworkPaths: (TargetId:14)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveAssemblyReferences" depends on it):
+19:43:51.667     1>Done building target "GetFrameworkPaths" in project "DiagramDetective.vcxproj".: (TargetId:14)
+19:43:51.667     1>Target "GetReferenceAssemblyPaths: (TargetId:15)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveAssemblyReferences" depends on it):
+19:43:51.667     1>Done building target "GetReferenceAssemblyPaths" in project "DiagramDetective.vcxproj".: (TargetId:15)
+19:43:51.667     1>Target "AddExternalIncludDirectoriesToPaths: (TargetId:16)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.Cpp.Current.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "SetBuildDefaultEnvironmentVariables" depends on it):
+19:43:51.667     1>Done building target "AddExternalIncludDirectoriesToPaths" in project "DiagramDetective.vcxproj".: (TargetId:16)
+19:43:51.667     1>Target "SetBuildDefaultEnvironmentVariables: (TargetId:17)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.Cpp.Current.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareForBuild" depends on it):
+                   Task "SetEnv" (TaskId:12)
+                   Done executing task "SetEnv". (TaskId:12)
+                   Task "SetEnv" (TaskId:13)
+                   Done executing task "SetEnv". (TaskId:13)
+                   Task "SetEnv" (TaskId:14)
+                   Done executing task "SetEnv". (TaskId:14)
+                   Task "SetEnv" (TaskId:15)
+                   Done executing task "SetEnv". (TaskId:15)
+                   Task "SetEnv" (TaskId:16)
+                   Done executing task "SetEnv". (TaskId:16)
+19:43:51.668     1>Done building target "SetBuildDefaultEnvironmentVariables" in project "DiagramDetective.vcxproj".: (TargetId:17)
+19:43:51.668     1>Target "GetResolvedWinMD: (TargetId:18)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareForBuild" depends on it):
+19:43:51.668     1>Done building target "GetResolvedWinMD" in project "DiagramDetective.vcxproj".: (TargetId:18)
+19:43:51.669     1>Target "_CheckWindowsSDKInstalled: (TargetId:19)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.Cpp.WindowsSDK.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareForBuild" depends on it):
+19:43:51.669     1>Done building target "_CheckWindowsSDKInstalled" in project "DiagramDetective.vcxproj".: (TargetId:19)
+19:43:51.669     1>Target "SetCABuildNativeEnvironmentVariables: (TargetId:20)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VisualStudio\v18.0\CodeAnalysis\Microsoft.CodeAnalysis.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "PrepareForBuild" depends on it):
+                   Task "SetEnv" (TaskId:17)
+                   Done executing task "SetEnv". (TaskId:17)
+19:43:51.669     1>Done building target "SetCABuildNativeEnvironmentVariables" in project "DiagramDetective.vcxproj".: (TargetId:20)
+19:43:51.669     1>Target "PrepareForBuild: (TargetId:21)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveAssemblyReferences" depends on it):
+                   Task "MakeDir" (TaskId:18)
+                   Done executing task "MakeDir". (TaskId:18)
+                   Task "CheckVCToolsetVersion" (TaskId:19)
+                   Done executing task "CheckVCToolsetVersion". (TaskId:19)
+                   Task "VCMessage" (TaskId:20)
+                   Done executing task "VCMessage". (TaskId:20)
+                   Task "MakeDir" (TaskId:21)
+                   Done executing task "MakeDir". (TaskId:21)
+19:43:51.675     1>Done building target "PrepareForBuild" in project "DiagramDetective.vcxproj".: (TargetId:21)
+19:43:51.675     1>Target "ResolveSDKReferences: (TargetId:22)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveAssemblyReferences" depends on it):
+19:43:51.675     1>Done building target "ResolveSDKReferences" in project "DiagramDetective.vcxproj".: (TargetId:22)
+19:43:51.675     1>Target "ExpandSDKReferences: (TargetId:23)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveAssemblyReferences" depends on it):
+19:43:51.675     1>Done building target "ExpandSDKReferences" in project "DiagramDetective.vcxproj".: (TargetId:23)
+19:43:51.677     1>Target "ResolveAssemblyReferences: (TargetId:24)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+19:43:51.677     1>Done building target "ResolveAssemblyReferences" in project "DiagramDetective.vcxproj".: (TargetId:24)
+19:43:51.677     1>Target "AfterResolveReferences: (TargetId:25)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ResolveReferences" depends on it):
+19:43:51.677     1>Done building target "AfterResolveReferences" in project "DiagramDetective.vcxproj".: (TargetId:25)
+19:43:51.677     1>Target "ResolveReferences: (TargetId:26)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "Build" depends on it):
+19:43:51.677     1>Done building target "ResolveReferences" in project "DiagramDetective.vcxproj".: (TargetId:26)
+19:43:51.677     1>Target "InitializeBuildStatus: (TargetId:27)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "Build" depends on it):
+                   Task "ReadLinesFromFile" (TaskId:22)
+                   Done executing task "ReadLinesFromFile". (TaskId:22)
+                   Task "WriteLinesToFile" (TaskId:23)
+                   Done executing task "WriteLinesToFile". (TaskId:23)
+                   Task "Touch" (TaskId:24)
+                   Done executing task "Touch". (TaskId:24)
+19:43:51.682     1>Done building target "InitializeBuildStatus" in project "DiagramDetective.vcxproj".: (TargetId:27)
+19:43:51.682     1>Target "BuildGenerateSourcesTraverse: (TargetId:28)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "BuildGenerateSources" depends on it):
+19:43:51.682     1>Done building target "BuildGenerateSourcesTraverse" in project "DiagramDetective.vcxproj".: (TargetId:28)
+19:43:51.682     1>Target "BeforeBuildGenerateSources: (TargetId:29)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.BuildSteps.Targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.682     1>Done building target "BeforeBuildGenerateSources" in project "DiagramDetective.vcxproj".: (TargetId:29)
+19:43:51.682     1>Target "PreBuildEvent: (TargetId:30)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.682     1>Done building target "PreBuildEvent" in project "DiagramDetective.vcxproj".: (TargetId:30)
+19:43:51.682     1>Target "_SelectedFiles: (TargetId:31)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "SelectCustomBuild" depends on it):
+19:43:51.682     1>Done building target "_SelectedFiles" in project "DiagramDetective.vcxproj".: (TargetId:31)
+19:43:51.682     1>Target "SelectCustomBuild: (TargetId:32)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "CustomBuild" depends on it):
+19:43:51.682     1>Done building target "SelectCustomBuild" in project "DiagramDetective.vcxproj".: (TargetId:32)
+19:43:51.682     1>Target "ComputeCustomBuildOutput: (TargetId:33)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "CustomBuild" depends on it):
+                   Task "MakeDir" (TaskId:25)
+                   Done executing task "MakeDir". (TaskId:25)
+19:43:51.683     1>Done building target "ComputeCustomBuildOutput" in project "DiagramDetective.vcxproj".: (TargetId:33)
+19:43:51.683     1>Target "CustomBuild: (TargetId:34)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+                   Task "GetOutOfDateItems" (TaskId:26)
+                   Done executing task "GetOutOfDateItems". (TaskId:26)
+                   Task "GetOutOfDateItems" (TaskId:27)
+                   Done executing task "GetOutOfDateItems". (TaskId:27)
+19:43:51.690     1>Done building target "CustomBuild" in project "DiagramDetective.vcxproj".: (TargetId:34)
+19:43:51.690     1>Target "CopyFileToFolders: (TargetId:35)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+                   Task "GetOutOfDateItems" (TaskId:28)
+                   Done executing task "GetOutOfDateItems". (TaskId:28)
+19:43:51.690     1>Done building target "CopyFileToFolders" in project "DiagramDetective.vcxproj".: (TargetId:35)
+19:43:51.691     1>Target "_Xsd: (TargetId:36)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.691     1>Done building target "_Xsd" in project "DiagramDetective.vcxproj".: (TargetId:36)
+19:43:51.691     1>Target "MakeDirsForMidl: (TargetId:37)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_Midl" depends on it):
+                   Task "Makedir" (TaskId:29)
+                   Done executing task "Makedir". (TaskId:29)
+19:43:51.691     1>Done building target "MakeDirsForMidl" in project "DiagramDetective.vcxproj".: (TargetId:37)
+19:43:51.691     1>Target "ComputeMIDLGeneratedCompileInputs: (TargetId:38)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_Midl" depends on it):
+19:43:51.691     1>Done building target "ComputeMIDLGeneratedCompileInputs" in project "DiagramDetective.vcxproj".: (TargetId:38)
+19:43:51.691     1>Target "AfterMidl: (TargetId:39)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_Midl" depends on it):
+19:43:51.691     1>Done building target "AfterMidl" in project "DiagramDetective.vcxproj".: (TargetId:39)
+19:43:51.691     1>Target "_Midl: (TargetId:40)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.691     1>Done building target "_Midl" in project "DiagramDetective.vcxproj".: (TargetId:40)
+19:43:51.691     1>Target "AfterBuildGenerateSources: (TargetId:41)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.BuildSteps.Targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.691     1>Done building target "AfterBuildGenerateSources" in project "DiagramDetective.vcxproj".: (TargetId:41)
+19:43:51.691     1>Target "AfterBuildGenerateSourcesEvent: (TargetId:42)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_BuildGenerateSourcesAction" depends on it):
+19:43:51.691     1>Done building target "AfterBuildGenerateSourcesEvent" in project "DiagramDetective.vcxproj".: (TargetId:42)
+19:43:51.691     1>Target "_BuildGenerateSourcesAction: (TargetId:43)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "BuildGenerateSources" depends on it):
+19:43:51.691     1>Done building target "_BuildGenerateSourcesAction" in project "DiagramDetective.vcxproj".: (TargetId:43)
+19:43:51.691     1>Target "BuildGenerateSources: (TargetId:44)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "Build" depends on it):
+19:43:51.691     1>Done building target "BuildGenerateSources" in project "DiagramDetective.vcxproj".: (TargetId:44)
+19:43:51.691     1>Target "BuildCompileTraverse: (TargetId:45)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "BuildCompile" depends on it):
+19:43:51.691     1>Done building target "BuildCompileTraverse" in project "DiagramDetective.vcxproj".: (TargetId:45)
+19:43:51.691     1>Target "BeforeClCompile: (TargetId:46)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:51.691     1>Done building target "BeforeClCompile" in project "DiagramDetective.vcxproj".: (TargetId:46)
+19:43:51.691     1>Target "ComputeCLInputPDBName: (TargetId:47)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:51.691     1>Done building target "ComputeCLInputPDBName" in project "DiagramDetective.vcxproj".: (TargetId:47)
+19:43:51.691     1>Target "FindReferenceAssembliesForReferences: (TargetId:48)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\Microsoft.Common.CurrentVersion.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ComputeReferenceCLInput" depends on it):
+19:43:51.691     1>Done building target "FindReferenceAssembliesForReferences" in project "DiagramDetective.vcxproj".: (TargetId:48)
+19:43:51.691     1>Target "GetReferencedVCProjectsInfo: (TargetId:49)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ComputeReferenceCLInput" depends on it):
+19:43:51.691     1>Done building target "GetReferencedVCProjectsInfo" in project "DiagramDetective.vcxproj".: (TargetId:49)
+19:43:51.691     1>Target "QtGetDefaultClCompile: (TargetId:50)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_build.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ComputeReferenceCLInput" depends on it):
+19:43:51.691     1>Done building target "QtGetDefaultClCompile" in project "DiagramDetective.vcxproj".: (TargetId:50)
+19:43:51.691     1>Target "ComputeReferenceCLInput: (TargetId:51)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:51.692     1>Done building target "ComputeReferenceCLInput" in project "DiagramDetective.vcxproj".: (TargetId:51)
+19:43:51.692     1>Target "WarnCompileDuplicatedFilename: (TargetId:52)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:51.692     1>Done building target "WarnCompileDuplicatedFilename" in project "DiagramDetective.vcxproj".: (TargetId:52)
+19:43:51.692     1>Target "SetCppLanguageStandardCapabilities: (TargetId:53)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ComputeStdModulesCompileInputs" depends on it):
+19:43:51.693     1>Done building target "SetCppLanguageStandardCapabilities" in project "DiagramDetective.vcxproj".: (TargetId:53)
+19:43:51.693     1>Target "ComputeStdModulesCompileInputs: (TargetId:54)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:51.693     1>Done building target "ComputeStdModulesCompileInputs" in project "DiagramDetective.vcxproj".: (TargetId:54)
+19:43:51.693     1>Target "QtPrepare: (TargetId:55)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_globals.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+                   Task "Message" (TaskId:30)
+                      Qt/MSBuild: 3.5.0.0 (TaskId:30)
+                   Done executing task "Message". (TaskId:30)
+                   Task "ReadLinesFromFile" (TaskId:31)
+                   Done executing task "ReadLinesFromFile". (TaskId:31)
+19:43:51.695     1>Done building target "QtPrepare" in project "DiagramDetective.vcxproj".: (TargetId:55)
+19:43:51.695     1>Target "QtHash: (TargetId:56)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_globals.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+                   Task "GetItemHash" (TaskId:32)
+                   Done executing task "GetItemHash". (TaskId:32)
+19:43:51.880     1>Done building target "QtHash" in project "DiagramDetective.vcxproj".: (TargetId:56)
+19:43:51.880     1>Target "QtVarsPrepare: (TargetId:57)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_vars.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+                   Task "MSBuild" (TaskId:33)
+19:43:51.642     1>Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (1) is building "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (1:2) on node 2 (QtVarsRead target(s)).
+19:43:51.882   1:2>Target "QtVarsRead: (TargetId:58)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_vars.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (entry point):
+19:43:51.882   1:2>Task "ReadLinesFromFile" (TaskId:34)
+                   Done executing task "ReadLinesFromFile". (TaskId:34)
+                   Task "XmlPeek" (TaskId:35)
+                   Done executing task "XmlPeek". (TaskId:35)
+19:43:51.888   1:2>Done building target "QtVarsRead" in project "DiagramDetective.vcxproj".: (TargetId:58)
+19:43:51.889   1:2>Done Building Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (QtVarsRead target(s)).
+19:43:51.892     1>Done executing task "MSBuild". (TaskId:33)
+                   Task "CreateProperty" (TaskId:36)
+                   Done executing task "CreateProperty". (TaskId:36)
+19:43:51.893     1>Done building target "QtVarsPrepare" in project "DiagramDetective.vcxproj".: (TargetId:57)
+19:43:51.893     1>Target "QtMocInit: (TargetId:59)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+19:43:51.893     1>Done building target "QtMocInit" in project "DiagramDetective.vcxproj".: (TargetId:59)
+19:43:51.893     1>Target "QtUicInit: (TargetId:60)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\uic\qtuic.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+                   Task "CreateProperty" (TaskId:37)
+                   Done executing task "CreateProperty". (TaskId:37)
+19:43:51.893     1>Done building target "QtUicInit" in project "DiagramDetective.vcxproj".: (TargetId:60)
+19:43:51.894     1>Target "QtQmlStaticGatherQmlPaths: (TargetId:61)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_static.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQmlStaticGenerateImportFile" depends on it):
+                   Task "ListQrc" (TaskId:38)
+                   Done executing task "ListQrc". (TaskId:38)
+19:43:52.042     1>Done building target "QtQmlStaticGatherQmlPaths" in project "DiagramDetective.vcxproj".: (TargetId:61)
+19:43:52.042     1>Target "QtQmlStaticGenerateImportFile: (TargetId:62)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_static.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVars" depends on it):
+19:43:52.042     1>Done building target "QtQmlStaticGenerateImportFile" in project "DiagramDetective.vcxproj".: (TargetId:62)
+19:43:52.042     1>Target "QtVars: (TargetId:63)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_vars.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtVarsLoad" depends on it):
+                   Task "Exec" (TaskId:39)
+                     WHERE /Q cl.exe (TaskId:39)
+                   Done executing task "Exec". (TaskId:39)
+                   Task "MakeDir" (TaskId:40)
+                   Done executing task "MakeDir". (TaskId:40)
+                   Task "HostTranslatePaths" (TaskId:41)
+                   Done executing task "HostTranslatePaths". (TaskId:41)
+                   Task "HostExec" (TaskId:42)
+                     ("C:/Qt/6.11.1/msvc2022_64/bin/qmake" -query) 1> props.txt (TaskId:42)
+                   Done executing task "HostExec". (TaskId:42)
+                   Task "ReadLinesFromFile" (TaskId:43)
+                   Done executing task "ReadLinesFromFile". (TaskId:43)
+                   Task "Message" (TaskId:44)
+                     Reading Qt configuration (C:/Qt/6.11.1/msvc2022_64/bin/qmake) (TaskId:44)
+                   Done executing task "Message". (TaskId:44)
+                   Task "WriteLinesToFile" (TaskId:45)
+                   Done executing task "WriteLinesToFile". (TaskId:45)
+                   Task "HostExec" (TaskId:46)
+                     ("C:/Qt/6.11.1/msvc2022_64/bin/qmake"  -tp vc -early "CONFIG -= debug release debug_and_release" "CONFIG += debug warn_off"  qtvars.pro) 1> qtvars.log 2>&1 (TaskId:46)
+                   Done executing task "HostExec". (TaskId:46)
+                   Task "ReadLinesFromFile" (TaskId:47)
+                   Done executing task "ReadLinesFromFile". (TaskId:47)
+                   Task "GetVarsFromMSBuild" (TaskId:48)
+                   Done executing task "GetVarsFromMSBuild". (TaskId:48)
+                   Task "WriteLinesToFile" (TaskId:49)
+                   Done executing task "WriteLinesToFile". (TaskId:49)
+                   Task "MakeDir" (TaskId:50)
+                   Done executing task "MakeDir". (TaskId:50)
+                   Task "Copy" (TaskId:51)
+                   Done executing task "Copy". (TaskId:51)
+                   Task "QtAtomicReplaceFile" (TaskId:52)
+                   Done executing task "QtAtomicReplaceFile". (TaskId:52)
+                   Task "Delete" (TaskId:53)
+                   Done executing task "Delete". (TaskId:53)
+                   Task "Delete" (TaskId:54)
+                   Done executing task "Delete". (TaskId:54)
+19:43:53.171     1>Done building target "QtVars" in project "DiagramDetective.vcxproj".: (TargetId:63)
+19:43:53.171     1>Target "QtVarsLoad: (TargetId:64)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_vars.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "MSBuild" (TaskId:55)
+19:43:51.642     1>Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (1) is building "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (1:3) on node 2 (QtVarsRead target(s)).
+19:43:53.172   1:3>Done Building Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (QtVarsRead target(s)).
+19:43:53.172     1>Done executing task "MSBuild". (TaskId:55)
+                   Task "CreateProperty" (TaskId:56)
+                   Done executing task "CreateProperty". (TaskId:56)
+                   Task "CreateProperty" (TaskId:57)
+                   Done executing task "CreateProperty". (TaskId:57)
+                   Task "CreateProperty" (TaskId:58)
+                   Done executing task "CreateProperty". (TaskId:58)
+                   Task "CreateProperty" (TaskId:59)
+                   Done executing task "CreateProperty". (TaskId:59)
+                   Task "CreateProperty" (TaskId:60)
+                   Done executing task "CreateProperty". (TaskId:60)
+                   Task "CreateProperty" (TaskId:61)
+                   Done executing task "CreateProperty". (TaskId:61)
+                   Task "CreateProperty" (TaskId:62)
+                   Done executing task "CreateProperty". (TaskId:62)
+                   Task "CreateProperty" (TaskId:63)
+                   Done executing task "CreateProperty". (TaskId:63)
+                   Task "CreateProperty" (TaskId:64)
+                   Done executing task "CreateProperty". (TaskId:64)
+                   Task "CreateProperty" (TaskId:65)
+                   Done executing task "CreateProperty". (TaskId:65)
+                   Task "CreateProperty" (TaskId:66)
+                   Done executing task "CreateProperty". (TaskId:66)
+                   Task "CreateProperty" (TaskId:67)
+                   Done executing task "CreateProperty". (TaskId:67)
+                   Task "CreateProperty" (TaskId:68)
+                   Done executing task "CreateProperty". (TaskId:68)
+                   Task "CreateProperty" (TaskId:69)
+                   Done executing task "CreateProperty". (TaskId:69)
+                   Task "CreateProperty" (TaskId:70)
+                   Done executing task "CreateProperty". (TaskId:70)
+                   Task "CreateProperty" (TaskId:71)
+                   Done executing task "CreateProperty". (TaskId:71)
+                   Task "CreateProperty" (TaskId:72)
+                   Done executing task "CreateProperty". (TaskId:72)
+                   Task "CreateProperty" (TaskId:73)
+                   Done executing task "CreateProperty". (TaskId:73)
+                   Task "CreateProperty" (TaskId:74)
+                   Done executing task "CreateProperty". (TaskId:74)
+                   Task "CreateProperty" (TaskId:75)
+                   Done executing task "CreateProperty". (TaskId:75)
+                   Task "CreateProperty" (TaskId:76)
+                   Done executing task "CreateProperty". (TaskId:76)
+                   Task "CreateProperty" (TaskId:77)
+                   Done executing task "CreateProperty". (TaskId:77)
+                   Task "CreateProperty" (TaskId:78)
+                   Done executing task "CreateProperty". (TaskId:78)
+                   Task "CreateProperty" (TaskId:79)
+                   Done executing task "CreateProperty". (TaskId:79)
+                   Task "CreateProperty" (TaskId:80)
+                   Done executing task "CreateProperty". (TaskId:80)
+                   Task "CreateProperty" (TaskId:81)
+                   Done executing task "CreateProperty". (TaskId:81)
+                   Task "CreateProperty" (TaskId:82)
+                   Done executing task "CreateProperty". (TaskId:82)
+                   Task "CreateProperty" (TaskId:83)
+                   Done executing task "CreateProperty". (TaskId:83)
+                   Task "CreateProperty" (TaskId:84)
+                   Done executing task "CreateProperty". (TaskId:84)
+                   Task "CreateProperty" (TaskId:85)
+                   Done executing task "CreateProperty". (TaskId:85)
+                   Task "CreateProperty" (TaskId:86)
+                   Done executing task "CreateProperty". (TaskId:86)
+                   Task "CreateProperty" (TaskId:87)
+                   Done executing task "CreateProperty". (TaskId:87)
+                   Task "CreateProperty" (TaskId:88)
+                   Done executing task "CreateProperty". (TaskId:88)
+                   Task "CreateProperty" (TaskId:89)
+                   Done executing task "CreateProperty". (TaskId:89)
+                   Task "CreateProperty" (TaskId:90)
+                   Done executing task "CreateProperty". (TaskId:90)
+                   Task "CreateProperty" (TaskId:91)
+                   Done executing task "CreateProperty". (TaskId:91)
+                   Task "Message" (TaskId:92)
+                      Qt: 6.11.1 (TaskId:92)
+                   Done executing task "Message". (TaskId:92)
+19:43:53.175     1>Done building target "QtVarsLoad" in project "DiagramDetective.vcxproj".: (TargetId:64)
+19:43:53.175     1>Target "QtTranslation: (TargetId:65)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\translation\qttranslation.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+19:43:53.175     1>Done building target "QtTranslation" in project "DiagramDetective.vcxproj".: (TargetId:65)
+19:43:53.175     1>Target "QtUicPrepare: (TargetId:66)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\uic\qtuic.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtUic" depends on it):
+19:43:53.176     1>Done building target "QtUicPrepare" in project "DiagramDetective.vcxproj".: (TargetId:66)
+19:43:53.176     1>Target "QtUicSetModified: (TargetId:67)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\uic\qtuic.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtUic" depends on it):
+19:43:53.176     1>Done building target "QtUicSetModified" in project "DiagramDetective.vcxproj".: (TargetId:67)
+19:43:53.176     1>Target "QtUic: (TargetId:68)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\uic\qtuic.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:93)
+                   Done executing task "CreateProperty". (TaskId:93)
+                   Task "Flatten" (TaskId:94)
+                   Done executing task "Flatten". (TaskId:94)
+                   Task "HostTranslatePaths" (TaskId:95)
+                   Done executing task "HostTranslatePaths". (TaskId:95)
+19:43:53.332     1>Done building target "QtUic" in project "DiagramDetective.vcxproj".: (TargetId:68)
+19:43:53.332     1>Target "QtRccInit: (TargetId:69)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRccSetDependencies" depends on it):
+19:43:53.332     1>Done building target "QtRccInit" in project "DiagramDetective.vcxproj".: (TargetId:69)
+19:43:53.332     1>Target "QtRccSetDependencies: (TargetId:70)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRccPrepare" depends on it):
+                   Task "ListQrc" (TaskId:96)
+                   Done executing task "ListQrc". (TaskId:96)
+19:43:53.333     1>Done building target "QtRccSetDependencies" in project "DiagramDetective.vcxproj".: (TargetId:70)
+19:43:53.333     1>Target "QtQmlCachePrepare: (TargetId:71)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRccPrepare" depends on it):
+19:43:53.333     1>Done building target "QtQmlCachePrepare" in project "DiagramDetective.vcxproj".: (TargetId:71)
+19:43:53.333     1>Target "QtRccPrepare: (TargetId:72)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRcc" depends on it):
+19:43:53.333     1>Done building target "QtRccPrepare" in project "DiagramDetective.vcxproj".: (TargetId:72)
+19:43:53.333     1>Target "QtRccSetModified: (TargetId:73)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRcc" depends on it):
+19:43:53.334     1>Done building target "QtRccSetModified" in project "DiagramDetective.vcxproj".: (TargetId:73)
+19:43:53.334     1>Target "QtRccOverrideCpp: (TargetId:74)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRcc" depends on it):
+19:43:53.334     1>Done building target "QtRccOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:74)
+19:43:53.334     1>Target "QtRccFilterSetModified: (TargetId:75)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRccFilter" depends on it):
+19:43:53.334     1>Done building target "QtRccFilterSetModified" in project "DiagramDetective.vcxproj".: (TargetId:75)
+19:43:53.334     1>Target "QtRccFilter: (TargetId:76)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQmlCacheLoader" depends on it):
+19:43:53.334     1>Done building target "QtRccFilter" in project "DiagramDetective.vcxproj".: (TargetId:76)
+19:43:53.334     1>Target "QtQmlCacheLoader: (TargetId:77)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQmlCache" depends on it):
+19:43:53.334     1>Done building target "QtQmlCacheLoader" in project "DiagramDetective.vcxproj".: (TargetId:77)
+19:43:53.334     1>Target "QtQmlSetModified: (TargetId:78)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQmlCacheItem" depends on it):
+19:43:53.334     1>Done building target "QtQmlSetModified" in project "DiagramDetective.vcxproj".: (TargetId:78)
+19:43:53.334     1>Target "QtQmlCacheItem: (TargetId:79)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQmlCache" depends on it):
+19:43:53.334     1>Done building target "QtQmlCacheItem" in project "DiagramDetective.vcxproj".: (TargetId:79)
+19:43:53.334     1>Target "QtQmlCache: (TargetId:80)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml_cache.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtRcc" depends on it):
+19:43:53.334     1>Done building target "QtQmlCache" in project "DiagramDetective.vcxproj".: (TargetId:80)
+19:43:53.334     1>Target "QtRcc: (TargetId:81)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\rcc\qtrcc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:97)
+                   Done executing task "CreateProperty". (TaskId:97)
+                   Task "Flatten" (TaskId:98)
+                   Done executing task "Flatten". (TaskId:98)
+                   Task "HostTranslatePaths" (TaskId:99)
+                   Done executing task "HostTranslatePaths". (TaskId:99)
+19:43:53.338     1>Done building target "QtRcc" in project "DiagramDetective.vcxproj".: (TargetId:81)
+19:43:53.338     1>Target "QtMocEnsureCollectJsonMarkers: (TargetId:82)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMocPrepare" depends on it):
+19:43:53.338     1>Done building target "QtMocEnsureCollectJsonMarkers" in project "DiagramDetective.vcxproj".: (TargetId:82)
+19:43:53.338     1>Target "QtMocPrepare: (TargetId:83)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.338     1>Done building target "QtMocPrepare" in project "DiagramDetective.vcxproj".: (TargetId:83)
+19:43:53.338     1>Target "QtMocSetModified: (TargetId:84)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.338     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:84)
+19:43:53.338     1>Target "QtMocSetModified: (TargetId:85)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+                   Task "CreateProperty" (TaskId:100)
+                   Done executing task "CreateProperty". (TaskId:100)
+19:43:53.339     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:85)
+19:43:53.339     1>Target "QtMocSetModified: (TargetId:86)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+                   Task "CreateProperty" (TaskId:101)
+                   Done executing task "CreateProperty". (TaskId:101)
+19:43:53.339     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:86)
+19:43:53.339     1>Target "QtMocSetModified: (TargetId:87)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.340     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:87)
+19:43:53.340     1>Target "QtMocSetModified: (TargetId:88)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.340     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:88)
+19:43:53.340     1>Target "QtMocSetModified: (TargetId:89)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.340     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:89)
+19:43:53.340     1>Target "QtMocSetModified: (TargetId:90)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.340     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:90)
+19:43:53.340     1>Target "QtMocSetModified: (TargetId:91)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.340     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:91)
+19:43:53.340     1>Target "QtMocSetModified: (TargetId:92)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+                   Task "CreateProperty" (TaskId:102)
+                   Done executing task "CreateProperty". (TaskId:102)
+19:43:53.341     1>Done building target "QtMocSetModified" in project "DiagramDetective.vcxproj".: (TargetId:92)
+19:43:53.341     1>Target "QtMocOverrideCpp: (TargetId:93)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.342     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:93)
+19:43:53.342     1>Target "QtMocOverrideCpp: (TargetId:94)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.342     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:94)
+19:43:53.342     1>Target "QtMocOverrideCpp: (TargetId:95)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.343     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:95)
+19:43:53.343     1>Target "QtMocOverrideCpp: (TargetId:96)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.343     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:96)
+19:43:53.343     1>Target "QtMocOverrideCpp: (TargetId:97)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.343     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:97)
+19:43:53.343     1>Target "QtMocOverrideCpp: (TargetId:98)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.344     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:98)
+19:43:53.344     1>Target "QtMocOverrideCpp: (TargetId:99)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.344     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:99)
+19:43:53.344     1>Target "QtMocOverrideCpp: (TargetId:100)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.345     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:100)
+19:43:53.345     1>Target "QtMocOverrideCpp: (TargetId:101)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc_cl.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.345     1>Done building target "QtMocOverrideCpp" in project "DiagramDetective.vcxproj".: (TargetId:101)
+19:43:53.345     1>Target "QtMocUpdate: (TargetId:102)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtMoc" depends on it):
+19:43:53.345     1>Done building target "QtMocUpdate" in project "DiagramDetective.vcxproj".: (TargetId:102)
+19:43:53.346     1>Target "QtMoc: (TargetId:103)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:103)
+                   Done executing task "CreateProperty". (TaskId:103)
+                   Task "Flatten" (TaskId:104)
+                   Done executing task "Flatten". (TaskId:104)
+                   Task "HostTranslatePaths" (TaskId:105)
+                   Done executing task "HostTranslatePaths". (TaskId:105)
+19:43:53.355     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:103)
+19:43:53.355     1>Target "QtMoc: (TargetId:104)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:106)
+                   Done executing task "CreateProperty". (TaskId:106)
+                   Task "Flatten" (TaskId:107)
+                   Done executing task "Flatten". (TaskId:107)
+                   Task "HostTranslatePaths" (TaskId:108)
+                   Done executing task "HostTranslatePaths". (TaskId:108)
+19:43:53.361     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:104)
+19:43:53.361     1>Target "QtMoc: (TargetId:105)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:109)
+                   Done executing task "CreateProperty". (TaskId:109)
+                   Task "Flatten" (TaskId:110)
+                   Done executing task "Flatten". (TaskId:110)
+                   Task "HostTranslatePaths" (TaskId:111)
+                   Done executing task "HostTranslatePaths". (TaskId:111)
+19:43:53.366     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:105)
+19:43:53.366     1>Target "QtMoc: (TargetId:106)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:112)
+                   Done executing task "CreateProperty". (TaskId:112)
+                   Task "Flatten" (TaskId:113)
+                   Done executing task "Flatten". (TaskId:113)
+                   Task "HostTranslatePaths" (TaskId:114)
+                   Done executing task "HostTranslatePaths". (TaskId:114)
+19:43:53.373     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:106)
+19:43:53.373     1>Target "QtMoc: (TargetId:107)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:115)
+                   Done executing task "CreateProperty". (TaskId:115)
+                   Task "Flatten" (TaskId:116)
+                   Done executing task "Flatten". (TaskId:116)
+                   Task "HostTranslatePaths" (TaskId:117)
+                   Done executing task "HostTranslatePaths". (TaskId:117)
+19:43:53.381     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:107)
+19:43:53.381     1>Target "QtMoc: (TargetId:108)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:118)
+                   Done executing task "CreateProperty". (TaskId:118)
+                   Task "Flatten" (TaskId:119)
+                   Done executing task "Flatten". (TaskId:119)
+                   Task "HostTranslatePaths" (TaskId:120)
+                   Done executing task "HostTranslatePaths". (TaskId:120)
+19:43:53.387     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:108)
+19:43:53.387     1>Target "QtMoc: (TargetId:109)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:121)
+                   Done executing task "CreateProperty". (TaskId:121)
+                   Task "Flatten" (TaskId:122)
+                   Done executing task "Flatten". (TaskId:122)
+                   Task "HostTranslatePaths" (TaskId:123)
+                   Done executing task "HostTranslatePaths". (TaskId:123)
+19:43:53.394     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:109)
+19:43:53.394     1>Target "QtMoc: (TargetId:110)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:124)
+                   Done executing task "CreateProperty". (TaskId:124)
+                   Task "Flatten" (TaskId:125)
+                   Done executing task "Flatten". (TaskId:125)
+                   Task "HostTranslatePaths" (TaskId:126)
+                   Done executing task "HostTranslatePaths". (TaskId:126)
+19:43:53.400     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:110)
+19:43:53.400     1>Target "QtMoc: (TargetId:111)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\moc\qtmoc.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+                   Task "CreateProperty" (TaskId:127)
+                   Done executing task "CreateProperty". (TaskId:127)
+                   Task "Flatten" (TaskId:128)
+                   Done executing task "Flatten". (TaskId:128)
+                   Task "HostTranslatePaths" (TaskId:129)
+                   Done executing task "HostTranslatePaths". (TaskId:129)
+19:43:53.406     1>Done building target "QtMoc" in project "DiagramDetective.vcxproj".: (TargetId:111)
+19:43:53.406     1>Target "QtQmlCreateItems: (TargetId:112)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtQml" depends on it):
+19:43:53.406     1>Done building target "QtQmlCreateItems" in project "DiagramDetective.vcxproj".: (TargetId:112)
+19:43:53.406     1>Target "QtQml: (TargetId:113)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qml\qtqml.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWorkPrepare" depends on it):
+19:43:53.406     1>Done building target "QtQml" in project "DiagramDetective.vcxproj".: (TargetId:113)
+19:43:53.406     1>Target "QtWorkPrepare: (TargetId:114)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:130)
+                   Done executing task "GetItemHash". (TaskId:130)
+                   Task "FindInList" (TaskId:131)
+                   Done executing task "FindInList". (TaskId:131)
+19:43:53.408     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:114)
+19:43:53.408     1>Target "QtWorkPrepare: (TargetId:115)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:132)
+                   Done executing task "GetItemHash". (TaskId:132)
+                   Task "FindInList" (TaskId:133)
+                   Done executing task "FindInList". (TaskId:133)
+19:43:53.409     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:115)
+19:43:53.409     1>Target "QtWorkPrepare: (TargetId:116)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:134)
+                   Done executing task "GetItemHash". (TaskId:134)
+                   Task "FindInList" (TaskId:135)
+                   Done executing task "FindInList". (TaskId:135)
+19:43:53.410     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:116)
+19:43:53.410     1>Target "QtWorkPrepare: (TargetId:117)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:136)
+                   Done executing task "GetItemHash". (TaskId:136)
+                   Task "MakeDir" (TaskId:137)
+                   Done executing task "MakeDir". (TaskId:137)
+19:43:53.411     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:117)
+19:43:53.411     1>Target "QtWorkPrepare: (TargetId:118)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:138)
+                   Done executing task "GetItemHash". (TaskId:138)
+                   Task "MakeDir" (TaskId:139)
+                   Done executing task "MakeDir". (TaskId:139)
+19:43:53.412     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:118)
+19:43:53.412     1>Target "QtWorkPrepare: (TargetId:119)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:140)
+                   Done executing task "GetItemHash". (TaskId:140)
+                   Task "FindInList" (TaskId:141)
+                   Done executing task "FindInList". (TaskId:141)
+19:43:53.412     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:119)
+19:43:53.412     1>Target "QtWorkPrepare: (TargetId:120)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:142)
+                   Done executing task "GetItemHash". (TaskId:142)
+                   Task "FindInList" (TaskId:143)
+                   Done executing task "FindInList". (TaskId:143)
+19:43:53.413     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:120)
+19:43:53.413     1>Target "QtWorkPrepare: (TargetId:121)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:144)
+                   Done executing task "GetItemHash". (TaskId:144)
+                   Task "FindInList" (TaskId:145)
+                   Done executing task "FindInList". (TaskId:145)
+19:43:53.414     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:121)
+19:43:53.414     1>Target "QtWorkPrepare: (TargetId:122)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:146)
+                   Done executing task "GetItemHash". (TaskId:146)
+                   Task "FindInList" (TaskId:147)
+                   Done executing task "FindInList". (TaskId:147)
+19:43:53.415     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:122)
+19:43:53.415     1>Target "QtWorkPrepare: (TargetId:123)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:148)
+                   Done executing task "GetItemHash". (TaskId:148)
+                   Task "FindInList" (TaskId:149)
+                   Done executing task "FindInList". (TaskId:149)
+19:43:53.415     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:123)
+19:43:53.415     1>Target "QtWorkPrepare: (TargetId:124)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtWork" depends on it):
+                   Task "GetItemHash" (TaskId:150)
+                   Done executing task "GetItemHash". (TaskId:150)
+                   Task "MakeDir" (TaskId:151)
+                   Done executing task "MakeDir". (TaskId:151)
+19:43:53.416     1>Done building target "QtWorkPrepare" in project "DiagramDetective.vcxproj".: (TargetId:124)
+19:43:53.416     1>Target "QtWork: (TargetId:125)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_work.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtAddCompilerSources" depends on it):
+                   Task "QtRunWork" (TaskId:152)
+                     moc Node.h (TaskId:152)
+                     moc Object.h (TaskId:152)
+                     moc Functor.h (TaskId:152)
+                   Done executing task "QtRunWork". (TaskId:152)
+                   Task "WriteLinesToFile" (TaskId:153)
+                   Done executing task "WriteLinesToFile". (TaskId:153)
+                   Task "WriteLinesToFile" (TaskId:154)
+                   Done executing task "WriteLinesToFile". (TaskId:154)
+                   Task "WriteLinesToFile" (TaskId:155)
+                   Done executing task "WriteLinesToFile". (TaskId:155)
+                   Task "WriteLinesToFile" (TaskId:156)
+                   Done executing task "WriteLinesToFile". (TaskId:156)
+                   Task "WriteLinesToFile" (TaskId:157)
+                   Done executing task "WriteLinesToFile". (TaskId:157)
+                   Task "WriteLinesToFile" (TaskId:158)
+                   Done executing task "WriteLinesToFile". (TaskId:158)
+                   Task "WriteLinesToFile" (TaskId:159)
+                   Done executing task "WriteLinesToFile". (TaskId:159)
+                   Task "WriteLinesToFile" (TaskId:160)
+                   Done executing task "WriteLinesToFile". (TaskId:160)
+                   Task "WriteLinesToFile" (TaskId:161)
+                   Done executing task "WriteLinesToFile". (TaskId:161)
+                   Task "WriteLinesToFile" (TaskId:162)
+                   Done executing task "WriteLinesToFile". (TaskId:162)
+                   Task "WriteLinesToFile" (TaskId:163)
+                   Done executing task "WriteLinesToFile". (TaskId:163)
+                   Task "WriteLinesToFile" (TaskId:164)
+                   Done executing task "WriteLinesToFile". (TaskId:164)
+                   Task "WriteLinesToFile" (TaskId:165)
+                   Done executing task "WriteLinesToFile". (TaskId:165)
+                   Task "WriteLinesToFile" (TaskId:166)
+                   Done executing task "WriteLinesToFile". (TaskId:166)
+19:43:53.938     1>Done building target "QtWork" in project "DiagramDetective.vcxproj".: (TargetId:125)
+19:43:53.938     1>Target "QtAddCompilerSources: (TargetId:126)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_build.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtUpdateCompilerOptions" depends on it):
+                   Task "Expand" (TaskId:167)
+                   Done executing task "Expand". (TaskId:167)
+19:43:54.096     1>Done building target "QtAddCompilerSources" in project "DiagramDetective.vcxproj".: (TargetId:126)
+19:43:54.096     1>Target "QtPrepareResourceCompilerDefines: (TargetId:127)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_build.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "QtUpdateCompilerOptions" depends on it):
+19:43:54.096     1>Done building target "QtPrepareResourceCompilerDefines" in project "DiagramDetective.vcxproj".: (TargetId:127)
+19:43:54.096     1>Target "QtUpdateCompilerOptions: (TargetId:128)" in file "C:\Users\Administrator\AppData\Local\QtMsBuild\qt_build.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "FixupCLCompileOptions" depends on it):
+                   Task "QtRunTask" (TaskId:168)
+                   Done executing task "QtRunTask". (TaskId:168)
+                   Task "Flatten" (TaskId:169)
+                   Done executing task "Flatten". (TaskId:169)
+19:43:54.356     1>Done building target "QtUpdateCompilerOptions" in project "DiagramDetective.vcxproj".: (TargetId:128)
+19:43:54.356     1>Target "FixupCLCompileOptions: (TargetId:129)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+19:43:54.369     1>Done building target "FixupCLCompileOptions" in project "DiagramDetective.vcxproj".: (TargetId:129)
+19:43:54.369     1>Target "MakeDirsForCl: (TargetId:130)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+                   Task "MakeDir" (TaskId:170)
+                   Done executing task "MakeDir". (TaskId:170)
+19:43:54.369     1>Done building target "MakeDirsForCl" in project "DiagramDetective.vcxproj".: (TargetId:130)
+19:43:54.369     1>Target "SelectClCompile: (TargetId:131)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppBuild.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "ClCompile" depends on it):
+19:43:54.369     1>Done building target "SelectClCompile" in project "DiagramDetective.vcxproj".: (TargetId:131)
+19:43:54.369     1>Target "ClCompile: (TargetId:132)" in file "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Microsoft\VC\v180\Microsoft.CppCommon.targets" from project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (target "_ClCompile" depends on it):
+                   Task "CL" (TaskId:171)
+                     C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.51.36231\bin\HostX64\x64\CL.exe /c /IDiagramDetective\x64\Debug\qt\moc /IDiagramDetective\x64\Debug\qt\uic /IC:\Qt\6.11.1\msvc2022_64\include /IC:\Qt\6.11.1\msvc2022_64\include\QtWidgets /IC:\Qt\6.11.1\msvc2022_64\include\QtGui /IC:\Qt\6.11.1\msvc2022_64\include\QtCore /I"C:\Qt\6.11.1\msvc2022_64\mkspecs\win32-msvc" /IC:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\ /ZI /JMC /nologo /W3 /WX- /diagnostics:column /sdl /MP /Od /D _WINDOWS /D UNICODE /D _UNICODE /D WIN32 /D _ENABLE_EXTENDED_ALIGNED_STORAGE /D WIN64 /D QT_WIDGETS_LIB /D QT_GUI_LIB /D QT_CORE_LIB /D QT_NO_DEPRECATED_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++17 /permissive- /Fo"DiagramDetective\x64\Debug\\" /Fd"DiagramDetective\x64\Debug\vc145.pdb" /external:W3 /Gd /TP /FC /errorReport:prompt -Zc:rvalueCast -Zc:strictStrings -Zc:throwingNew -Zc:__cplusplus -Zc:externConstexpr -utf-8 Arrow.cpp Functor.cpp SketchView.cpp Category.cpp SketchWithinCategory.cpp DiagramScene.cpp Node.cpp Object.cpp DiagramDetective.cpp main.cpp (TaskId:171)
+                     Arrow.cpp (TaskId:171)
+                     Functor.cpp (TaskId:171)
+                     SketchView.cpp (TaskId:171)
+                     Category.cpp (TaskId:171)
+                     SketchWithinCategory.cpp (TaskId:171)
+                     DiagramScene.cpp (TaskId:171)
+                     Node.cpp (TaskId:171)
+                     Object.cpp (TaskId:171)
+19:43:58.799     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Node.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.805     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Object.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.806     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'SketchWithinCategory.cpp')
+                      (TaskId:171)
+19:43:58.835     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.836     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.838     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.838     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Functor.cpp')
+                      (TaskId:171)
+19:43:58.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(5,1): error C2512: 'Arrow': no appropriate default constructor available
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Arrow.h(5,7):
+                         see declaration of 'Arrow'
+                      (TaskId:171)
+19:43:58.848     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(6,11): error C2039: 'surroundingCategory': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.848     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(6,41): error C2039: 'surroundingCategory': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.848     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(13,3): error C2664: 'void Arrow::setDomain(Node *)': cannot convert argument 1 from 'Category *' to 'Node *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(13,13):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Arrow.h(14,15):
+                         see declaration of 'Arrow::setDomain'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(13,3):
+                         while trying to match the argument list '(Category *)'
+                      (TaskId:171)
+19:43:58.848     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(14,3): error C2664: 'void Arrow::setCodomain(Node *)': cannot convert argument 1 from 'Category *' to 'Node *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(14,15):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Arrow.h(15,15):
+                         see declaration of 'Arrow::setCodomain'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(14,3):
+                         while trying to match the argument list '(Category *)'
+                      (TaskId:171)
+19:43:58.849     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,28): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,32): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+19:43:58.851     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Category.cpp')
+                      (TaskId:171)
+                     DiagramDetective.cpp (TaskId:171)
+19:43:58.894     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.894     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.894     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.894     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.894     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.895     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+19:43:58.895     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'DiagramScene.cpp')
+                      (TaskId:171)
+                     main.cpp (TaskId:171)
+19:43:58.899     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(19,57): error C2039: 'id': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.899     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(23,9): error C2039: 'setPos': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(26,9): error C2039: 'setFlag': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(27,9): error C2039: 'setFlag': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(28,9): error C2039: 'setFlag': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(29,9): error C2039: 'setZValue': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(30,2): error C2664: 'void QGraphicsScene::addItem(QGraphicsItem *)': cannot convert argument 1 from 'Category *' to 'QGraphicsItem *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(30,10):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                         C:\Qt\6.11.1\msvc2022_64\include\QtWidgets\qgraphicsscene.h(134,10):
+                         see declaration of 'QGraphicsScene::addItem'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(30,2):
+                         while trying to match the argument list '(Category *)'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,50): error C2039: 'childItems': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,29): error C2143: syntax error: missing ';' before ':'
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,62): error C2143: syntax error: missing ';' before ')'
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(40,11): error C2660: 'Category::adopt': function does not take 2 arguments
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,7):
+                         see declaration of 'Category::adopt'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(40,11):
+                         while trying to match the argument list '(Node *, QPointF)'
+                      (TaskId:171)
+19:43:58.900     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(42,3): error C2664: 'void QGraphicsScene::removeItem(QGraphicsItem *)': cannot convert argument 1 from 'Category *' to 'QGraphicsItem *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(42,14):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                         C:\Qt\6.11.1\msvc2022_64\include\QtWidgets\qgraphicsscene.h(150,10):
+                         see declaration of 'QGraphicsScene::removeItem'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(42,3):
+                         while trying to match the argument list '(Category *)'
+                      (TaskId:171)
+19:43:58.901     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(54,11): error C2446: '==': no conversion from 'Category *const ' to 'QGraphicsItem *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(54,14):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                      (TaskId:171)
+19:43:58.901     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(57,28): error C2446: '==': no conversion from 'Category *const ' to 'QGraphicsItem *'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(57,31):
+                         Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+                      (TaskId:171)
+19:43:58.901     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(71,21): error C2039: 'createCanvasObject': is not a member of 'Category'
+                         C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,7):
+                         see declaration of 'Category'
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.940     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.941     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.941     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:43:58.942     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'Arrow.cpp')
+                      (TaskId:171)
+19:44:01.845     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.845     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+19:44:01.846     1>C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     (compiling source file 'DiagramDetective.cpp')
+                      (TaskId:171)
+                   Done executing task "CL" -- FAILED. (TaskId:171)
+19:44:02.225     1>Done building target "ClCompile" in project "DiagramDetective.vcxproj" -- FAILED.: (TargetId:132)
+19:44:02.227     1>Done Building Project "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (Build target(s)) -- FAILED.
+
+Project Performance Summary:
+    10591 ms  C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj   3 calls
+              10585 ms  Build                                      1 calls
+                  6 ms  QtVarsRead                                 2 calls
+
+Target Performance Summary:
+        0 ms  QtGetDefaultClCompile                      1 calls
+        0 ms  ComputeStdModulesCompileInputs             1 calls
+        0 ms  WarnCompileDuplicatedFilename              1 calls
+        0 ms  SelectClCompile                            1 calls
+        0 ms  GetReferencedVCProjectsInfo                1 calls
+        0 ms  FindReferenceAssembliesForReferences       1 calls
+        0 ms  ComputeCLInputPDBName                      1 calls
+        0 ms  QtQmlCreateItems                           1 calls
+        0 ms  BeforeClCompile                            1 calls
+        0 ms  BuildGenerateSources                       1 calls
+        0 ms  _BuildGenerateSourcesAction                1 calls
+        0 ms  AfterBuildGenerateSourcesEvent             1 calls
+        0 ms  QtQmlCache                                 1 calls
+        0 ms  _Midl                                      1 calls
+        0 ms  AfterMidl                                  1 calls
+        0 ms  BuildCompileTraverse                       1 calls
+        0 ms  ComputeMIDLGeneratedCompileInputs          1 calls
+        0 ms  QtMocUpdate                                1 calls
+        0 ms  QtUicInit                                  1 calls
+        0 ms  QtQmlCacheItem                             1 calls
+        0 ms  QtQmlSetModified                           1 calls
+        0 ms  QtQmlCacheLoader                           1 calls
+        0 ms  QtRccFilter                                1 calls
+        0 ms  QtRccFilterSetModified                     1 calls
+        0 ms  QtRccOverrideCpp                           1 calls
+        0 ms  QtMocInit                                  1 calls
+        0 ms  QtRccPrepare                               1 calls
+        0 ms  QtRccInit                                  1 calls
+        0 ms  QtMocEnsureCollectJsonMarkers              1 calls
+        0 ms  QtUicSetModified                           1 calls
+        0 ms  QtTranslation                              1 calls
+        0 ms  QtMocPrepare                               1 calls
+        0 ms  QtQmlStaticGenerateImportFile              1 calls
+        0 ms  QtQmlCachePrepare                          1 calls
+        0 ms  MakeDirsForMidl                            1 calls
+        0 ms  AfterBuildGenerateSources                  1 calls
+        0 ms  CopyFileToFolders                          1 calls
+        0 ms  _PrepareForReferenceResolution             1 calls
+        0 ms  BeforeResolveReferences                    1 calls
+        0 ms  IgnoreJavaScriptOutputAssembly             1 calls
+        0 ms  _SplitProjectReferencesByFileExistence     1 calls
+        0 ms  _AddOutputPathToGlobalPropertiesToRemove   1 calls
+        0 ms  PrepareProjectReferences                   1 calls
+        0 ms  GetFrameworkPaths                          1 calls
+        0 ms  GetReferenceAssemblyPaths                  1 calls
+        0 ms  AddExternalIncludDirectoriesToPaths        1 calls
+        0 ms  _Xsd                                       1 calls
+        0 ms  _CheckWindowsSDKInstalled                  1 calls
+        0 ms  SetCABuildNativeEnvironmentVariables       1 calls
+        0 ms  QtPrepareResourceCompilerDefines           1 calls
+        0 ms  GetResolvedWinMD                           1 calls
+        0 ms  SelectCustomBuild                          1 calls
+        0 ms  PreBuildEvent                              1 calls
+        0 ms  ExpandSDKReferences                        1 calls
+        0 ms  ResolveAssemblyReferences                  1 calls
+        0 ms  BeforeBuildGenerateSources                 1 calls
+        0 ms  AfterResolveReferences                     1 calls
+        0 ms  QtQml                                      1 calls
+        0 ms  ResolveSDKReferences                       1 calls
+        0 ms  ResolveReferences                          1 calls
+        0 ms  _SelectedFiles                             1 calls
+        0 ms  BuildGenerateSourcesTraverse               1 calls
+        1 ms  MakeDirsForCl                              1 calls
+        1 ms  QtUicPrepare                               1 calls
+        1 ms  QtRccSetModified                           1 calls
+        1 ms  SetCppLanguageStandardCapabilities         1 calls
+        1 ms  ComputeReferenceCLInput                    1 calls
+        1 ms  QtRccSetDependencies                       1 calls
+        1 ms  ComputeCustomBuildOutput                   1 calls
+        1 ms  _GetProjectReferenceTargetFrameworkProperties   1 calls
+        1 ms  AssignProjectConfiguration                 1 calls
+        1 ms  _PrepareForBuild                           1 calls
+        1 ms  ResolveProjectReferences                   1 calls
+        2 ms  SetBuildDefaultEnvironmentVariables        1 calls
+        2 ms  QtPrepare                                  1 calls
+        3 ms  QtMocSetModified                           9 calls
+        4 ms  QtRcc                                      1 calls
+        4 ms  QtVarsLoad                                 1 calls
+        5 ms  QtMocOverrideCpp                           9 calls
+        5 ms  InitializeBuildStatus                      1 calls
+        5 ms  _CheckForInvalidConfigurationAndPlatform   1 calls
+        6 ms  QtVarsRead                                 1 calls
+        7 ms  PrepareForBuild                            1 calls
+        7 ms  CustomBuild                                1 calls
+       10 ms  QtWorkPrepare                             11 calls
+       11 ms  SetTelemetryEnvironmentVariables           1 calls
+       13 ms  FixupCLCompileOptions                      1 calls
+       13 ms  QtVarsPrepare                              1 calls
+       60 ms  QtMoc                                      9 calls
+      147 ms  QtQmlStaticGatherQmlPaths                  1 calls
+      157 ms  QtUic                                      1 calls
+      158 ms  QtAddCompilerSources                       1 calls
+      185 ms  QtHash                                     1 calls
+      259 ms  QtUpdateCompilerOptions                    1 calls
+      522 ms  QtWork                                     1 calls
+     1129 ms  QtVars                                     1 calls
+     7856 ms  ClCompile                                  1 calls
+
+Task Performance Summary:
+        0 ms  FindInList                                 8 calls
+        0 ms  SetRidAgnosticValueForProjects             1 calls
+        1 ms  Message                                    5 calls
+        1 ms  Delete                                     2 calls
+        1 ms  Touch                                      1 calls
+        1 ms  XmlPeek                                    1 calls
+        1 ms  AssignProjectConfiguration                 1 calls
+        2 ms  CheckVCToolsetVersion                      1 calls
+        2 ms  ListQrc                                    2 calls
+        2 ms  VCMessage                                  1 calls
+        2 ms  Copy                                       1 calls
+        2 ms  CreateProperty                            52 calls
+        3 ms  HostTranslatePaths                        12 calls
+        4 ms  ReadLinesFromFile                          5 calls
+        4 ms  SetEnv                                    11 calls
+        4 ms  Expand                                     1 calls
+        5 ms  MakeDir                                   10 calls
+        5 ms  GetItemHash                               12 calls
+        7 ms  GetOutOfDateItems                          3 calls
+        7 ms  QtAtomicReplaceFile                        1 calls
+       10 ms  GetVarsFromMSBuild                         1 calls
+       11 ms  Flatten                                   12 calls
+       13 ms  MSBuild                                    3 calls
+       17 ms  WriteLinesToFile                          17 calls
+       74 ms  QtRunTask                                  1 calls
+      142 ms  Exec                                       1 calls
+      311 ms  QtRunWork                                  1 calls
+      382 ms  HostExec                                   2 calls
+     7852 ms  CL                                         1 calls
+
+Build FAILED.
+
+                   "C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramDetective.vcxproj" (Build target) (1) ->
+                   (ClCompile target) -> 
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(5,1): error C2512: 'Arrow': no appropriate default constructor available
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(6,11): error C2039: 'surroundingCategory': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(6,41): error C2039: 'surroundingCategory': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(13,3): error C2664: 'void Arrow::setDomain(Node *)': cannot convert argument 1 from 'Category *' to 'Node *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Functor.cpp(14,3): error C2664: 'void Arrow::setCodomain(Node *)': cannot convert argument 1 from 'Category *' to 'Node *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(46,28): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Node.h(57,32): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(19,57): error C2039: 'id': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(23,9): error C2039: 'setPos': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(26,9): error C2039: 'setFlag': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(27,9): error C2039: 'setFlag': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(28,9): error C2039: 'setFlag': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(29,9): error C2039: 'setZValue': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(30,2): error C2664: 'void QGraphicsScene::addItem(QGraphicsItem *)': cannot convert argument 1 from 'Category *' to 'QGraphicsItem *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,50): error C2039: 'childItems': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,29): error C2143: syntax error: missing ';' before ':'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(35,62): error C2143: syntax error: missing ';' before ')'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(40,11): error C2660: 'Category::adopt': function does not take 2 arguments
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(42,3): error C2664: 'void QGraphicsScene::removeItem(QGraphicsItem *)': cannot convert argument 1 from 'Category *' to 'QGraphicsItem *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(54,11): error C2446: '==': no conversion from 'Category *const ' to 'QGraphicsItem *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(57,28): error C2446: '==': no conversion from 'Category *const ' to 'QGraphicsItem *'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\DiagramScene.cpp(71,21): error C2039: 'createCanvasObject': is not a member of 'Category'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(6,24): error C2504: 'Node': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,10): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(17,28): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(14,7): error C3668: 'Object::paint': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,9): error C3668: 'Object::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Object.h(15,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(6,26): error C2504: 'Object': base class undefined
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,8): error C2143: syntax error: missing ';' before '*'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,2): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(16,53): error C2238: unexpected token(s) preceding ';'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(20,13): error C2061: syntax error: identifier 'Node'
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,9): error C3668: 'Category::boundingRect': method with override specifier 'override' did not override any base class methods
+                     C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\DiagramDetective\Category.h(27,48): error C3861: 'childrenBoundingRect': identifier not found
+
+    0 Warning(s)
+    84 Error(s)
+
+Time Elapsed 00:00:10.58

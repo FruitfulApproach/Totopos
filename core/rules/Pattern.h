@@ -1,0 +1,104 @@
+#pragma once
+
+#include <QList>
+#include <QHash>
+#include <QString>
+#include <QSet>
+#include <QMetaType>
+
+class Node;
+class Arrow;
+class Category;
+class Rule;
+
+// A diagram as plain data: no QGraphicsItem, no pointers, nothing that belongs
+// to a thread. Everything the matcher needs to know about a node is copied in,
+// and every reference between nodes becomes an index.
+//
+// This exists so the search can run OFF the GUI thread. Node and Arrow are
+// QObjects living in the GUI thread, and a QGraphicsScene is not safe to read
+// while that thread may be editing it, so a background search cannot walk the
+// live diagram. It walks one of these instead: captured on the GUI thread in a
+// single cheap pass, then handed over and never touched again.
+//
+// Indices are the whole trick. A match comes back as pattern index -> diagram
+// index, and the GUI thread turns those back into live nodes with the parallel
+// array it kept when it captured (see RuleSearch).
+struct PatternNode
+{
+	QString label;            // Node::id(): what was typed
+	QString effectiveLabel;   // Arrow::effectiveId(), or the label for an object
+	bool isArrow = false;
+	bool isCategory = false;
+	int parent = -1;          // the node this one is drawn in; -1 for the root
+	int domain = -1;          // an arrow's ends, when both are inside this pattern
+	int codomain = -1;
+	bool rowsExact = false;
+	bool columnsExact = false;
+};
+
+class Pattern
+{
+public:
+	// The whole of a diagram, from its ambient category down. Index 0 is the
+	// ambient category itself. GUI thread only - it reads live nodes.
+	//
+	// `liveNodes`, when given, comes back as the parallel array index -> node,
+	// which is how a match is read back afterwards.
+	static Pattern fromDiagram(Category* ambient, QList<Node*>* liveNodes = nullptr);
+
+	// A rule's premise, in the order the search wants it: index 0 is the
+	// rule's root, then premiseObjects() parents-first, then premiseArrows().
+	// That order is fixed and reproducible from the file, which is what lets a
+	// match be stored as ordinals and resolved against a fresh parse later
+	// (see RuleSearch::applyEntry).
+	static Pattern fromRulePremise(const Rule& rule);
+
+	const QList<PatternNode>& nodes() const { return m_nodes; }
+	int size() const { return int(m_nodes.size()); }
+	const PatternNode& at(int index) const { return m_nodes.at(index); }
+
+	// the nodes drawn directly inside `parent`, split the way the search asks
+	// for them: an arrow is never an object
+	const QList<int>& objectsIn(int parent) const;
+	const QList<int>& arrowsIn(int parent) const;
+
+	// Where a rule whose root is called `label` could sit: the ambient
+	// category when the name is right, and every category of that name drawn
+	// anywhere inside it.
+	QList<int> rootsNamed(const QString& label) const;
+
+	// how many premise objects a rule pattern holds (index 1 .. objectCount)
+	int objectCount() const { return m_objectCount; }
+	int arrowCount() const { return m_arrowCount; }
+
+private:
+	void index();
+
+	QList<PatternNode> m_nodes;
+	QHash<int, QList<int>> m_objectChildren;
+	QHash<int, QList<int>> m_arrowChildren;
+	QHash<QString, QList<int>> m_categoriesByLabel;
+	int m_objectCount = 0;
+	int m_arrowCount = 0;
+};
+
+// One place a pattern sits inside a diagram, as indices into each.
+struct PatternMatch
+{
+	QHash<int, int> objects;   // pattern index -> diagram index
+	QHash<int, int> arrows;
+};
+
+Q_DECLARE_METATYPE(Pattern)
+
+namespace PatternMatcher
+{
+	// Every place `pattern` sits inside `diagram`, as a subgraph with the same
+	// nesting and the same arrows between the same things - constants matching
+	// constants, variables standing for anything, consistently, and no two
+	// pattern nodes standing for one diagram node.
+	//
+	// Pure data in, pure data out: safe to call from any thread.
+	QList<PatternMatch> find(const Pattern& pattern, const Pattern& diagram, int cap = 200);
+}

@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "DiagramDetective\\x64\\Release\\DiagramScene.obj",
+            "outputs": [
+                "DiagramDetective\\x64\\Release\\DiagramScene.cpp.obj.dt.module.json",
+                "DiagramDetective\\x64\\Release\\DiagramScene.cpp.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

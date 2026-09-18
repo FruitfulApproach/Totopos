@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "DiagramDetective\\x64\\Debug\\moc_Node.obj",
+            "outputs": [
+                "DiagramDetective\\x64\\Debug\\moc_Node.cpp.obj.dt.module.json",
+                "DiagramDetective\\x64\\Debug\\moc_Node.cpp.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}
