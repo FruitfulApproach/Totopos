@@ -6,6 +6,10 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QDir>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QBrush>
+#include <QColor>
 #include <QFileInfo>
 #include <QDesktopServices>
 #include <QElapsedTimer>
@@ -133,10 +137,21 @@ void LibraryDock::fill(QTreeWidgetItem* parent, const QString& path, int depth)
 		// it in Explorer, copying its path - read this one instead.
 		branch->setData(0, FolderRole, entry.absoluteFilePath());
 		fill(branch, entry.absoluteFilePath(), depth + 1);
+		// AN EMPTY FOLDER IS STILL SHOWN.
+		//
+		// It used to be dropped - nothing of ours down there, so nothing to
+		// list - which was fine while folders only ever arrived with files
+		// already in them. Now that one can be MADE here, dropping it would
+		// mean making a folder and watching it vanish on the next refresh,
+		// with nowhere to put anything into. It is greyed instead, so an
+		// empty one still reads differently from a full one.
+		branch->setExpanded(true);
 		if (branch->childCount() == 0)
-			delete branch;   // nothing of ours down there
-		else
-			branch->setExpanded(true);
+		{
+			branch->setForeground(0, QBrush(QColor(140, 140, 140)));
+			branch->setToolTip(0, QStringLiteral("Empty. Save a diagram into it, or right-click to "
+			                                     "rename or remove it."));
+		}
 	}
 
 	for (const QFileInfo& entry : dir.entryInfoList({ "*.totopos" }, QDir::Files | QDir::NoSymLinks, QDir::Name))
@@ -173,19 +188,45 @@ void LibraryDock::showContextMenu(const QPoint& at)
 	if (onDisk.isEmpty())
 		return;
 
+	// WHERE "HERE" IS.
+	//
+	// On a folder it is inside that folder. On a FILE it is beside the file -
+	// a file is not a place to put a folder into, and the folder it sits in
+	// is plainly what was meant. Right-clicking a file and being told "no"
+	// would be a refusal over a distinction the user did not draw.
+	const QFileInfo info(onDisk);
+	const QString here = info.isDir() ? info.absoluteFilePath() : info.absolutePath();
+
 	QMenu menu(this);
+	QAction* rename = menu.addAction(QString("Rename %1...").arg(info.fileName()));
+	if (info.isDir())
+	{
+		rename->setToolTip("Rename this folder. Everything in it moves with it, and anything you have "
+		                   "open from inside it follows.");
+		connect(rename, &QAction::triggered, this, [this, onDisk] { renameFolder(onDisk); });
+	}
+	else
+	{
+		rename->setToolTip("Rename this file. What it IS is written in its name, so the kind is asked "
+		                   "for alongside.");
+		connect(rename, &QAction::triggered, this, [this, path] { renameFile(path); });
+	}
+
+	QAction* folder = menu.addAction(QString("New folder in %1...")
+		.arg(info.isDir() ? info.fileName() : QFileInfo(here).fileName()));
+	folder->setToolTip("Make a folder here. A library is sorted by folder - a category, a chapter, "
+	                   "the classical axioms - and a folder is how that sorting is said.");
+	connect(folder, &QAction::triggered, this, [this, here] { createFolder(here); });
+
 	if (!path.isEmpty())
 	{
-		QAction* rename = menu.addAction(QString("Rename %1...").arg(QFileInfo(path).fileName()));
-		connect(rename, &QAction::triggered, this, [this, path] { renameFile(path); });
-
 		menu.addSeparator();
 		QAction* remove = menu.addAction(QString("%1  Remove %2 from the library")
 			.arg(Emoji::remove(), QFileInfo(path).fileName()));
 		remove->setToolTip("Take this file out of the library and off the disk.");
 		connect(remove, &QAction::triggered, this, [this, path] { removeFile(path); });
-		menu.addSeparator();
 	}
+	menu.addSeparator();
 
 	QAction* reveal = menu.addAction(QStringLiteral("Open in Explorer"));
 	reveal->setToolTip("Show this in a file manager window, with it picked out.");
@@ -194,7 +235,7 @@ void LibraryDock::showContextMenu(const QPoint& at)
 	QAction* copy = menu.addAction(QStringLiteral("Copy path"));
 	copy->setToolTip("Put its path on the clipboard, written from the library folder down.");
 	connect(copy, &QAction::triggered, this, [this, onDisk] {
-		const QString relative = relativeToLibrary(onDisk);
+		const QString relative = Library::relativePath(onDisk);
 		QGuiApplication::clipboard()->setText(relative);
 		m_where->setText(QString("Copied: %1").arg(relative));
 	});
@@ -202,22 +243,115 @@ void LibraryDock::showContextMenu(const QPoint& at)
 	menu.exec(m_tree->viewport()->mapToGlobal(at));
 }
 
-QString LibraryDock::relativeToLibrary(const QString& path)
+namespace
 {
-	// From the library folder down - "Grp/classic/inverses exist.axiom.totopos" -
-	// because that is the name a rule goes by everywhere else in the program:
-	// it is what a proof records as the rule it cited, and what the file it
-	// proves is named by. An absolute path would be no use for either.
-	//
-	// Forward slashes: that is how the paths already stored in files are
-	// written, and Windows takes them everywhere it takes backslashes.
-	const QString root = Library::root();
-	if (root.isEmpty())
-		return QDir::toNativeSeparators(path);
-	const QString relative = QDir(root).relativeFilePath(path);
-	// a path that climbs out of the library is not a library path: say where
-	// it really is rather than spelling it as ../../somewhere
-	return relative.startsWith(QLatin1String("..")) ? QDir::toNativeSeparators(path) : relative;
+	// What a folder may not be called. Not a matter of taste: these are the
+	// characters Windows refuses outright, and a name made of nothing but
+	// spaces or dots is one the file system will either reject or silently
+	// turn into something else.
+	QString whatIsWrongWithFolderName(const QString& name)
+	{
+		if (name.trimmed().isEmpty())
+			return QStringLiteral("A folder needs a name.");
+		for (const QChar c : { QChar('/'), QChar('\\'), QChar(':'), QChar('*'),
+		                       QChar('?'), QChar('"'), QChar('<'), QChar('>'), QChar('|') })
+			if (name.contains(c))
+				return QString("A folder name cannot contain %1").arg(c);
+		if (QString(name).remove(QChar('.')).trimmed().isEmpty())
+			return QStringLiteral("A folder cannot be named with dots alone.");
+		if (name != name.trimmed())
+			return QStringLiteral("A folder name cannot begin or end with a space.");
+		return QString();
+	}
+}
+
+void LibraryDock::createFolder(const QString& inDir)
+{
+	if (inDir.isEmpty())
+		return;
+	for (;;)
+	{
+		bool said = false;
+		const QString name = QInputDialog::getText(this, QStringLiteral("New folder"),
+			QString("A new folder in %1:").arg(Library::relativePath(inDir)),
+			QLineEdit::Normal, QString(), &said).trimmed();
+		if (!said)
+			return;
+		if (const QString wrong = whatIsWrongWithFolderName(name); !wrong.isEmpty())
+		{
+			QMessageBox::warning(this, QStringLiteral("New folder"), wrong);
+			continue;   // back to the box with what they typed still in mind
+		}
+		const QString target = QDir(inDir).absoluteFilePath(name);
+		if (QFileInfo::exists(target))
+		{
+			QMessageBox::warning(this, QStringLiteral("New folder"),
+				QString("There is already something called %1 there.").arg(name));
+			continue;
+		}
+		if (!QDir().mkpath(target))
+		{
+			QMessageBox::warning(this, QStringLiteral("New folder"),
+				QString("%1 could not be made.").arg(name));
+			return;
+		}
+		rescan();
+		m_where->setText(QString("Made %1.").arg(Library::relativePath(target)));
+		return;
+	}
+}
+
+void LibraryDock::renameFolder(const QString& dir)
+{
+	const QFileInfo info(dir);
+	if (!info.isDir())
+		return;
+	// The library root is not ours to rename: everything here is found by
+	// looking inside it, and renaming it would leave the panel looking at
+	// nothing with no way to say why.
+	if (QFileInfo(Library::root()).absoluteFilePath() == info.absoluteFilePath())
+	{
+		QMessageBox::information(this, QStringLiteral("Rename"),
+			QStringLiteral("This is the library itself, not a folder in it."));
+		return;
+	}
+
+	for (;;)
+	{
+		bool said = false;
+		const QString name = QInputDialog::getText(this, QStringLiteral("Rename folder"),
+			QString("Rename %1 to:").arg(Library::relativePath(dir)),
+			QLineEdit::Normal, info.fileName(), &said).trimmed();
+		if (!said || name == info.fileName())
+			return;
+		if (const QString wrong = whatIsWrongWithFolderName(name); !wrong.isEmpty())
+		{
+			QMessageBox::warning(this, QStringLiteral("Rename folder"), wrong);
+			continue;
+		}
+		const QString target = info.absoluteDir().absoluteFilePath(name);
+		if (QFileInfo::exists(target))
+		{
+			QMessageBox::warning(this, QStringLiteral("Rename folder"),
+				QString("There is already something called %1 there.").arg(name));
+			continue;
+		}
+		if (!QDir().rename(info.absoluteFilePath(), target))
+		{
+			QMessageBox::warning(this, QStringLiteral("Rename folder"),
+				QString("%1 could not be renamed. Something in it may be open in another program.")
+					.arg(info.fileName()));
+			return;
+		}
+		rescan();
+		// EVERY FILE UNDER IT HAS MOVED, and some of them may be open. Said
+		// only now, with the folder actually renamed, so nothing changes under
+		// the user while the dialog is still up - the same order renameFile
+		// keeps for the same reason.
+		emit folderRenamed(info.absoluteFilePath(), target);
+		m_where->setText(QString("Renamed to %1.").arg(Library::relativePath(target)));
+		return;
+	}
 }
 
 void LibraryDock::showInExplorer(const QString& path)

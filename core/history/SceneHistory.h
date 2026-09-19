@@ -36,6 +36,16 @@ public:
 	QList<Memento*> structural() const;
 	QStringList structuralDescriptions() const;
 
+	// HAS THIS DIAGRAM CHANGED SINCE IT WAS LAST SAVED?
+	//
+	// Kept as the POSITION the file was written at rather than as a flag,
+	// because a flag cannot be undone. Draw something, save, draw another
+	// thing, undo it: a flag would still say modified, when in fact what is
+	// on screen is exactly what is on disk again. Comparing positions gets
+	// that right, and gets redoing back out of it right too.
+	void markSaved();
+	bool isModified() const { return m_position != m_savedAt; }
+
 	// While suspended nothing is recorded: undo and redo change the scene, and
 	// those changes are not new history.
 	void suspend(bool on);
@@ -54,5 +64,6 @@ private:
 
 	QList<Memento*> m_mementos;
 	int m_position = 0;
+	int m_savedAt = 0;      // where in the history the file on disk stands
 	int m_suspended = 0;
 };

@@ -22,6 +22,15 @@ void SceneHistory::dropUndone()
 {
 	// anything undone is now a road not taken: the mementos that held the
 	// items taken out of the scene destroy them as they go
+	// THE SAVED POINT MAY BE ON THE ROAD NOT TAKEN.
+	//
+	// Undo back past where the file was written, then do something new: the
+	// steps between are thrown away here, and the position they were counted
+	// from no longer names anything. The diagram cannot get back to what is on
+	// disk by any amount of undoing, so it is modified and must stay modified.
+	// -1 is a position nothing can reach.
+	if (m_savedAt > m_position)
+		m_savedAt = -1;
 	while (m_mementos.size() > m_position)
 		delete m_mementos.takeLast();
 }
@@ -76,7 +85,16 @@ void SceneHistory::clear()
 	qDeleteAll(m_mementos);
 	m_mementos.clear();
 	m_position = 0;
+	m_savedAt = 0;   // an empty diagram is a saved one: there is nothing in it to lose
 	emit changed();
+}
+
+void SceneHistory::markSaved()
+{
+	if (m_savedAt == m_position)
+		return;
+	m_savedAt = m_position;
+	emit changed();   // the asterisk on the tab and in the title goes
 }
 
 QList<Memento*> SceneHistory::structural() const

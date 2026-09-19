@@ -48,6 +48,7 @@ template <> constexpr inline auto Node::qt_create_metaobjectdata<qt_meta_tag_ZN4
         "moved",
         "QPointF",
         "delta",
+        "labelOffsetChanged",
         "styleChanged"
     };
 
@@ -64,8 +65,12 @@ template <> constexpr inline auto Node::qt_create_metaobjectdata<qt_meta_tag_ZN4
         QtMocHelpers::SignalData<void(Node *, const QPointF &)>(7, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 3, 4 }, { 0x80000000 | 8, 9 },
         }}),
+        // Signal 'labelOffsetChanged'
+        QtMocHelpers::SignalData<void(Node *, const QPointF &)>(10, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 3, 4 }, { 0x80000000 | 8, 9 },
+        }}),
         // Signal 'styleChanged'
-        QtMocHelpers::SignalData<void(Node *)>(10, 2, QMC::AccessPublic, QMetaType::Void, {{
+        QtMocHelpers::SignalData<void(Node *)>(11, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 3, 4 },
         }}),
     };
@@ -94,7 +99,8 @@ void Node::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void *
         case 0: _t->idChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
         case 1: _t->deleted((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
         case 2: _t->moved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
-        case 3: _t->styleChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
+        case 3: _t->labelOffsetChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
+        case 4: _t->styleChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
         default: ;
         }
     }
@@ -129,6 +135,13 @@ void Node::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void *
                 *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType::fromType< Node* >(); break;
             }
             break;
+        case 4:
+            switch (*reinterpret_cast<int*>(_a[1])) {
+            default: *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType(); break;
+            case 0:
+                *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType::fromType< Node* >(); break;
+            }
+            break;
         }
     }
     if (_c == QMetaObject::IndexOfMethod) {
@@ -138,7 +151,9 @@ void Node::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void *
             return;
         if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * , const QPointF & )>(_a, &Node::moved, 2))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * )>(_a, &Node::styleChanged, 3))
+        if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * , const QPointF & )>(_a, &Node::labelOffsetChanged, 3))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * )>(_a, &Node::styleChanged, 4))
             return;
     }
 }
@@ -162,14 +177,14 @@ int Node::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 4)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 4;
+        _id -= 5;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 4)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 4;
+        _id -= 5;
     }
     return _id;
 }
@@ -193,8 +208,14 @@ void Node::moved(Node * _t1, const QPointF & _t2)
 }
 
 // SIGNAL 3
+void Node::labelOffsetChanged(Node * _t1, const QPointF & _t2)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 3, nullptr, _t1, _t2);
+}
+
+// SIGNAL 4
 void Node::styleChanged(Node * _t1)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 3, nullptr, _t1);
+    QMetaObject::activate<void>(this, &staticMetaObject, 4, nullptr, _t1);
 }
 QT_WARNING_POP

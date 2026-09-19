@@ -609,7 +609,7 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 	in.readRawData(magic, 4);
 	if (memcmp(magic, kMagic, 4) != 0)
 	{
-		if (error != nullptr) *error = QStringLiteral("That is not a Diagram Detective file.");
+		if (error != nullptr) *error = QStringLiteral("That is not a Totopos file.");
 		return false;
 	}
 	quint16 version = 0;

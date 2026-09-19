@@ -39,6 +39,10 @@ signals:
 	// which is why this is emitted only after the rename has happened, never
 	// while the dialog is still up.
 	void renamed(const QString& before, const QString& after);
+	// A FOLDER was renamed, so every file under it has moved with it. Whoever
+	// has one of them open follows by path: anything beginning with `before`
+	// now begins with `after`.
+	void folderRenamed(const QString& before, const QString& after);
 	// a file the user picked, by clicking it: lay it over the diagram as a rule
 	void chosen(const QString& path);
 	void applyAllRequested();
@@ -52,6 +56,10 @@ private slots:
 	// take it out of the library, off the disk. Asks first, unless the
 	// asking has been turned off from the box that asks.
 	void removeFile(const QString& path);
+	// make a folder inside that one, asking what to call it
+	void createFolder(const QString& inDir);
+	// rename a folder of the library; everything in it goes with it
+	void renameFolder(const QString& dir);
 
 private:
 	// Where a FOLDER row is on disk. A file's path lives in Qt::UserRole, and
@@ -62,9 +70,6 @@ private:
 	void fill(QTreeWidgetItem* parent, const QString& path, int depth);
 	// show it in a file manager, picked out in the folder it is in
 	void showInExplorer(const QString& path);
-	// "Grp/classic/inverses exist.axiom.totopos": the name a rule goes by
-	// everywhere else, not where it happens to sit on this machine
-	static QString relativeToLibrary(const QString& path);
 
 	// what the last scan did, so a slow one can say where it went
 	int m_folders = 0;

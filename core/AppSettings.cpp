@@ -27,14 +27,47 @@ const char* AppSettings::EnglishSelectionOnly = "english/selectionOnly";
 
 namespace
 {
+	// WHERE THE SETTINGS LIVE, and where they USED to live.
+	//
+	// The program was called Diagram Detective and its settings were filed
+	// under that name. Renaming the program does not move them: QSettings
+	// keys off the two names below, so a rename alone would have left every
+	// stored preference behind and started everyone back at the defaults with
+	// no explanation. See migrateFromOldName.
+	const char* kOrganisation = "Totopos";
+	const char* kApplication = "Totopos";
+	const char* kFormerOrganisation = "DiagramDetective";
+	const char* kFormerApplication = "DiagramDetective";
+
 	QSettings store()
 	{
-		return QSettings("DiagramDetective", "DiagramDetective");
+		return QSettings(kOrganisation, kApplication);
 	}
+}
+
+void AppSettings::migrateFromOldName()
+{
+	// Once, and only into an empty store. Anything already saved under the
+	// new name is what the user has said more recently and is never written
+	// over; the old store is left exactly as it is, so an older build of the
+	// program still opens with its settings intact.
+	QSettings fresh(kOrganisation, kApplication);
+	if (!fresh.allKeys().isEmpty())
+		return;
+	QSettings former(kFormerOrganisation, kFormerApplication);
+	const QStringList keys = former.allKeys();
+	if (keys.isEmpty())
+		return;
+	for (const QString& key : keys)
+		fresh.setValue(key, former.value(key));
+	fresh.sync();
 }
 
 AppSettings::AppSettings()
 {
+	// before anything is read: the singleton is built on the first ask, and
+	// every ask goes through it
+	migrateFromOldName();
 }
 
 AppSettings& AppSettings::instance()

@@ -10,12 +10,12 @@ namespace
 
 bool Tutor::isEnabled()
 {
-	return QSettings("DiagramDetective", "DiagramDetective").value(kTutorKey, true).toBool();
+	return QSettings("Totopos", "Totopos").value(kTutorKey, true).toBool();
 }
 
 void Tutor::setEnabled(bool on)
 {
-	QSettings("DiagramDetective", "DiagramDetective").setValue(kTutorKey, on);
+	QSettings("Totopos", "Totopos").setValue(kTutorKey, on);
 }
 
 Tutor::~Tutor()

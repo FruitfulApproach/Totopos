@@ -14,6 +14,13 @@ class AppSettings : public QObject
 public:
 	static AppSettings& instance();
 
+	// Carry the settings over from the name the program used to go by, once,
+	// and only when nothing has been saved under the new one. Called for you
+	// when the singleton is built; main() calls it first thing as well, so
+	// that anything reading QSettings directly - the tutor does - finds them
+	// already moved.
+	static void migrateFromOldName();
+
 	// keys
 	static const char* SnapEnabled;      // bool, true
 	static const char* SnapUnit;         // double, 25.0

@@ -46,6 +46,20 @@ QString Library::ensureRoot()
 	return QDir(wanted).absolutePath();
 }
 
+QString Library::relativePath(const QString& path)
+{
+	if (path.isEmpty())
+		return QString();
+	const QString base = root();
+	if (base.isEmpty())
+		return QDir::toNativeSeparators(path);
+	const QString relative = QDir(base).relativeFilePath(path);
+	// A path that climbs back out of the library is not a library path, and
+	// spelling it ../../somewhere would be worse than useless - it would look
+	// like a name and be unusable as one. Say where the file really is.
+	return relative.startsWith(QLatin1String("..")) ? QDir::toNativeSeparators(path) : relative;
+}
+
 int Library::seedExamples(QString* error)
 {
 	const QString base = ensureRoot();

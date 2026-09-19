@@ -48,6 +48,8 @@ template <> constexpr inline auto DiagramScene::qt_create_metaobjectdata<qt_meta
         "text",
         "chasingChanged",
         "chasing",
+        "notationChanged",
+        "classical",
         "commutesChanged",
         "commutes",
         "statementKindChanged",
@@ -80,41 +82,45 @@ template <> constexpr inline auto DiagramScene::qt_create_metaobjectdata<qt_meta
         QtMocHelpers::SignalData<void(bool)>(7, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::Bool, 8 },
         }}),
-        // Signal 'commutesChanged'
+        // Signal 'notationChanged'
         QtMocHelpers::SignalData<void(bool)>(9, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::Bool, 10 },
         }}),
+        // Signal 'commutesChanged'
+        QtMocHelpers::SignalData<void(bool)>(11, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::Bool, 12 },
+        }}),
         // Signal 'statementKindChanged'
-        QtMocHelpers::SignalData<void(int, const QString &)>(11, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::Int, 12 }, { QMetaType::QString, 13 },
+        QtMocHelpers::SignalData<void(int, const QString &)>(13, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::Int, 14 }, { QMetaType::QString, 15 },
         }}),
         // Signal 'error'
-        QtMocHelpers::SignalData<void(const QString &)>(14, 2, QMC::AccessPublic, QMetaType::Void, {{
+        QtMocHelpers::SignalData<void(const QString &)>(16, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::QString, 6 },
         }}),
         // Signal 'nodesAdded'
-        QtMocHelpers::SignalData<void(const QList<Node*> &)>(15, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 16, 17 },
+        QtMocHelpers::SignalData<void(const QList<Node*> &)>(17, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 18, 19 },
         }}),
         // Signal 'ruleChanged'
-        QtMocHelpers::SignalData<void(const QString &, int)>(18, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QString, 13 }, { QMetaType::Int, 19 },
+        QtMocHelpers::SignalData<void(const QString &, int)>(20, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QString, 15 }, { QMetaType::Int, 21 },
         }}),
         // Signal 'nodesRemoved'
-        QtMocHelpers::SignalData<void(const QList<Node*> &)>(20, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 16, 17 },
+        QtMocHelpers::SignalData<void(const QList<Node*> &)>(22, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 18, 19 },
         }}),
         // Signal 'statementChanged'
-        QtMocHelpers::SignalData<void(const QString &)>(21, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QString, 22 },
+        QtMocHelpers::SignalData<void(const QString &)>(23, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QString, 24 },
         }}),
         // Signal 'fragmentDragRequested'
-        QtMocHelpers::SignalData<void(const QByteArray &)>(23, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QByteArray, 24 },
+        QtMocHelpers::SignalData<void(const QByteArray &)>(25, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QByteArray, 26 },
         }}),
         // Slot 'setAmbientCategory'
-        QtMocHelpers::SlotData<void(const QString &)>(25, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QString, 13 },
+        QtMocHelpers::SlotData<void(const QString &)>(27, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QString, 15 },
         }}),
     };
     QtMocHelpers::UintData qt_properties {
@@ -142,15 +148,16 @@ void DiagramScene::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         case 0: _t->ambientCategoryChanged((*reinterpret_cast<std::add_pointer_t<Category*>>(_a[1]))); break;
         case 1: _t->message((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
         case 2: _t->chasingChanged((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
-        case 3: _t->commutesChanged((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
-        case 4: _t->statementKindChanged((*reinterpret_cast<std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
-        case 5: _t->error((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 6: _t->nodesAdded((*reinterpret_cast<std::add_pointer_t<QList<Node*>>>(_a[1]))); break;
-        case 7: _t->ruleChanged((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 8: _t->nodesRemoved((*reinterpret_cast<std::add_pointer_t<QList<Node*>>>(_a[1]))); break;
-        case 9: _t->statementChanged((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 10: _t->fragmentDragRequested((*reinterpret_cast<std::add_pointer_t<QByteArray>>(_a[1]))); break;
-        case 11: _t->setAmbientCategory((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
+        case 3: _t->notationChanged((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
+        case 4: _t->commutesChanged((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
+        case 5: _t->statementKindChanged((*reinterpret_cast<std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
+        case 6: _t->error((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
+        case 7: _t->nodesAdded((*reinterpret_cast<std::add_pointer_t<QList<Node*>>>(_a[1]))); break;
+        case 8: _t->ruleChanged((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 9: _t->nodesRemoved((*reinterpret_cast<std::add_pointer_t<QList<Node*>>>(_a[1]))); break;
+        case 10: _t->statementChanged((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
+        case 11: _t->fragmentDragRequested((*reinterpret_cast<std::add_pointer_t<QByteArray>>(_a[1]))); break;
+        case 12: _t->setAmbientCategory((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
         default: ;
         }
     }
@@ -164,14 +171,14 @@ void DiagramScene::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
                 *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType::fromType< Category* >(); break;
             }
             break;
-        case 6:
+        case 7:
             switch (*reinterpret_cast<int*>(_a[1])) {
             default: *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType(); break;
             case 0:
                 *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType::fromType< QList<Node*> >(); break;
             }
             break;
-        case 8:
+        case 9:
             switch (*reinterpret_cast<int*>(_a[1])) {
             default: *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType(); break;
             case 0:
@@ -187,21 +194,23 @@ void DiagramScene::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
             return;
         if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(bool )>(_a, &DiagramScene::chasingChanged, 2))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(bool )>(_a, &DiagramScene::commutesChanged, 3))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(bool )>(_a, &DiagramScene::notationChanged, 3))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(int , const QString & )>(_a, &DiagramScene::statementKindChanged, 4))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(bool )>(_a, &DiagramScene::commutesChanged, 4))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & )>(_a, &DiagramScene::error, 5))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(int , const QString & )>(_a, &DiagramScene::statementKindChanged, 5))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QList<Node*> & )>(_a, &DiagramScene::nodesAdded, 6))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & )>(_a, &DiagramScene::error, 6))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & , int )>(_a, &DiagramScene::ruleChanged, 7))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QList<Node*> & )>(_a, &DiagramScene::nodesAdded, 7))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QList<Node*> & )>(_a, &DiagramScene::nodesRemoved, 8))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & , int )>(_a, &DiagramScene::ruleChanged, 8))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & )>(_a, &DiagramScene::statementChanged, 9))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QList<Node*> & )>(_a, &DiagramScene::nodesRemoved, 9))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QByteArray & )>(_a, &DiagramScene::fragmentDragRequested, 10))
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QString & )>(_a, &DiagramScene::statementChanged, 10))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (DiagramScene::*)(const QByteArray & )>(_a, &DiagramScene::fragmentDragRequested, 11))
             return;
     }
 }
@@ -225,14 +234,14 @@ int DiagramScene::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 12)
+        if (_id < 13)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 12;
+        _id -= 13;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 12)
+        if (_id < 13)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 12;
+        _id -= 13;
     }
     return _id;
 }
@@ -256,50 +265,56 @@ void DiagramScene::chasingChanged(bool _t1)
 }
 
 // SIGNAL 3
-void DiagramScene::commutesChanged(bool _t1)
+void DiagramScene::notationChanged(bool _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 3, nullptr, _t1);
 }
 
 // SIGNAL 4
-void DiagramScene::statementKindChanged(int _t1, const QString & _t2)
+void DiagramScene::commutesChanged(bool _t1)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 4, nullptr, _t1, _t2);
+    QMetaObject::activate<void>(this, &staticMetaObject, 4, nullptr, _t1);
 }
 
 // SIGNAL 5
-void DiagramScene::error(const QString & _t1)
+void DiagramScene::statementKindChanged(int _t1, const QString & _t2)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 5, nullptr, _t1);
+    QMetaObject::activate<void>(this, &staticMetaObject, 5, nullptr, _t1, _t2);
 }
 
 // SIGNAL 6
-void DiagramScene::nodesAdded(const QList<Node*> & _t1)
+void DiagramScene::error(const QString & _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 6, nullptr, _t1);
 }
 
 // SIGNAL 7
-void DiagramScene::ruleChanged(const QString & _t1, int _t2)
+void DiagramScene::nodesAdded(const QList<Node*> & _t1)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 7, nullptr, _t1, _t2);
+    QMetaObject::activate<void>(this, &staticMetaObject, 7, nullptr, _t1);
 }
 
 // SIGNAL 8
-void DiagramScene::nodesRemoved(const QList<Node*> & _t1)
+void DiagramScene::ruleChanged(const QString & _t1, int _t2)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 8, nullptr, _t1);
+    QMetaObject::activate<void>(this, &staticMetaObject, 8, nullptr, _t1, _t2);
 }
 
 // SIGNAL 9
-void DiagramScene::statementChanged(const QString & _t1)
+void DiagramScene::nodesRemoved(const QList<Node*> & _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 9, nullptr, _t1);
 }
 
 // SIGNAL 10
-void DiagramScene::fragmentDragRequested(const QByteArray & _t1)
+void DiagramScene::statementChanged(const QString & _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 10, nullptr, _t1);
+}
+
+// SIGNAL 11
+void DiagramScene::fragmentDragRequested(const QByteArray & _t1)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 11, nullptr, _t1);
 }
 QT_WARNING_POP
