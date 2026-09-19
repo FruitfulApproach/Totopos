@@ -487,11 +487,11 @@ void DiagramScene::showHandles(Node* node, const QPointF& itemPos)
 				return;
 			// carried across, shown, and KEPT carried: from here the codomain
 			// follows the domain
-			// one switch does all of it: on show, and kept in step from here
-			if (maps->mirrorsGeometry())
+			// on show, and kept up to date from here
+			if (maps->isLive())
 				maps->sync();
 			else
-				maps->setMirrorsGeometry(true);
+				maps->setLive(true);
 			emit message(QString("Chasing the elements of %1 into %2, and keeping them there.")
 				.arg(arrow->domain() != nullptr ? arrow->domain()->id() : QString(), maps->codomain()->id()));
 		});

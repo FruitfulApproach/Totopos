@@ -69,7 +69,7 @@ MapsElements::MapsElements(Arrow* arrow)
 	// categories drawn on the canvas mean? An ordinary morphism - an R-linear
 	// map, a homomorphism - waits to be asked, because its domain usually
 	// holds only the few elements the chase is about.
-	m_mirror = dynamic_cast<Functor*>(arrow) != nullptr;
+	m_live = dynamic_cast<Functor*>(arrow) != nullptr;
 	if (arrow != nullptr)
 	{
 		m_name = arrow->id();
@@ -84,7 +84,7 @@ MapsElements::MapsElements(Arrow* arrow)
 		// arrow, and must follow it when it is relabelled
 		connect(arrow, &Node::idChanged, this, &MapsElements::onFunctorRenamed);
 	}
-	if (m_mirror)
+	if (m_live)
 		listen(true);
 }
 
@@ -123,7 +123,7 @@ void MapsElements::onFunctorRenamed()
 	}
 	m_syncing = false;
 
-	if (m_mirror)
+	if (m_live)
 		sync();
 }
 void MapsElements::removeImages()
@@ -163,10 +163,42 @@ QString MapsElements::formula(const QString& functor)
 		return QString(hole());
 	if (functor.contains(hole()))
 		return functor;
+
+	// A NAME THAT IS NOT ONE THING IS BRACKETED FIRST.
+	//
+	// G∘F is a composite, not a letter: applied to X it reads (G∘F)(X), because
+	// G∘F(X) says something else - it is G applied to F(X), which is the same
+	// value here but is not the name of this node. Only a name that would be
+	// read as a single thing can take the argument bare.
+	const QString name = atomic(functor)
+		? functor
+		: QStringLiteral("(") + functor + QStringLiteral(")");
+
 	// no hole written: it goes at the end, in whichever notation is set
 	return AppSettings::instance().functorParentheses()
-		? functor + QLatin1Char('(') + hole() + QLatin1Char(')')
-		: functor + hole();
+		? name + QStringLiteral("(") + hole() + QStringLiteral(")")
+		: name + hole();
+}
+
+bool MapsElements::atomic(const QString& name)
+{
+	// One thing: a letter with whatever is decoration on it - a prime, a
+	// subscript, a digit. An operator or a space between two parts makes it
+	// two things, and two things need brackets before they take an argument.
+	//
+	// A name already wrapped in its own brackets - (G∘F), H(A,D) - is left
+	// alone: it reads as one thing as it stands, and bracketing it again
+	// would only stutter.
+	const QString trimmed = name.trimmed();
+	if (trimmed.isEmpty())
+		return true;
+	if (trimmed.endsWith(QLatin1Char(')')))
+		return true;
+	for (QChar c : trimmed)
+		if (!c.isLetterOrNumber() && c != QLatin1Char('_') && c != QChar(0x27)   // a prime
+		    && !c.isMark())
+			return false;
+	return true;
 }
 
 QString MapsElements::applied(const QString& functor, const QString& element)
@@ -283,6 +315,20 @@ void MapsElements::setMirrorsGeometry(bool mirror)
 		return;
 	m_mirror = mirror;
 
+	// GEOMETRY ONLY. Off, the two sides stop travelling with each other and
+	// each keeps the arrangement it has; the image itself is untouched - it
+	// stays drawn, stays on show, and goes on following what is drawn and
+	// deleted in the domain. Putting the image away is setLive(false), which
+	// is a different question and a different switch.
+	emit settingsChanged();
+}
+
+void MapsElements::setLive(bool live)
+{
+	if (m_live == live)
+		return;
+	m_live = live;
+
 	// Off, the image is put AWAY, not given up: the nodes are hidden, and
 	// whatever is drawn inside them is hidden with them and comes back
 	// untouched. On, they are shown again and brought up to date at once.
@@ -292,14 +338,14 @@ void MapsElements::setMirrorsGeometry(bool mirror)
 		{
 			auto* node = dynamic_cast<Node*>(child);
 			if (node != nullptr && isOurImage(node))
-				node->setVisible(mirror);
+				node->setVisible(live);
 		}
 		// the codomain's frame is the union of what it HOLDS AND SHOWS
 		cod->refreshFrame();
 	}
 
-	listen(mirror);
-	if (mirror)
+	listen(live);
+	if (live)
 		sync();
 	emit settingsChanged();
 }
@@ -309,7 +355,7 @@ void MapsElements::setContravariant(bool contravariant)
 	if (m_contravariant == contravariant)
 		return;
 	m_contravariant = contravariant;
-	if (m_mirror)
+	if (m_live)
 		sync();   // the image arrows turn round
 	emit settingsChanged();
 }
@@ -437,7 +483,7 @@ void MapsElements::onImageLabelMoved(Node* image, const QPointF& delta)
 
 void MapsElements::onSourceDeleted(Node* source)
 {
-	if (!m_mirror || source == nullptr)
+	if (!m_live || source == nullptr)
 		return;
 	Arrow* F = arrow();
 	Object* cod = codomain();
@@ -478,7 +524,7 @@ bool MapsElements::closesALoop() const
 		if (other == nullptr || other == F)
 			continue;
 		auto* maps = dynamic_cast<MapsElements*>(other->prop(MapsElements::Key()));
-		if (maps == nullptr || !maps->mirrorsGeometry())
+		if (maps == nullptr || !maps->isLive())
 			continue;
 		Node* from = maps->domain();
 		Node* to = maps->codomain();
@@ -511,16 +557,16 @@ void MapsElements::sync()
 	Arrow* F = arrow();
 	Node* dom = domain();
 	Object* cod = codomain();
-	if (!m_mirror || F == nullptr || dom == nullptr || cod == nullptr || dom == cod || m_syncing)
+	if (!m_live || F == nullptr || dom == nullptr || cod == nullptr || dom == cod || m_syncing)
 		return;
 
 	// Round in circles (see closesALoop): switched off rather than run. Not
-	// through setMirrorsGeometry - that would sync again from inside sync -
+	// through setLive - that would sync again from inside sync -
 	// but by hand, and the images already drawn are left exactly where they
 	// are. Turning it back on will refuse again until the loop is broken.
 	if (closesALoop())
 	{
-		m_mirror = false;
+		m_live = false;
 		listen(false);
 		if (auto* board = dynamic_cast<DiagramScene*>(F->scene()))
 			QMetaObject::invokeMethod(board, "message", Qt::QueuedConnection,
@@ -600,7 +646,7 @@ void MapsElements::sync()
 			// moves, by the same amount, but it can be put wherever you like.
 			img = cod->createNamedChild(applied(name, source->id()), cod->mapToScene(source->pos()));
 			stamp(img, name, source);
-			img->setVisible(m_mirror);
+			img->setVisible(m_live);
 		}
 		else if (img->id() != applied(name, source->id()))
 		{
@@ -669,7 +715,7 @@ void MapsElements::sync()
 				drawn->refreshFrame();
 				img = drawn;
 				stamp(img, name, source);
-				img->setVisible(m_mirror);
+				img->setVisible(m_live);
 			}
 			else
 			{
@@ -678,7 +724,7 @@ void MapsElements::sync()
 					continue;   // elements of a module have no arrows between them
 				img = codCat->createArrow(applied(name, source->id()), from, to);
 				stamp(img, name, source);
-				img->setVisible(m_mirror);
+				img->setVisible(m_live);
 			}
 		}
 		else if (equals)

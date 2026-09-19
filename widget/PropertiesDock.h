@@ -130,7 +130,9 @@ private:
 
 	QGroupBox* m_mappingBox = nullptr;
 	QLabel* m_mappingHint = nullptr;
-	// the whole mirror, in one switch (see MapsElements::mirrorsGeometry)
+	// whether there is an image at all (see MapsElements::isLive), and
+	// separately whether geometry travels between the two sides
+	ToggleSwitch* m_live = nullptr;
 	ToggleSwitch* m_mirror = nullptr;
 	ToggleSwitch* m_contravariant = nullptr;
 	QPushButton* m_mapNow = nullptr;

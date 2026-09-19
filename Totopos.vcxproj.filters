@@ -46,7 +46,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Totopos.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="art\Arrow.cpp">
       <Filter>art</Filter>
@@ -237,9 +236,11 @@
     <ClCompile Include="widget\ToggleSwitch.cpp">
       <Filter>widget</Filter>
     </ClCompile>
+    <ClCompile Include="Totopos.cpp">
+      <Filter>dialog</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="Totopos.h" />
     <QtMoc Include="art\Arrow.h">
       <Filter>art</Filter>
     </QtMoc>
@@ -387,6 +388,9 @@
     <QtMoc Include="widget\ToggleSwitch.h">
       <Filter>widget</Filter>
     </QtMoc>
+    <QtMoc Include="Totopos.h">
+      <Filter>dialog</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="core\view\ClassicalView.h">
@@ -434,11 +438,15 @@
     <ClInclude Include="tutor\Tutor.h">
       <Filter>tutor</Filter>
     </ClInclude>
-    <ClInclude Include="art\GraphicsHelpers.h" />
+    <ClInclude Include="art\GraphicsHelpers.h">
+      <Filter>core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <QtUic Include="Totopos.ui" />
     <QtUic Include="dialog\CategoryDialog.ui">
+      <Filter>dialog</Filter>
+    </QtUic>
+    <QtUic Include="Totopos.ui">
       <Filter>dialog</Filter>
     </QtUic>
   </ItemGroup>

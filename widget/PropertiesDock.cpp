@@ -324,10 +324,19 @@ void PropertiesDock::build()
 	m_mappingHint->setEnabled(false);
 	mappingForm->addRow(m_mappingHint);
 
-	// ONE SWITCH, not eight. Showing the image, keeping it live, carrying
-	// object moves, bend points and label placements across - each way round -
-	// were separate toggles, and nobody wanted half of a mirror: the useful
-	// answers were all-on and all-off, and everything between read as a bug.
+	// TWO SWITCHES, not eight and not one. Carrying object moves, bend points
+	// and label placements across - each way round - were four toggles, and
+	// nobody wanted half of a mirror: those are one answer. But whether there
+	// is an image at all is a different question from whether the two sides
+	// travel together, and folding it in meant that freezing the arrangement
+	// put the whole image away, which read as a bug because it was one.
+	m_live = new ToggleSwitch(m_mappingBox);
+	connect(m_live, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating) return;
+		if (MapsElements* maps = soleMapping()) maps->setLive(on);
+	});
+	mappingForm->addRow("Show the image, kept live", m_live);
+
 	m_mirror = new ToggleSwitch(m_mappingBox);
 	connect(m_mirror, &QAbstractButton::toggled, this, [this](bool on) {
 		if (m_updating) return;
@@ -609,16 +618,21 @@ void PropertiesDock::refresh()
 		const QString to = QString(QChar(0x2192));
 		m_mappingBox->setTitle(QString("Mapping  %1 %2 %3").arg(dom, to, cod));
 		m_mappingHint->setText(QString("What is drawn in %1 appears in %2.").arg(dom, cod));
+		m_live->setChecked(maps->isLive());
+		m_live->setToolTip(QString(
+			"Draw the image of %1 in %2 and keep it there: it follows whatever is drawn or "
+			"deleted in %1, and is relabelled when %1 is.\n\n"
+			"Off, the image is put away - hidden, not given up: whatever is drawn inside it comes "
+			"back untouched when this goes on again.").arg(dom, cod));
 		m_mirror->setChecked(maps->mirrorsGeometry());
 		m_mirror->setToolTip(QString(
-			"Keep %1 and %2 in step, both ways round.\n\n"
-			"The image is on show and follows whatever is drawn or deleted in %1. Moving an object, "
-			"bending an arrow, or dragging a label clear of its node moves the matching one on the "
-			"far side BY THE SAME AMOUNT (%1 %3 %2, and %2 %3 %1) - each side keeps the arrangement "
-			"you gave it and simply travels with the other. Whichever one you drag leads, and the "
-			"other follows without answering back.\n\n"
-			"Off, the image is put away - hidden, not given up: whatever is drawn inside it comes "
-			"back untouched when this goes on again.").arg(dom, cod, to));
+			"Keep the ARRANGEMENT of %1 and %2 in step, both ways round.\n\n"
+			"Moving an object, bending an arrow, or dragging a label clear of its node moves the "
+			"matching one on the far side BY THE SAME AMOUNT (%1 %3 %2, and %2 %3 %1) - each side "
+			"keeps the arrangement you gave it and simply travels with the other. Whichever one "
+			"you drag leads, and the other follows without answering back.\n\n"
+			"Off, each side is arranged on its own. Nothing appears or disappears either way: what "
+			"is drawn in %1 still appears in %2 for as long as the image is live.").arg(dom, cod, to));
 		m_contravariant->setChecked(maps->isContravariant());
 		m_contravariant->setToolTip(QString(
 			"The image arrows run the other way: the image of f : X %1 Y goes from the image of Y to the "

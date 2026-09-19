@@ -49,6 +49,10 @@ public:
 signals:
 	void triggered(const QString& id);
 
+	// The pills changed, so the bar is a different size and wants placing
+	// again. It cannot place itself: where it sits is the view's business.
+	void changed();
+
 private:
 	QHBoxLayout* m_row = nullptr;
 	QList<Action> m_actions;

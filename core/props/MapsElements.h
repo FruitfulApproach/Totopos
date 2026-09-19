@@ -55,6 +55,11 @@ public:
 	static QString applied(const QString& functor, const QString& element);
 	static QChar hole() { return QLatin1Char('.'); }
 
+	// Would this name be read as ONE thing? G is; G∘F is not, and has to be
+	// bracketed before it takes an argument, or (G∘F)(X) comes out as
+	// G∘F(X), which reads as G applied to F(X).
+	static bool atomic(const QString& name);
+
 	// The formula a name stands for. EVERY name is a formula with a hole in
 	// it: one written without a hole has it at the end, the way the notation
 	// setting asks - F means F(.), or F. juxtaposed. So H(.,D) and F are the
@@ -93,6 +98,18 @@ public:
 	bool mirrorsGeometry() const { return m_mirror; }
 	void setMirrorsGeometry(bool mirror);
 
+	// LIVE: the image EXISTS, is on show, and follows what is drawn and
+	// deleted in the domain. A separate question from the mirror above, which
+	// is only about geometry - position, bends, label offsets - travelling
+	// between the two sides. Switching the mirror off freezes the arrangement;
+	// it does not put the image away. This is what does that.
+	//
+	// On for a freshly placed functor, and off for an ordinary morphism until
+	// it is asked, because such a domain usually holds only the few elements
+	// the chase is about.
+	bool isLive() const { return m_live; }
+	void setLive(bool live);
+
 	// Contravariant: the image arrows run the OTHER WAY. Hom(-,D) is like
 	// this - a map f : X -> Y gives Hom(f,D) : Hom(Y,D) -> Hom(X,D) - while
 	// Hom(A,-) is covariant and runs the same way. Which one a formula is
@@ -121,7 +138,7 @@ public:
 	// them and comes back untouched. This is the mirror seen from the other
 	// side: putting the image away IS switching the mirror off, which is what
 	// double-clicking the arrow does.
-	bool imagesVisible() const { return m_mirror; }
+	bool imagesVisible() const { return m_live; }
 
 	// WOULD KEEPING THIS LIVE GO ROUND IN CIRCLES?
 	//
@@ -178,7 +195,8 @@ private:
 	// is that node one of ours?
 	bool isOurImage(const Node* node) const;
 
-	bool m_mirror = true;   // the whole mirror: on show, live, and both ways
+	bool m_mirror = true;   // geometry travels between the two sides, both ways
+	bool m_live = true;     // the image is drawn, on show, and kept up to date
 	bool m_contravariant = false;
 	bool m_syncing = false;
 	QString m_name;        // what the functor was called when its images were drawn

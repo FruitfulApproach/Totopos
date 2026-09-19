@@ -110,7 +110,7 @@ QWidget* ApplicableRulesDock::rowFor(const ApplicableRule& rule, int index)
 	auto* pin = new QToolButton(row);
 	pin->setCheckable(true);
 	pin->setChecked(m_pinned.contains(rule.name));
-	pin->setText(QString(QChar(0x1F4CC)));   // a pushpin
+	pin->setText(QStringLiteral(u"\U0001F4CC"));   // a pushpin - above the BMP, so not a QChar
 	pin->setAutoRaise(true);
 	pin->setToolTip(QString("Keep %1 to hand: pinned, it also sits along the foot of the canvas "
 	                        "whenever it fits the diagram.").arg(rule.name));

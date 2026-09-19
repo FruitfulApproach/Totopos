@@ -65,4 +65,5 @@ void CanvasActionBar::setActions(const QList<Action>& actions)
 
 	setVisible(!m_actions.isEmpty());
 	adjustSize();
+	emit changed();
 }

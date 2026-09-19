@@ -164,7 +164,7 @@ namespace
 			// view of a diagram quietly editing another. The picture is a
 			// snapshot; what it shows was already drawn by the real functor.
 			if (auto* maps = dynamic_cast<MapsElements*>(copy->prop(MapsElements::Key())))
-				maps->setMirrorsGeometry(false);
+				maps->setLive(false);
 			into.insert(source, copy);
 		}
 	}

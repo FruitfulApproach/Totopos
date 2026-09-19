@@ -264,6 +264,9 @@ void SketchView::buildOverlay()
 	// the pills, over the sentence: what can be done here and now
 	m_actions = new CanvasActionBar(this);
 	connect(m_actions, &CanvasActionBar::triggered, this, &SketchView::canvasActionTriggered);
+	// A new set of pills is a new size: put it back at the foot, where a
+	// resize would have put it. Nothing else moves the overlay between resizes.
+	connect(m_actions, &CanvasActionBar::changed, this, &SketchView::placeOverlay);
 
 	placeOverlay();
 	m_toggle->raise();
