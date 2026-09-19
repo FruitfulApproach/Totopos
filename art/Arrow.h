@@ -28,11 +28,24 @@ public:
 	void addBend(const QPointF& at);
 	void removeBend(int index);
 	void straighten();
+	// the same, and put it in the scene's history - what the menu entry and
+	// the Properties button both want, neither of them being able to reach
+	// recordBends from outside
+	void straightenRecorded();
 	// the bend under a point in this arrow's coordinates, or -1
 	int bendAt(const QPointF& pos, qreal radius = 9.0) const;
 
 	// the curve as drawn, in this arrow's coordinates
 	QPainterPath curve() const;
+
+	// IS THIS PRESS THE ARROW'S, OR DOES IT BELONG TO WHAT IS UNDER IT?
+	//
+	// True on an existing bend point, and anywhere in the middle stretch of
+	// the line. False near either end, where the line lies across the object
+	// it runs into and the press is almost certainly aimed at that object
+	// (see BendFreeEnds). The scene asks this too, so that what it writes
+	// down as the thing being dragged is the same thing that gets the press.
+	bool takesPressAt(const QPointF& itemPos) const;
 	// the clipped start, the bends, and the clipped end
 	QList<QPointF> throughPoints() const;
 	// the frame an end is joined to; an arrow is joined at the middle of its line
@@ -185,6 +198,18 @@ public:
 	void setMonicRecorded(bool monic);
 	void setEpicRecorded(bool epic);
 
+	// THE SHAFT AND THE HEAD ARE TWO SEPARATE QUESTIONS.
+	//
+	// An equals is a double line with no head, because it points nowhere; a
+	// plain arrow is a single line with a head. Asking the two apart is what
+	// lets the third combination exist: an implication (art/Implies.h) is a
+	// double line WITH a head, which is how "implies" is written.
+	virtual bool drawsDoubleLine() const { return m_style == Style::Equals; }
+	virtual bool drawsHead() const { return m_style != Style::Equals; }
+	// half the space between the two lines, in scene units before the arrow's
+	// depth is taken off it
+	virtual qreal doubleLineGap() const { return 1.8; }
+
 	QRectF boundingRect() const override;
 	QPainterPath shape() const override;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
@@ -230,6 +255,26 @@ private:
 	void recordBends(const QString& what, const QList<QPointF>& before);
 	// the index a new bend at this point should take among the others
 	int bendIndexFor(const QPointF& pos) const;
+
+	// How far along the line that point is, from 0 at the tail to 1 at the
+	// head. Measured along the CURVE, so a bent arrow answers about the line
+	// as drawn rather than the straight run between its ends.
+	qreal fractionAlong(const QPointF& pos) const;
+
+	// HOW MUCH OF EACH END IS NOT FOR BENDING.
+	//
+	// An arrow is drawn right up to the edge of the thing it leaves and the
+	// thing it arrives at, and it is wide to the mouse (arrowHitWidth) so it
+	// can be grabbed at all. Between them, the last stretch of line before an
+	// object lies across the very place you reach for to pick that object up:
+	// going for O, you catch the arrow a few pixels short of it, and the
+	// press became a bend instead of a drag.
+	//
+	// So the outer third at each end belongs to whatever is under it. The
+	// middle third bends - which is where a bend is wanted anyway, a line
+	// being pulled out sideways from its middle - and an existing bend point
+	// can still be grabbed wherever it happens to sit.
+	static constexpr qreal BendFreeEnds = 1.0 / 3.0;
 	// is that point near enough to the line the arrow would take without it?
 	bool isRedundantBend(const QPointF& point, const QList<QPointF>& without) const;
 

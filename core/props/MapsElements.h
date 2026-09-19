@@ -123,6 +123,21 @@ public:
 	// double-clicking the arrow does.
 	bool imagesVisible() const { return m_mirror; }
 
+	// WOULD KEEPING THIS LIVE GO ROUND IN CIRCLES?
+	//
+	// F : X -> Y draws what is in X into Y. If Y is also the domain of a live
+	// G : Y -> Z, and Z of a live H : Z -> X, then what F draws lands back in
+	// its own domain as something new to draw - H(G(F(x))) - and the next lap
+	// maps that. The diagram grows without end, and since each lap is a
+	// signal answering a signal it grows DOWN THE STACK, making and
+	// destroying scene items all the way, which is what took the program out
+	// while the canvas was being painted.
+	//
+	// So a mapping asks, before it works, whether the images it is about to
+	// draw can find their way home. One that can is not kept live: it says so
+	// and switches itself off, and the picture stays as it is.
+	bool closesALoop() const;
+
 	// make the image match the domain, exactly, right now
 	void sync();
 	// everything this mapping drew, taken away again

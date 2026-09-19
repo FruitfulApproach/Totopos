@@ -24,8 +24,6 @@ const char* AppSettings::ArrowHitWidth = "arrow/hitWidth";
 const char* AppSettings::LabelPointSize = "label/pointSize";
 const char* AppSettings::ComposeWithRing = "notation/composeWithRing";
 const char* AppSettings::EnglishSelectionOnly = "english/selectionOnly";
-const char* AppSettings::ArrowButtonDelay = "arrow/buttonDelayMs";
-const char* AppSettings::ArrowButtonLife = "arrow/buttonLifeMs";
 
 namespace
 {
@@ -68,8 +66,6 @@ QVariant AppSettings::defaultValue(const char* key)
 	if (k == LabelPointSize) return 11.0;
 	if (k == ComposeWithRing) return true;
 	if (k == EnglishSelectionOnly) return false;
-	if (k == ArrowButtonDelay) return 500;
-	if (k == ArrowButtonLife) return 2000;
 	return QVariant();
 }
 

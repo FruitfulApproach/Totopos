@@ -7,6 +7,7 @@
 #include <QFrame>
 #include <QComboBox>
 #include <QLabel>
+#include "widget/CanvasActionBar.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QPropertyAnimation>
@@ -260,6 +261,10 @@ void SketchView::buildOverlay()
 	m_statement->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	m_statement->hide();
 
+	// the pills, over the sentence: what can be done here and now
+	m_actions = new CanvasActionBar(this);
+	connect(m_actions, &CanvasActionBar::triggered, this, &SketchView::canvasActionTriggered);
+
 	placeOverlay();
 	m_toggle->raise();
 	m_panel->raise();
@@ -320,12 +325,24 @@ void SketchView::placeOverlay()
 	m_panel->resize(hint.width(), m_open ? hint.height() : m_panel->height());
 	m_panel->move(right - m_panel->width(), kMargin + m_toggle->height() + 4);
 
+	int foot = height() - kMargin;
 	if (m_statement != nullptr && !m_statement->text().isEmpty())
 	{
 		m_statement->setFixedWidth(qMax(160, width() - 2 * kMargin));
 		m_statement->adjustSize();
-		m_statement->move(kMargin, height() - m_statement->height() - kMargin);
+		m_statement->move(kMargin, foot - m_statement->height());
 		m_statement->raise();
+		foot -= m_statement->height() + 6;
+	}
+
+	// The pills stack ON TOP of the sentence, so neither covers the other and
+	// the sentence keeps the foot of the view it has always had.
+	if (m_actions != nullptr && !m_actions->isEmpty())
+	{
+		m_actions->setFixedWidth(qMax(160, width() - 2 * kMargin));
+		m_actions->adjustSize();
+		m_actions->move(kMargin, foot - m_actions->height());
+		m_actions->raise();
 	}
 }
 

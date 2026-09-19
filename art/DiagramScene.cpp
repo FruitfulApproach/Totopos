@@ -3,7 +3,6 @@
 #include "tutor/TutorSession.h"
 #include "core/AppSettings.h"
 #include "art/NodeHandles.h"
-#include "art/ArrowHandle.h"
 #include "art/AtomicElement.h"
 #include "tutor/ElementOpTutor.h"
 #include "core/layout/GraphLayoutThread.h"
@@ -30,6 +29,7 @@
 #include <QDrag>
 #include "core/io/SceneFile.h"
 #include "core/english/Translation.h"
+#include "core/view/ClassicalView.h"
 #include <QIODevice>
 #include <functional>
 
@@ -47,6 +47,21 @@ DiagramScene::DiagramScene(QObject* parent)
 	// re-centres the scene whenever it changes; the first node placed would
 	// jump away from the cursor
 	setSceneRect(-4000, -4000, 8000, 8000);
+
+	// NO BSP INDEX.
+	//
+	// Qt keeps a binary space partition tree of the items, to answer "what is
+	// in this rectangle" without walking the lot. It is worth having for
+	// thousands of items; a diagram has tens, and a linear walk of tens costs
+	// nothing measurable.
+	//
+	// What it does cost is a second copy of every item pointer, kept in step
+	// by hand as items move, change shape and are destroyed - and every crash
+	// this program has had in the scene has died in that tree, climbing it
+	// during a repaint and finding an item that is no longer there. With no
+	// index, the scene reads the one list it definitely maintains, and there
+	// is no second copy to fall out of step.
+	setItemIndexMethod(QGraphicsScene::NoIndex);
 	m_history = new SceneHistory(this);
 	// undo and redo change what the diagram says, so the sentence follows the
 	// history rather than every place that edits the scene
@@ -92,6 +107,69 @@ void DiagramScene::drawBackground(QPainter* painter, const QRectF& rect)
 
 DiagramScene::~DiagramScene()
 {
+	// out of line, and here rather than in the header, because the unique_ptr
+	// holds a type the header only forward-declares
+}
+
+// ---------------------------------------------------------------- how it is written
+
+void DiagramScene::toggleNotation()
+{
+	setNotation(isClassical() ? Notation::Succinct : Notation::Classical);
+}
+
+void DiagramScene::setNotation(Notation notation)
+{
+	if (m_notation == notation)
+		return;
+
+	// Nothing half-done survives the switch. A rule laid over the diagram, an
+	// arrow being placed, a tutor pointing at something: all of them point at
+	// what is about to be hidden.
+	endRule();
+	hideHandles();
+	cancelArrow();
+	clearSelection();
+
+	if (m_classical)
+	{
+		// what was dragged about in the classical view is kept before the view
+		// that holds it goes (see classicalPositions)
+		m_classical->harvestPositions(m_classicalPositions);
+		m_classical.reset();
+	}
+
+	m_notation = notation;
+
+	if (m_notation == Notation::Classical)
+	{
+		auto view = std::make_unique<ClassicalView>(this);
+		if (!view->build(m_classicalPositions))
+		{
+			m_notation = Notation::Succinct;
+			emit message(QStringLiteral("There is no diagram to write out the long way."));
+			emit notationChanged(false);
+			return;
+		}
+		m_classical = std::move(view);
+		if (m_ambientCategory != nullptr)
+			m_ambientCategory->setVisible(false);
+		emit message(statementName().isEmpty()
+			? QStringLiteral("Classical notation: what is given, and what follows from it.")
+			: QString("Classical notation: the givens imply \"%1\".").arg(statementName()));
+	}
+	else if (m_ambientCategory != nullptr)
+	{
+		m_ambientCategory->setVisible(true);
+	}
+
+	emit notationChanged(isClassical());
+}
+
+void DiagramScene::syncClassicalPositions()
+{
+	if (m_classical)
+		m_classical->harvestPositions(m_classicalPositions);
 }
 
 void DiagramScene::setAmbientCategory(const QString& name)
@@ -132,7 +210,6 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	if (isMoving())
 		cancelMove();
 	hideHandles();
-	hideArrowHandle();   // and its dwell/expiry timers, which hold a node
 	hideArrowPreview();
 
 	// The rule overlay keeps RAW pointers into the diagram (RuleMatch holds
@@ -241,34 +318,61 @@ void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 
 void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
-	// a double-click ON A LABEL puts the keyboard in it rather than placing
-	// anything; while it is already being edited the text widget wants the
-	// double-click itself, to select a word
-	if (auto* label = dynamic_cast<NodeLabel*>(hitItem(event->scenePos())))
+	// A DOUBLE-CLICK ON SOMETHING DRAWN STARTS AN ARROW OUT OF IT.
+	//
+	// It used to be a little button that appeared when the mouse came near a
+	// border, which put an icon over the diagram nearly all the time for a
+	// gesture wanted once an arrow. The gesture is now the double-click
+	// itself, on the thing the arrow is to come out of - its face or its
+	// name, both being the same thing to point at.
+	//
+	// What that displaces is the editor: double-clicking a name no longer
+	// opens it. Renaming is on the right-click menu, of the node or of the
+	// name (Edit label), where it can say what it does.
+	//
+	// THE CANVAS IS THE ONE EXCEPTION, AND IT IS THE ONLY ONE.
+	//
+	// A double-click on the canvas - the ambient category, the yellow behind
+	// everything - is where a new object goes, and that is how a diagram is
+	// drawn in the first place. Everything ELSE drawn in it is a thing an
+	// arrow can come out of, and a double-click on it starts that arrow: on
+	// its face or on its name, both being the same thing to point at.
+	//
+	// That holds however deep the nesting goes and whatever the nodes happen
+	// to BE. A category drawn in BigCat is an object of BigCat, so
+	// double-clicking it starts a functor; a module drawn in R-Mod is an
+	// object of R-Mod, so double-clicking it starts an R-linear map. The face
+	// of a nested category used to be treated as room to place into instead,
+	// which made the commonest gesture in the program mean two different
+	// things depending on how deep you were - and left a stray object inside
+	// the very node you were trying to draw an arrow out of.
+	//
+	// Placing INTO a nested category is still there, on its right-click menu
+	// ("New object here", "New subcategory here"), where it can say which
+	// category it means.
+	//
+	// WHILE AN ARROW IS BEING PLACED none of this applies: a double-click
+	// then says the other end goes here, and that is handled below.
+	Node* pending = m_arrowFrom.data();
+	const bool finishing = arrowPending() && pending != nullptr;
+
+	if (!finishing)
 	{
-		if (!label->isEditing())
+		QGraphicsItem* hit = hitItem(event->scenePos());
+		auto* label = dynamic_cast<NodeLabel*>(hit);
+
+		// mid-edit the text widget wants its own double-click, to select a word
+		if (label != nullptr && label->isEditing())
 		{
-			label->beginEdit();
-			event->accept();
+			QGraphicsScene::mouseDoubleClickEvent(event);
 			return;
 		}
-		QGraphicsScene::mouseDoubleClickEvent(event);
-		return;
-	}
 
-	// A double-click on an ARROW shows or hides what its mapping drew. The
-	// image nodes are only hidden, so whatever has been drawn inside them is
-	// there again when it comes back.
-	if (auto* arrow = dynamic_cast<Arrow*>(nodeAt(event->scenePos())))
-	{
-		if (auto* maps = dynamic_cast<MapsElements*>(arrow->prop(MapsElements::Key())))
+		Node* from = label != nullptr ? dynamic_cast<Node*>(label->parentItem())
+		                              : nodeAt(event->scenePos());
+		if (from != nullptr && from != m_ambientCategory && from->canStartArrow())
 		{
-			const bool show = !maps->mirrorsGeometry();
-			maps->setMirrorsGeometry(show);
-			auto* cod = maps->codomain();
-			emit message(show
-				? QString("The image of %1 is back in %2.").arg(arrow->id(), cod != nullptr ? cod->id() : QString())
-				: QString("The image of %1 is put away. Double-click it again to bring it back.").arg(arrow->id()));
+			beginArrow(from);
 			event->accept();
 			return;
 		}
@@ -277,12 +381,12 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	// let items under the cursor take the double-click first
 	QGraphicsScene::mouseDoubleClickEvent(event);
 
-	// A double-click puts a new object in. Which category it goes into is the
-	// nearest one AT the cursor, so double-clicking the canvas places into the
-	// canvas, and double-clicking something drawn inside a category places
-	// beside it, in that category. Arrows are drawn from the border button
-	// instead, and the label has already been dealt with above - a
-	// double-click there opens the editor.
+	// A double-click on the CANVAS, or on the face of a category, puts a new
+	// object in: the nearest category AT the cursor is the one it goes into,
+	// so double-clicking the canvas places into the canvas and
+	// double-clicking inside a category places in that category. Everything
+	// drawn has been dealt with above - there, a double-click starts an
+	// arrow. An element is put in from the right-click menu (Add element).
 	//
 	// WHILE AN ARROW IS BEING PLACED a double-click is not a cancel: it says
 	// the other end goes HERE. Anywhere here - over the domain's category or
@@ -290,8 +394,8 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	// whatever lies under the cursor. An arrow joins two objects of one
 	// category, so there is nowhere else it could go, and that category's
 	// frame simply grows to reach the object just put down.
-	Node* from = m_arrowFrom.data();
-	const bool finishing = arrowPending() && from != nullptr;
+	Node* from = pending;
+
 	Category* category = finishing ? from->surroundingCategory()
 							  : categoryAt(hitItem(event->scenePos()));
 	if (category == nullptr)
@@ -325,7 +429,7 @@ QGraphicsItem* DiagramScene::hitItem(const QPointF& scenePos) const
 	const QList<QGraphicsItem*> under = items(scenePos, Qt::IntersectsItemShape, Qt::DescendingOrder);
 	for (QGraphicsItem* item : under)
 	{
-		if (item == m_handle || item == m_arrowHandle)
+		if (item == m_handle)
 			continue;
 		// The arrow being placed RUNS TO THE CURSOR, so it is always directly
 		// under it - and so is its label. Were it not skipped here, every
@@ -346,6 +450,27 @@ Node* DiagramScene::nodeAt(const QPointF& scenePos) const
 	while (item != nullptr && dynamic_cast<Node*>(item) == nullptr)
 		item = item->parentItem();   // a label hit counts for its node
 	return dynamic_cast<Node*>(item);
+}
+
+Node* DiagramScene::nodeForPress(const QPointF& scenePos) const
+{
+	// Topmost first, as the scene will deliver the press. An arrow that does
+	// not want it is passed over here as well, so the handle bar and the
+	// record of what is being dragged are about the node that will actually
+	// move - not about the line lying across it.
+	for (QGraphicsItem* item : items(scenePos))
+	{
+		Node* node = nullptr;
+		for (QGraphicsItem* up = item; up != nullptr && node == nullptr; up = up->parentItem())
+			node = dynamic_cast<Node*>(up);
+		if (node == nullptr)
+			continue;
+		if (auto* arrow = dynamic_cast<Arrow*>(node);
+		    arrow != nullptr && !arrow->takesPressAt(arrow->mapFromScene(scenePos)))
+			continue;
+		return node;
+	}
+	return nullptr;
 }
 
 void DiagramScene::showHandles(Node* node, const QPointF& itemPos)
@@ -989,6 +1114,25 @@ void DiagramScene::deleteNodes(const QList<Node*>& nodes)
 	for (Node* node : nodes)
 		if (node != nullptr && node != m_ambientCategory && !doomed.contains(node))
 			doomed << node;
+	// Nothing in the classical view can be deleted: what is drawn there is a
+	// COPY of the diagram, and taking a copy away would say nothing about the
+	// diagram while looking exactly as though it had. Switch back and delete
+	// the thing itself.
+	if (m_classical)
+	{
+		const int before = doomed.size();
+		QList<Node*> real;
+		for (Node* node : doomed)
+			if (!ClassicalView::isPartOfView(node))
+				real << node;
+		doomed = real;
+		if (doomed.isEmpty() && before > 0)
+		{
+			emit message(QStringLiteral("That is a copy, drawn to show what the diagram says. "
+			                            "Switch back to the succinct notation to change the diagram itself."));
+			return;
+		}
+	}
 	if (doomed.isEmpty())
 		return;
 
@@ -1021,6 +1165,20 @@ void DiagramScene::deleteNodes(const QList<Node*>& nodes)
 
 void DiagramScene::clearDiagram()
 {
+	// The classical view is a picture OF this diagram, so it goes with it -
+	// and it goes first, before the nodes it is a picture of are destroyed.
+	// The positions are NOT kept: they belong to the diagram being cleared
+	// away, and the one about to be read in has its own.
+	m_classical.reset();
+	m_classicalPositions.clear();
+	if (m_notation != Notation::Succinct)
+	{
+		m_notation = Notation::Succinct;
+		emit notationChanged(false);
+	}
+	if (m_ambientCategory != nullptr)
+		m_ambientCategory->setVisible(true);
+
 	endRule();
 	hideHandles();
 	cancelArrow();
@@ -1083,83 +1241,10 @@ void DiagramScene::hideArrowPreview()
 	m_pending = nullptr;
 }
 
-namespace
-{
-	// How far OUTSIDE a rectangle a point is: zero on the outline, positive
-	// beyond it, and NEGATIVE inside - the depth in.
-	//
-	// The sign is what matters. The button appears from the outline outwards
-	// and never over the inside of a node, so that the whole face of a node
-	// stays a place to pick it up and carry it, and the button is something
-	// aimed at rather than something met on the way across.
-	qreal distanceOutside(const QRectF& r, const QPointF& p)
-	{
-		const qreal outX = qMax(r.left() - p.x(), p.x() - r.right());
-		const qreal outY = qMax(r.top() - p.y(), p.y() - r.bottom());
-		if (outX <= 0 && outY <= 0)
-			return qMax(outX, outY);   // inside: how deep, as a negative number
-		const qreal dx = qMax(qreal(0), outX);
-		const qreal dy = qMax(qreal(0), outY);
-		return qSqrt(dx * dx + dy * dy);
-	}
-}
-
-Node* DiagramScene::nodeWithBorderNear(const QPointF& scenePos, qreal within) const
-{
-	if (m_ambientCategory == nullptr)
-		return nullptr;
-	QList<Node*> nodes;
-	everyNode(m_ambientCategory, nodes);
-
-	Node* nearest = nullptr;
-	qreal best = within;
-	for (Node* node : nodes)
-	{
-		// An arrow has no border to speak of - its box is the bounding box of
-		// a line - and the canvas itself is not something to draw out of.
-		if (node == m_ambientCategory || dynamic_cast<Arrow*>(node) != nullptr)
-			continue;
-		if (!node->isVisible())
-			continue;
-		const qreal d = distanceOutside(node->mapRectToScene(node->boxRect()), scenePos);
-		// The drawn border straddles the rectangle - a pen of width w puts
-		// half of itself inside - so being ON the line the user can see counts
-		// as being at the outline, and nothing further in does.
-		const qreal onTheLine = node->border().style() == Qt::NoPen
-			? 0.0 : node->border().widthF() / 2.0;
-		if (d >= -onTheLine && d <= best)
-		{
-			best = qMax(qreal(0), d);
-			nearest = node;
-		}
-	}
-	return nearest;
-}
-
-QList<int> DiagramScene::handleButtonsFor(const Node* node) const
-{
-	QList<int> buttons;
-	if (node == nullptr)
-		return buttons;
-
-	if (dynamic_cast<const AtomicElement*>(node) != nullptr)
-	{
-		// An element is not something an arrow comes out of - an arrow joins
-		// two OBJECTS - so the handle has nothing to offer it. What CAN be
-		// done with an element (+, -, =) is on its right-click menu, where
-		// there is room to say what each one means.
-		return buttons;
-	}
-
-	buttons << int(ArrowHandle::Button::DrawArrow);
-	return buttons;
-}
-
 void DiagramScene::beginElementOp(Node* from, ElementOp operation)
 {
 	if (from == nullptr)
 		return;
-	hideArrowHandle();
 	const ElementOpTutor::Operation which =
 		  operation == ElementOp::Plus   ? ElementOpTutor::Operation::Plus
 		: operation == ElementOp::Equals ? ElementOpTutor::Operation::Equals
@@ -1171,124 +1256,10 @@ void DiagramScene::beginElementOp(Node* from, ElementOp operation)
 		tutor->deleteLater();
 }
 
-void DiagramScene::refreshArrowHandle(const QPointF& scenePos)
-{
-	// A BUTTON THAT ANSWERS A PAUSE, NOT A PASSING CURSOR.
-	//
-	// It used to appear the instant the mouse came within reach of any
-	// border, which put an icon over the diagram nearly all the time. Now the
-	// mouse has to REST near a border for arrowButtonDelay before it shows,
-	// and it takes itself away after arrowButtonLife. Moving on before the
-	// dwell is up costs nothing and shows nothing.
-	if (m_handleDwell == nullptr)
-	{
-		m_handleDwell = new QTimer(this);
-		m_handleDwell->setSingleShot(true);
-		connect(m_handleDwell, &QTimer::timeout, this, &DiagramScene::showArrowHandleNow);
-		m_handleLife = new QTimer(this);
-		m_handleLife->setSingleShot(true);
-		connect(m_handleLife, &QTimer::timeout, this, &DiagramScene::expireArrowHandle);
-	}
-
-	// Not while something else has the mouse: drawing an arrow already,
-	// carrying a node about, or a tutor taking the clicks.
-	if (arrowPending() || isMoving() || Node::userDragging() || !m_session.isNull() || isEditingLabel())
-	{
-		hideArrowHandle();
-		return;
-	}
-
-	if (m_arrowHandle != nullptr && m_arrowHandle->isVisible())
-	{
-		// On the button itself: it waits, however long that takes. Reaching
-		// for it is exactly the gesture that would otherwise run its time out
-		// from under the hand.
-		if (m_arrowHandle->coversScenePos(scenePos, 12.0))
-		{
-			m_handleLife->stop();
-			return;
-		}
-		// moved off it again: let it have the rest of its life and go
-		if (!m_handleLife->isActive())
-			m_handleLife->start(qMax(200, AppSettings::instance().arrowButtonLife()));
-		return;
-	}
-
-	Node* from = nodeWithBorderNear(scenePos, ArrowHandle::reach());
-	// nothing there, or nothing this node can be asked to do: no dwell at all
-	if (from == nullptr || handleButtonsFor(from).isEmpty())
-	{
-		m_handleDwell->stop();
-		m_handleWaitingOn = nullptr;
-		m_handleSpent = nullptr;   // away from the border: it may be asked for again
-		return;
-	}
-	if (from != m_handleSpent.data())
-		m_handleSpent = nullptr;   // a different border is a different question
-	else
-		return;                    // this one has had its turn; move off and back for another
-
-	// Still resting in the same spot, on the same border: let the count run
-	// rather than starting it again, or it would never finish.
-	const QPointF drift = scenePos - m_handleWaitingAt;
-	const bool held = m_handleWaitingOn == from && m_handleDwell->isActive()
-	               && (drift.x() * drift.x() + drift.y() * drift.y()) < 9.0;
-	if (held)
-		return;
-
-	m_handleWaitingOn = from;
-	m_handleWaitingAt = scenePos;
-	m_handleDwell->start(qMax(0, AppSettings::instance().arrowButtonDelay()));
-}
-
-void DiagramScene::showArrowHandleNow()
-{
-	Node* from = m_handleWaitingOn.data();
-	m_handleWaitingOn = nullptr;
-	if (from == nullptr || from->scene() != this)
-		return;
-	QList<ArrowHandle::Button> buttons;
-	for (int b : handleButtonsFor(from))
-		buttons << ArrowHandle::Button(b);
-	if (buttons.isEmpty())
-		return;
-
-	if (m_arrowHandle == nullptr)
-	{
-		m_arrowHandle = new ArrowHandle();
-		addItem(m_arrowHandle);
-	}
-	// where the mouse came to rest: the button appears under the hand rather
-	// than beside the node, so it is already where it is being reached for
-	m_arrowHandle->showFor(from, buttons, m_handleWaitingAt);
-	m_handleLife->start(qMax(200, AppSettings::instance().arrowButtonLife()));
-}
-
-void DiagramScene::expireArrowHandle()
-{
-	// Remember whose it was BEFORE hiding, so a hand left where it is does
-	// not have the button flash up again every delay + life.
-	Node* was = m_arrowHandle != nullptr ? m_arrowHandle->node() : nullptr;
-	hideArrowHandle();
-	m_handleSpent = was;
-}
-
-void DiagramScene::hideArrowHandle()
-{
-	if (m_handleDwell != nullptr)
-		m_handleDwell->stop();
-	if (m_handleLife != nullptr)
-		m_handleLife->stop();
-	m_handleWaitingOn = nullptr;
-	if (m_arrowHandle != nullptr)
-		m_arrowHandle->hideHandle();
-}
-
 void DiagramScene::beginArrow(Node* from)
 {
 	if (from == nullptr)
 		return;
-	hideArrowHandle();
 	// The arrow tutor takes the clicks from here. With tutor mode off it runs
 	// just the same, only without the remarks and the pointer.
 	auto* tutor = new ArrowTutor(this, from);
@@ -1336,18 +1307,6 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 	// The border button is up, so the cursor is on it: this press is the one
 	// gesture it offers. Taken here, before any of the press machinery below,
 	// so nothing starts a move or a selection underneath it.
-	if (event->button() == Qt::LeftButton && m_arrowHandle != nullptr && m_arrowHandle->isVisible())
-	{
-		Node* from = m_arrowHandle->node();
-		const bool onOne = m_arrowHandle->coversScenePos(event->scenePos());
-		hideArrowHandle();
-		if (from != nullptr && onOne)
-		{
-			beginArrow(from);
-			event->accept();
-			return;
-		}
-	}
 	// While an arrow is being drawn the tutor session filters the presses, so
 	// this only ever runs for ordinary clicks.
 	if (event->button() == Qt::LeftButton)
@@ -1358,7 +1317,7 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		const bool onHandle = m_handle != nullptr && m_handle->isVisible() && m_handle->isUnderMouse();
 		if (!onHandle)   // pressing the handle itself must reach the handle
 		{
-			Node* node = nodeAt(event->scenePos());
+			Node* node = nodeForPress(event->scenePos());
 			// an arrow gets the same bar: delete it, or draw an arrow TO it
 			if (node != nullptr && node != m_ambientCategory)
 				showHandles(node, node->mapFromScene(event->scenePos()));
@@ -1377,7 +1336,7 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		// move can be recorded as one change when the button comes back up
 		m_dragFrom.clear();
 		QList<Node*> watched;
-		if (Node* node = nodeAt(event->scenePos()))
+		if (Node* node = nodeForPress(event->scenePos()))
 			watched << node;
 		for (QGraphicsItem* item : selectedItems())
 			if (auto* node = dynamic_cast<Node*>(item))
@@ -1420,7 +1379,16 @@ void DiagramScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 		m_pressed = nullptr;
 		m_gesture = Gesture::None;
 		QApplication::restoreOverrideCursor();
-		if (m_moved && node->pos() != m_moveFrom && m_history != nullptr)
+		// A DRAG IN THE CLASSICAL VIEW IS NOT A STEP IN THIS DIAGRAM'S HISTORY.
+		//
+		// What is dragged there is a copy, and the copy is thrown away and
+		// built afresh every time the notation is switched. An entry pointing
+		// at one would be an entry that can never be undone, because by the
+		// time anybody asked, the thing it names is gone. Where the copy was
+		// put is kept instead - see classicalPositions - which is the right
+		// place for it: it is a layout, not a change to the diagram.
+		const bool inView = m_classical && ClassicalView::isPartOfView(node);
+		if (m_moved && node->pos() != m_moveFrom && m_history != nullptr && !inView)
 			m_history->record(new ItemsMoved(QString("Moved %1").arg(node->id()),
 				{ ItemsMoved::Move{ QPointer<Node>(node), m_moveFrom, node->pos() } }));
 		Node::setUserDragging(false);
@@ -1438,6 +1406,8 @@ void DiagramScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 	{
 		if (start.first.isNull() || start.first->pos() == start.second)
 			continue;
+		if (m_classical && ClassicalView::isPartOfView(start.first.data()))
+			continue;   // a copy, not the diagram: see the note above
 		moves.append(ItemsMoved::Move{ start.first, start.second, start.first->pos() });
 	}
 	m_dragFrom.clear();
@@ -1452,7 +1422,6 @@ void DiagramScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 void DiagramScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
 	m_lastScenePos = event->scenePos();   // where a paste with no point of its own lands
-	refreshArrowHandle(event->scenePos());
 
 	if (arrowPending() && !m_pending.isNull())
 		m_pending->setLooseEnd(event->scenePos());
@@ -1490,8 +1459,7 @@ void DiagramScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 			if (gone || m_moved)
 			{
 				m_moved = true;
-				if (QGraphicsItem* parent = m_pressed->parentItem())
-					m_pressed->setPos(parent->mapFromScene(event->scenePos()) + m_moveGrab);
+				m_pressed->setPos(inParentOf(m_pressed.data(), event->scenePos()) + m_moveGrab);
 			}
 			event->accept();
 			return;
@@ -1748,6 +1716,9 @@ void DiagramScene::setStatementName(const QString& name)
 			QString("Called it \"%1\"").arg(name), this, m_kind, m_kind, before, name));
 	emit statementKindChanged(int(m_kind), m_statementName);
 	emit statementChanged(statementText());
+	// the name rides the implication arrow: rename the rule and the arrow says so
+	if (m_classical)
+		m_classical->refreshName();
 }
 
 void DiagramScene::setProves(const QString& path)
@@ -2059,6 +2030,26 @@ void DiagramScene::recordNote(const QString& text)
 }
 
 
+QPointF DiagramScene::inParentOf(const Node* node, const QPointF& scenePos)
+{
+	// A NODE WITH NO PARENT IS STILL SOMEWHERE.
+	//
+	// A child's pos() is in its parent's coordinates; a node hanging off the
+	// scene itself has no parent to ask, and for that one the scene IS the
+	// frame - pos() and scenePos() are the same numbers.
+	//
+	// Both halves of the move used to do this conversion inside `if (parent)`,
+	// which quietly left a parentless node out: the grab offset was never
+	// worked out and setPos was never called, so the node could be pressed,
+	// picked up and dragged and simply did not go anywhere. That is every
+	// top-level node there is - the two boxes of the classical view among them.
+	if (node == nullptr)
+		return scenePos;
+	if (QGraphicsItem* parent = node->parentItem())
+		return parent->mapFromScene(scenePos);
+	return scenePos;
+}
+
 void DiagramScene::beginPress(Node* node, const QPointF& scenePos, Gesture gesture)
 {
 	if (node == nullptr || gesture == Gesture::None)
@@ -2070,8 +2061,7 @@ void DiagramScene::beginPress(Node* node, const QPointF& scenePos, Gesture gestu
 	if (gesture == Gesture::Move)
 	{
 		m_moveFrom = node->pos();
-		if (QGraphicsItem* parent = node->parentItem())
-			m_moveGrab = node->pos() - parent->mapFromScene(scenePos);
+		m_moveGrab = node->pos() - inParentOf(node, scenePos);
 		// the cursor says what the drag is, for as long as it lasts
 		QApplication::setOverrideCursor(Qt::SizeAllCursor);
 	}

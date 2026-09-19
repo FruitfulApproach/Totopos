@@ -60,6 +60,10 @@ private:
     Document* newDocument();
     // the diagram in front, or nullptr when there is none
     Document* current() const;
+    // The tab this file is already open in, or nullptr. Compared as the file
+    // system sees it, not as two strings: the library hands out one spelling
+    // of a path and a file dialog another, and they are the same file.
+    Document* documentFor(const QString& path) const;
     DiagramScene* currentScene() const;
     // point the docks and the window at this one
     void bindCurrent();
@@ -70,6 +74,15 @@ private:
     void updateTitle();
     void updateTabText(Document* document);
     void syncEditActions();
+    // put View > Classical notation in step with the diagram in front
+    void syncNotationAction();
+    // FILL THE PILLS ALONG THE FOOT OF THE CANVAS.
+    //
+    // Two sources, and the bar is the only place that knows about both: what
+    // the SELECTION is offering (one arrow picked out can map its domain's
+    // elements over), and which PINNED rules fit the diagram as it stands.
+    // Called whenever either could have changed, and cheap when nothing has.
+    void refreshCanvasActions();
     void showError(const QString& text);
     // open a file, in a new tab or in this empty one
     bool openInto(Document* document, const QString& path);
@@ -89,6 +102,10 @@ private:
     QAction* m_startChase = nullptr;
     // Help > Tutor mode: the tick follows the setting wherever it is changed
     QAction* m_tutorMode = nullptr;
+    // View > Classical notation. The notation belongs to the DIAGRAM, so this
+    // one tick shows the state of whichever tab is in front and is put back in
+    // step every time that changes (see syncNotationAction).
+    QAction* m_classicalNotation = nullptr;
 
     PropertiesDock* m_properties = nullptr;
     CommutativeEquationsDock* m_equations = nullptr;

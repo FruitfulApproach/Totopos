@@ -52,6 +52,8 @@ template <> constexpr inline auto SketchView::qt_create_metaobjectdata<qt_meta_t
         "statementNamed",
         "dropTargetChanged",
         "category",
+        "canvasActionTriggered",
+        "id",
         "toggleMenu",
         "setMenuOpen",
         "open",
@@ -99,44 +101,48 @@ template <> constexpr inline auto SketchView::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SignalData<void(const QString &)>(12, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::QString, 13 },
         }}),
+        // Signal 'canvasActionTriggered'
+        QtMocHelpers::SignalData<void(const QString &)>(14, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QString, 15 },
+        }}),
         // Slot 'toggleMenu'
-        QtMocHelpers::SlotData<void()>(14, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(16, 2, QMC::AccessPublic, QMetaType::Void),
         // Slot 'setMenuOpen'
-        QtMocHelpers::SlotData<void(bool)>(15, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::Bool, 16 },
+        QtMocHelpers::SlotData<void(bool)>(17, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::Bool, 18 },
         }}),
         // Slot 'fitTo'
-        QtMocHelpers::SlotData<void(const QRectF &)>(17, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 18, 19 },
+        QtMocHelpers::SlotData<void(const QRectF &)>(19, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 20, 21 },
         }}),
         // Slot 'setStatement'
-        QtMocHelpers::SlotData<void(const QString &)>(20, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QString, 21 },
+        QtMocHelpers::SlotData<void(const QString &)>(22, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QString, 23 },
         }}),
         // Slot 'centreOnContents'
-        QtMocHelpers::SlotData<void()>(22, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(24, 2, QMC::AccessPublic, QMetaType::Void),
         // Slot 'fitContents'
-        QtMocHelpers::SlotData<void()>(23, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(25, 2, QMC::AccessPublic, QMetaType::Void),
         // Slot 'setChasing'
-        QtMocHelpers::SlotData<void(bool)>(24, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::Bool, 25 },
+        QtMocHelpers::SlotData<void(bool)>(26, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::Bool, 27 },
         }}),
         // Slot 'setCommutes'
-        QtMocHelpers::SlotData<void(bool)>(26, 2, QMC::AccessPublic, QMetaType::Void, {{
+        QtMocHelpers::SlotData<void(bool)>(28, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::Bool, 7 },
         }}),
         // Slot 'setStatementKind'
-        QtMocHelpers::SlotData<void(int, const QString &)>(27, 2, QMC::AccessPublic, QMetaType::Void, {{
+        QtMocHelpers::SlotData<void(int, const QString &)>(29, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::Int, 10 }, { QMetaType::QString, 3 },
         }}),
         // Slot 'carryFragment'
-        QtMocHelpers::SlotData<void(const QByteArray &)>(28, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { QMetaType::QByteArray, 29 },
+        QtMocHelpers::SlotData<void(const QByteArray &)>(30, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { QMetaType::QByteArray, 31 },
         }}),
     };
     QtMocHelpers::UintData qt_properties {
         // property 'sceneCentre'
-        QtMocHelpers::PropertyData<QPointF>(30, 0x80000000 | 31, QMC::DefaultPropertyFlags | QMC::Writable | QMC::EnumOrFlag | QMC::StdCppSet),
+        QtMocHelpers::PropertyData<QPointF>(32, 0x80000000 | 33, QMC::DefaultPropertyFlags | QMC::Writable | QMC::EnumOrFlag | QMC::StdCppSet),
     };
     QtMocHelpers::UintData qt_enums {
     };
@@ -165,16 +171,17 @@ void SketchView::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 4: _t->statementKindPicked((*reinterpret_cast<std::add_pointer_t<int>>(_a[1]))); break;
         case 5: _t->statementNamed((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
         case 6: _t->dropTargetChanged((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 7: _t->toggleMenu(); break;
-        case 8: _t->setMenuOpen((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
-        case 9: _t->fitTo((*reinterpret_cast<std::add_pointer_t<QRectF>>(_a[1]))); break;
-        case 10: _t->setStatement((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 11: _t->centreOnContents(); break;
-        case 12: _t->fitContents(); break;
-        case 13: _t->setChasing((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
-        case 14: _t->setCommutes((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
-        case 15: _t->setStatementKind((*reinterpret_cast<std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
-        case 16: _t->carryFragment((*reinterpret_cast<std::add_pointer_t<QByteArray>>(_a[1]))); break;
+        case 7: _t->canvasActionTriggered((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
+        case 8: _t->toggleMenu(); break;
+        case 9: _t->setMenuOpen((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
+        case 10: _t->fitTo((*reinterpret_cast<std::add_pointer_t<QRectF>>(_a[1]))); break;
+        case 11: _t->setStatement((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
+        case 12: _t->centreOnContents(); break;
+        case 13: _t->fitContents(); break;
+        case 14: _t->setChasing((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
+        case 15: _t->setCommutes((*reinterpret_cast<std::add_pointer_t<bool>>(_a[1]))); break;
+        case 16: _t->setStatementKind((*reinterpret_cast<std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
+        case 17: _t->carryFragment((*reinterpret_cast<std::add_pointer_t<QByteArray>>(_a[1]))); break;
         default: ;
         }
     }
@@ -192,6 +199,8 @@ void SketchView::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         if (QtMocHelpers::indexOfMethod<void (SketchView::*)(const QString & )>(_a, &SketchView::statementNamed, 5))
             return;
         if (QtMocHelpers::indexOfMethod<void (SketchView::*)(const QString & )>(_a, &SketchView::dropTargetChanged, 6))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (SketchView::*)(const QString & )>(_a, &SketchView::canvasActionTriggered, 7))
             return;
     }
     if (_c == QMetaObject::ReadProperty) {
@@ -229,14 +238,14 @@ int SketchView::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 17)
+        if (_id < 18)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 17;
+        _id -= 18;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 17)
+        if (_id < 18)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 17;
+        _id -= 18;
     }
     if (_c == QMetaObject::ReadProperty || _c == QMetaObject::WriteProperty
             || _c == QMetaObject::ResetProperty || _c == QMetaObject::BindableProperty
@@ -287,5 +296,11 @@ void SketchView::statementNamed(const QString & _t1)
 void SketchView::dropTargetChanged(const QString & _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 6, nullptr, _t1);
+}
+
+// SIGNAL 7
+void SketchView::canvasActionTriggered(const QString & _t1)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 7, nullptr, _t1);
 }
 QT_WARNING_POP

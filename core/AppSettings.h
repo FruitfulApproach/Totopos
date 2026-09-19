@@ -35,8 +35,6 @@ public:
 	static const char* LabelPointSize;   // double, 11.0 (0 or less: follow the application font)
 	static const char* ComposeWithRing;  // bool, true: g o f rather than gf
 	static const char* EnglishSelectionOnly; // bool, false: the English panel reads the whole diagram
-	static const char* ArrowButtonDelay;  // int ms, 500: how long to dwell on a border before it appears
-	static const char* ArrowButtonLife;   // int ms, 2000: how long it then stays
 
 	QVariant value(const char* key) const;
 	void setValue(const char* key, const QVariant& value);
@@ -73,17 +71,6 @@ public:
 	bool composeWithRing() const { return value(ComposeWithRing).toBool(); }
 	// the English panel reads only what is selected
 	bool englishSelectionOnly() const { return value(EnglishSelectionOnly).toBool(); }
-
-	// THE DRAW-AN-ARROW BUTTON IS ASKED FOR BY HOLDING STILL.
-	//
-	// It used to appear the instant the cursor came near any border, which put
-	// an icon over the diagram nearly all the time. Now the mouse has to REST
-	// near a border for arrowButtonDelay before it shows, and it takes itself
-	// away again after arrowButtonLife - so it answers a deliberate pause and
-	// nothing else. Hovering the button itself holds it there, so a slow hand
-	// is not punished.
-	int arrowButtonDelay() const { return value(ArrowButtonDelay).toInt(); }
-	int arrowButtonLife() const { return value(ArrowButtonLife).toInt(); }
 
 	// push every stored value into the objects that act on them, then announce
 	void apply();

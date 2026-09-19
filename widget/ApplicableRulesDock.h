@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QDockWidget>
 #include <QList>
@@ -28,8 +28,19 @@ public:
 
 	void setScene(DiagramScene* scene);
 
+	// The pinned rules that FIT the diagram as it stands, one entry each: the
+	// first place each one fits. Empty when nothing is pinned, or when what is
+	// pinned no longer applies. The window reads this to fill the pills along
+	// the foot of the canvas.
+	QList<ApplicableRule> pinnedRules() const;
+	// draw a pinned rule in, at the first place it fits
+	void applyPinned(const QString& name);
+
 signals:
 	void message(const QString& text);
+	// something was pinned or unpinned, or the list of what fits has changed
+	// under the pins: whatever is showing them needs to look again
+	void pinnedChanged();
 
 private slots:
 	void onUpdated(const QList<ApplicableRule>& rules);
@@ -51,4 +62,8 @@ private:
 	// scratch on every change to the diagram, so without this every search
 	// would spring them all open again.
 	QSet<QString> m_collapsed;
+	// Rules kept to hand, BY NAME. Not by place: the list is rebuilt from
+	// scratch whenever the diagram changes, so an index would come back
+	// meaning a different place (see rowFor).
+	QSet<QString> m_pinned;
 };

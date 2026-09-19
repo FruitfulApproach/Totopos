@@ -15,6 +15,8 @@
 #include <QPainterPathStroker>
 #include <QStyleOptionGraphicsItem>
 #include <QtMath>
+#include "art/GraphicsHelpers.h"
+#include <QDebug>
 
 namespace
 {
@@ -79,6 +81,9 @@ void Arrow::setCodomain(Node* codomain)
 
 Arrow::~Arrow()
 {
+	// Log and remove from scene as a defensive measure against painting while
+	// the vtable of the derived object is being torn down.
+	safeRemoveAndLog(this, "Arrow");
 	if (m_domain != nullptr)
 		disconnectFromObject(m_domain);
 	if (m_codomain != nullptr)
@@ -117,8 +122,32 @@ void Arrow::disconnectFromObject(Node* object)
 
 namespace
 {
-	// half the space between the two lines of an equals, in scene units
-	const qreal kEqualsGap = 1.8;
+	// THE PATH WITH `cut` TAKEN OFF ITS FAR END, measured along the curve.
+	//
+	// Qt can tell you how long a path is and where a given length along it
+	// falls, but it cannot hand you back a piece of one, so this walks the
+	// curve and rebuilds it as far as the cut. The far END is what has to land
+	// exactly - it is being fitted against the arrowhead - and it does:
+	// percentAtLength puts the last point precisely where it was asked for.
+	// The samples between are only there to keep a bend looking like a bend,
+	// which is why a few per pixel of length is plenty and a straight arrow
+	// (nearly all of them) comes out straight whatever the count.
+	QPainterPath trimmedAtEnd(const QPainterPath& path, qreal cut)
+	{
+		const qreal total = path.length();
+		if (cut <= 0.0 || total <= 1e-6)
+			return path;
+		if (cut >= total)
+			return QPainterPath();   // the head has eaten the whole line
+
+		const qreal stop = path.percentAtLength(total - cut);
+		const int steps = qBound(2, int((total - cut) / 3.0), 240);
+		QPainterPath out;
+		out.moveTo(path.pointAtPercent(0.0));
+		for (int i = 1; i <= steps; ++i)
+			out.lineTo(path.pointAtPercent(stop * qreal(i) / steps));
+		return out;
+	}
 
 	qreal norm(const QPointF& p)
 	{
@@ -297,8 +326,25 @@ QList<QPointF> Arrow::throughPoints() const
 		? endFrame(m_codomain)
 		: QRectF(mapFromScene(m_looseEnd), QSizeF(0.01, 0.01));
 
+	// A BEND INSIDE ONE OF THE ENDS IS NOT A SHAPE, IT IS A MISTAKE.
+	//
+	// A point dropped within the frame of the thing the arrow runs into
+	// cannot be seen - it is under the object - and it wrecks the line: the
+	// end attaches at the spot on the frame nearest THAT point, so the line
+	// carries on past the object and the head is drawn inside it, aimed back
+	// out. (That is what a slip near the end used to leave behind, before a
+	// press there stopped counting as a bend.)
+	//
+	// Such points are left in the arrow - they are the person's, and undo may
+	// want them - but the line is not drawn through them.
+	QList<QPointF> drawnBends;
+	drawnBends.reserve(m_bends.size());
+	for (const QPointF& bend : m_bends)
+		if (!rd.contains(bend) && !rc.contains(bend))
+			drawnBends << bend;
+
 	QPointF start, end;
-	if (m_bends.isEmpty())
+	if (drawnBends.isEmpty())
 	{
 		// Nothing pulling it about: join the two frames at their nearest
 		// points. Two boxes beside each other meet on the line between their
@@ -354,14 +400,14 @@ QList<QPointF> Arrow::throughPoints() const
 	{
 		// pulled about: each end joins at the point nearest the bend it is
 		// heading for
-		start = attachTo(rd, m_bends.first());
-		end = attachTo(rc, m_bends.last());
+		start = attachTo(rd, drawnBends.first());
+		end = attachTo(rc, drawnBends.last());
 
-		QPointF out = m_bends.first() - start;
+		QPointF out = drawnBends.first() - start;
 		qreal length = norm(out);
 		if (length > 1e-6)
 			start += (out / length) * 3;
-		QPointF in = end - m_bends.last();
+		QPointF in = end - drawnBends.last();
 		length = norm(in);
 		if (length > 1e-6)
 			end -= (in / length) * 3;
@@ -378,7 +424,7 @@ QList<QPointF> Arrow::throughPoints() const
 	// not on an arrow too short to give up the room.
 	if (m_style == Style::Mono || (isMonic() && !isInclusion()))
 	{
-		const QPointF toward = m_bends.isEmpty() ? end : m_bends.first();
+		const QPointF toward = drawnBends.isEmpty() ? end : drawnBends.first();
 		QPointF along = toward - start;
 		const qreal length = norm(along);
 		const qreal room = AppSettings::instance().arrowHeadLength();
@@ -387,7 +433,7 @@ QList<QPointF> Arrow::throughPoints() const
 	}
 
 	pts << start;
-	pts << m_bends;
+	pts << drawnBends;
 	pts << end;
 	return pts;
 }
@@ -490,6 +536,15 @@ void Arrow::straighten()
 	setBends(QList<QPointF>());
 }
 
+void Arrow::straightenRecorded()
+{
+	if (m_bends.isEmpty())
+		return;
+	const QList<QPointF> before = m_bends;
+	straighten();
+	recordBends(QString("Straightened %1").arg(id()), before);
+}
+
 int Arrow::bendAt(const QPointF& pos, qreal radius) const
 {
 	for (int i = 0; i < m_bends.size(); ++i)
@@ -525,7 +580,62 @@ QPointF Arrow::labelAnchor() const
 		dir = length > 1e-6 ? dir / length : QPointF(1, 0);
 		normal = QPointF(-dir.y(), dir.x());
 		if (normal.y() > 0)
-			normal = -normal;   // above the line
+			normal = -normal;   // above the line, to begin with
+	}
+
+	// WHICHEVER SIDE IS FREE.
+	//
+	// Above the line is the right answer nearly always, and the wrong one
+	// exactly where it matters: a composite drawn in by a rule runs diagonally
+	// across the square it completes, and ABOVE that diagonal is where the two
+	// arrows it is the composite OF already are. The name landed on top of
+	// them - g o f written across f and N - which is the one place it must not
+	// be.
+	//
+	// So both sides are tried, and a side that puts the name on top of
+	// something loses to one that does not. Only the side is chosen here: a
+	// label that has been dragged keeps the side it was dragged to, because
+	// its offset is measured from this point and flipping it would move the
+	// label out from under the hand that placed it.
+	if (!m_labelPlacedByHand && !path.isEmpty())
+	{
+		const QRectF text = label()->boundingRect();
+		auto lands = [&](const QPointF& side) {
+			const QPointF at = middle + side * 12;
+			return QRectF(at.x() - text.width() / 2, at.y() - text.height() / 2,
+			              text.width(), text.height());
+		};
+		auto blocked = [&](const QRectF& where) {
+			QGraphicsItem* parent = parentItem();
+			if (parent == nullptr)
+				return false;
+			for (QGraphicsItem* sibling : parent->childItems())
+			{
+				auto* node = dynamic_cast<Node*>(sibling);
+				if (node == nullptr || node == this || !node->isVisible())
+					continue;
+				// what it IS - and for an ARROW that is its LINE, not the
+				// rectangle around it: a diagonal arrow's bounding box covers
+				// the whole square it crosses, which would call every side
+				// blocked and settle nothing
+				if (auto* line = dynamic_cast<Arrow*>(node); line != nullptr)
+				{
+					if (mapFromItem(line, line->curve()).intersects(where))
+						return true;
+				}
+				else if (where.intersects(mapFromItem(node, node->boxRect()).boundingRect()))
+				{
+					return true;
+				}
+				// and what it is CALLED, which is just as much in the way
+				const QRectF name = node->labelRect();
+				if (!name.isEmpty() && where.intersects(mapFromItem(node, name).boundingRect()))
+					return true;
+			}
+			return false;
+		};
+		if (blocked(lands(normal)) && !blocked(lands(-normal)))
+			normal = -normal;
 	}
 
 	const QRectF text = label()->boundingRect();
@@ -662,12 +772,18 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	if (path.isEmpty())
 		return;
 
+	// An arrow drawn inside something is drawn lighter and smaller than one on
+	// the canvas, and by the same step as everything else at that depth: the
+	// line, the head, and whatever mark the style puts on the tail all come
+	// off this one number, so an arrow stays in proportion with itself.
+	const qreal scale = depthScale();
+
 	QPen pen = border();
 	if (pen.style() == Qt::NoPen)
-		pen = QPen(Qt::black, 1.5);
+		pen = QPen(Qt::black, 1.5 * scale);
 	// the width is a setting, unless this arrow was given a colour by hand
 	if (!hasChosenStyle())
-		pen.setWidthF(AppSettings::instance().arrowLineWidth());
+		pen.setWidthF(AppSettings::instance().arrowLineWidth() * scale);
 	// round ends, so the tail is not a little square nub and a bend in the
 	// curve does not show a corner where two segments meet
 	pen.setCapStyle(Qt::RoundCap);
@@ -677,21 +793,24 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	if (hasError())
 	{
 		const Qt::PenStyle style = pen.style();
-		pen = QPen(QColor(255, 0, 0), 2.5);
+		pen = QPen(QColor(255, 0, 0), 2.5 * scale);
 		pen.setStyle(style);
 	}
 	if (isHighlighted())
 	{
 		const Qt::PenStyle style = pen.style();
-		pen = QPen(QColor(22, 163, 74), qMax(3.0, pen.widthF() + 1.0));
+		pen = QPen(QColor(22, 163, 74), qMax(3.0 * scale, pen.widthF() + 1.0 * scale));
 		pen.setStyle(style);
 	}
 	const bool selected = (option->state & QStyle::State_Selected) != 0;
 	if (selected)
-		pen.setWidthF(pen.widthF() + 1.5);
+		pen.setWidthF(pen.widthF() + 1.5 * scale);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
-	if (m_style == Style::Equals)
+	const qreal headLengthAhead = AppSettings::instance().arrowHeadLength() * scale;
+	const qreal headWidthAhead = AppSettings::instance().arrowHeadWidth() * scale;
+
+	if (drawsDoubleLine())
 	{
 		// The equals sign as it is written: two lines side by side. The path
 		// is drawn twice, shifted either way ACROSS the line it runs along, so
@@ -699,9 +818,28 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		QPointF run = path.pointAtPercent(1.0) - path.pointAtPercent(0.0);
 		const qreal span = norm(run);
 		run = span > 1e-6 ? run / span : QPointF(1, 0);
-		const QPointF sideways(-run.y() * kEqualsGap, run.x() * kEqualsGap);
-		painter->drawPath(path.translated(sideways));
-		painter->drawPath(path.translated(-sideways));
+		const qreal gap = doubleLineGap() * scale;
+		const QPointF sideways(-run.y() * gap, run.x() * gap);
+
+		// EACH LINE STOPS WHERE THE HEAD CROSSES IT.
+		//
+		// A single line ends at the tip, which is where the two strokes of the
+		// head meet, so it has nothing to overshoot. A doubled line does not:
+		// its two halves run either side of the tip and carry on past the
+		// strokes, which cross them at an angle and leave two whiskers poking
+		// out of the head.
+		//
+		// Where they cross is exact, not a guess. A stroke leaves the tip
+		// along (-dir*L + normal*W), so the point on it that is `gap` off to
+		// the side is the one at L*gap/W back along the line - and that is the
+		// same distance for both halves, the figure being symmetric. So take
+		// that much off the far end of each.
+		qreal cut = 0.0;
+		if (drawsHead() && headWidthAhead > 1e-6)
+			cut = headLengthAhead * gap / headWidthAhead;
+		const QPainterPath shaft = cut > 0.0 ? trimmedAtEnd(path, cut) : path;
+		painter->drawPath(shaft.translated(sideways));
+		painter->drawPath(shaft.translated(-sideways));
 	}
 	else
 	{
@@ -717,8 +855,8 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	const QPointF normal(-dir.y(), dir.x());
 	// Two strokes back from the tip, not a filled triangle: an arrowhead is
 	// drawn, not blocked in. The spread and the length together are its angle.
-	const qreal headLength = AppSettings::instance().arrowHeadLength();
-	const qreal headWidth = AppSettings::instance().arrowHeadWidth();
+	const qreal headLength = headLengthAhead;
+	const qreal headWidth = headWidthAhead;
 	// Selected thickens the head and whatever tail mark the style draws, not
 	// just the line: an arrow is its line AND its marks, and a fat line with a
 	// hairline hook reads as a mistake rather than as a selection.
@@ -734,18 +872,19 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// A stroke runs from the tip along (-L, W). Shifting a second copy back by
 	// d along the line moves it d*W/hypot(L, W) sideways OF ITSELF, so for a
 	// wanted gap g the step back is g*hypot(L, W)/W.
-	const qreal wantedGap = qMax(2.0, AppSettings::instance().arrowHeadLineWidth() * 1.5);
+	const qreal headLineWidth = AppSettings::instance().arrowHeadLineWidth() * scale;
+	const qreal wantedGap = qMax(2.0 * scale, headLineWidth * 1.5);
 	const qreal spread = qMax(0.5, headWidth);
 	const qreal secondHeadBack = wantedGap * qSqrt(headLength * headLength + spread * spread) / spread;
 
 	QPen headPen(pen.color(),
-	             AppSettings::instance().arrowHeadLineWidth() + (selected ? 1.5 : 0.0),
+	             headLineWidth + (selected ? 1.5 * scale : 0.0),
 	             Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 	painter->setPen(headPen);
 	painter->setBrush(Qt::NoBrush);
 	// An equals points nowhere: it says the two ends are the same thing, and a
 	// head on it would read as a map from one to the other.
-	if (m_style != Style::Equals)
+	if (drawsHead())
 	{
 		painter->drawLine(tip, tip - dir * headLength + normal * headWidth);
 		painter->drawLine(tip, tip - dir * headLength - normal * headWidth);
@@ -959,56 +1098,26 @@ QString Arrow::contextTitle() const
 
 void Arrow::populateActions(QMenu& menu)
 {
-	// what it does: carrying the elements of its domain over, and whatever
-	// else its properties offer
-	for (ArrowProp* p : m_props)
-		p->arrowContextMenu(menu, this);
-
-	// What this arrow is asserted to be, cancellable on the left or the right
-	// (or both). Checkable, like Exists such: an ASSERTION, not a construction.
-	// The Style submenu below says overlapping things with a drawn mark; both
-	// mechanisms are kept, and they are free to disagree.
-	Arrow* self = this;
-	QAction* monic = menu.addAction(Emoji::monomorphism() + "  Monomorphism");
-	monic->setCheckable(true);
-	monic->setChecked(isMonic());
-	monic->setToolTip(QString("Cancellable on the left: for g, h : Z %1 X, f%2g = f%2h implies g = h. "
-	                         "Drawn with a vee at the tail.")
-		.arg(Emoji::to(), Emoji::compose()));
-	QObject::connect(monic, &QAction::toggled, &menu, [self](bool on) { self->setMonicRecorded(on); });
-
-	QAction* epic = menu.addAction(Emoji::epimorphism() + "  Epimorphism");
-	epic->setCheckable(true);
-	epic->setChecked(isEpic());
-	epic->setToolTip(QString("Cancellable on the right: for g, h : Y %1 Z, g%2f = h%2f implies g = h. "
-	                        "Drawn with a doubled head.")
-		.arg(Emoji::to(), Emoji::compose()));
-	QObject::connect(epic, &QAction::toggled, &menu, [self](bool on) { self->setEpicRecorded(on); });
-	menu.addSeparator();
-
-	// what kind of arrow this is claimed to be
-	QMenu* style = menu.addMenu(Emoji::to() + "  Style");
-	auto* styles = new QActionGroup(style);
-	styles->setExclusive(true);
-	for (Style option : allStyles())
-	{
-		QAction* act = style->addAction(styleName(option));
-		act->setCheckable(true);
-		act->setChecked(m_style == option);
-		act->setToolTip(styleDescription(option));
-		styles->addAction(act);
-		QObject::connect(act, &QAction::triggered, style, [this, option] { setStyleRecorded(option); });
-	}
-
-	// the shape of the line. No asking twice about a bend - the history has
-	// it either way.
-	QMenu* shape = menu.addMenu(Emoji::shape() + "  Shape");
+	// THE ONE THING HERE THAT IS ABOUT THE POINT YOU CLICKED.
+	//
+	// A bend goes WHERE the cursor is, and taking one out means taking out
+	// the one under the cursor - neither question can be asked anywhere but
+	// here, because nowhere else knows the place. So this stays, and it is
+	// all that stays.
+	//
+	// What this arrow is claimed to be (monic, epic), what it is drawn as
+	// (Style), its colours, and what it does to the elements of its domain
+	// are all properties of the arrow rather than of the spot on its line,
+	// and are asked in the Properties panel. Straightening needs no place
+	// either, so it is there too. See Node::contextMenuEvent.
 	const QPointF at = contextPos();
 	const int index = bendAt(at);
 	if (index >= 0)
 	{
-		QAction* remove = shape->addAction("Delete bend point");
-		QObject::connect(remove, &QAction::triggered, shape, [this, index] {
+		QAction* remove = menu.addAction("Delete bend point");
+		remove->setToolTip("Take out the bend under the cursor. Straighten, on the Properties panel, "
+		                   "takes out all of them.");
+		QObject::connect(remove, &QAction::triggered, &menu, [this, index] {
 			const QList<QPointF> before = m_bends;
 			removeBend(index);
 			recordBends(QString("Took a bend out of %1").arg(id()), before);
@@ -1016,21 +1125,14 @@ void Arrow::populateActions(QMenu& menu)
 	}
 	else
 	{
-		QAction* add = shape->addAction("Add a bend here");
-		QObject::connect(add, &QAction::triggered, shape, [this, at] {
+		QAction* add = menu.addAction("Add a bend here");
+		add->setToolTip("Pull the line through this point. Drag the line to bend it by hand.");
+		QObject::connect(add, &QAction::triggered, &menu, [this, at] {
 			const QList<QPointF> before = m_bends;
 			addBend(at);
 			recordBends(QString("Bent %1").arg(id()), before);
 		});
 	}
-	QAction* straighten = shape->addAction("Straighten");
-	straighten->setEnabled(!m_bends.isEmpty());
-	QObject::connect(straighten, &QAction::triggered, shape, [this] {
-		const QList<QPointF> before = m_bends;
-		this->straighten();
-		recordBends(QString("Straightened %1").arg(id()), before);
-	});
-
 	menu.addSeparator();
 }
 // ---------------------------------------------------------------- what kind of arrow
@@ -1104,6 +1206,37 @@ void Arrow::setStyleRecorded(Style style)
 
 // ---------------------------------------------------------------- bending it by hand
 
+qreal Arrow::fractionAlong(const QPointF& at) const
+{
+	const QPainterPath path = curve();
+	if (path.isEmpty())
+		return 0.5;
+	// Sampled rather than solved: a cubic has no tidy nearest-point, and 64
+	// steps along a line a few hundred units long is finer than a mouse.
+	const int steps = 64;
+	qreal nearest = 0.5;
+	qreal best = -1;
+	for (int i = 0; i <= steps; ++i)
+	{
+		const qreal t = qreal(i) / steps;
+		const qreal d = norm(path.pointAtPercent(t) - at);
+		if (best < 0 || d < best)
+		{
+			best = d;
+			nearest = t;
+		}
+	}
+	return nearest;
+}
+
+bool Arrow::takesPressAt(const QPointF& itemPos) const
+{
+	if (bendAt(itemPos) >= 0)
+		return true;   // a point already placed is grabbable wherever it sits
+	const qreal along = fractionAlong(itemPos);
+	return along >= BendFreeEnds && along <= 1.0 - BendFreeEnds;
+}
+
 void Arrow::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	if (event->button() != Qt::LeftButton)
@@ -1111,6 +1244,16 @@ void Arrow::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		Node::mousePressEvent(event);
 		return;
 	}
+
+	// Near either end this press is not ours: ignored rather than swallowed,
+	// so the scene hands it on to whatever is under it and the node moves as
+	// it was asked to.
+	if (!takesPressAt(event->pos()))
+	{
+		event->ignore();
+		return;
+	}
+
 	m_bendsAtPress = m_bends;
 	m_dragBend = bendAt(event->pos());
 	m_pressPos = event->pos();
@@ -1197,6 +1340,13 @@ void Arrow::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 
 bool Arrow::isRedundantBend(const QPointF& point, const QList<QPointF>& without) const
 {
+	// Inside one of the ends: invisible, and ruinous to the line (see
+	// throughPoints). Let go of it there and it is let go of for good.
+	if (m_domain != nullptr && endFrame(m_domain).contains(point))
+		return true;
+	if (m_codomain != nullptr && endFrame(m_codomain).contains(point))
+		return true;
+
 	// the shape this arrow would have if that point were not there
 	Arrow* self = const_cast<Arrow*>(this);
 	const QList<QPointF> had = m_bends;

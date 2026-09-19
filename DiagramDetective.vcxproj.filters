@@ -28,6 +28,9 @@
     <Filter Include="core\rules">
       <UniqueIdentifier>{56bc27f4-d712-5d23-8122-f36f398219b8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\view">
+      <UniqueIdentifier>{9c1f4a2d-3e57-5b18-9d64-71a2c8e0f314}</UniqueIdentifier>
+    </Filter>
     <Filter Include="dialog">
       <UniqueIdentifier>{77ece2b2-6bde-5379-af55-02db81409e24}</UniqueIdentifier>
     </Filter>
@@ -62,6 +65,12 @@
     </ClCompile>
     <ClCompile Include="art\Functor.cpp">
       <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="art\Implies.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
+    <ClCompile Include="core\view\ClassicalView.cpp">
+      <Filter>core\view</Filter>
     </ClCompile>
     <ClCompile Include="art\Node.cpp">
       <Filter>art</Filter>
@@ -207,6 +216,9 @@
     <ClCompile Include="widget\ApplicableRulesDock.cpp">
       <Filter>widget</Filter>
     </ClCompile>
+    <ClCompile Include="widget\CanvasActionBar.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
     <ClCompile Include="widget\CommutativeEquationsDock.cpp">
       <Filter>widget</Filter>
     </ClCompile>
@@ -244,6 +256,9 @@
       <Filter>art</Filter>
     </QtMoc>
     <QtMoc Include="art\Functor.h">
+      <Filter>art</Filter>
+    </QtMoc>
+    <QtMoc Include="art\Implies.h">
       <Filter>art</Filter>
     </QtMoc>
     <QtMoc Include="art\Node.h">
@@ -351,6 +366,9 @@
     <QtMoc Include="widget\ApplicableRulesDock.h">
       <Filter>widget</Filter>
     </QtMoc>
+    <QtMoc Include="widget\CanvasActionBar.h">
+      <Filter>widget</Filter>
+    </QtMoc>
     <QtMoc Include="widget\CommutativeEquationsDock.h">
       <Filter>widget</Filter>
     </QtMoc>
@@ -371,6 +389,9 @@
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="core\view\ClassicalView.h">
+      <Filter>core\view</Filter>
+    </ClInclude>
     <ClInclude Include="art\NodeLabel.h">
       <Filter>art</Filter>
     </ClInclude>
@@ -413,6 +434,7 @@
     <ClInclude Include="tutor\Tutor.h">
       <Filter>tutor</Filter>
     </ClInclude>
+    <ClInclude Include="art\GraphicsHelpers.h" />
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="DiagramDetective.ui" />

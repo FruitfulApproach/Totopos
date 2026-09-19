@@ -45,7 +45,8 @@ signals:
 	void stopRequested();
 
 private slots:
-	// the right-click menu on a file: for now, renaming it
+	// the right-click menu: renaming and removing a file, and - for a folder
+	// as well as a file - showing it on disk and copying its path
 	void showContextMenu(const QPoint& at);
 	void renameFile(const QString& path);
 	// take it out of the library, off the disk. Asks first, unless the
@@ -53,7 +54,17 @@ private slots:
 	void removeFile(const QString& path);
 
 private:
+	// Where a FOLDER row is on disk. A file's path lives in Qt::UserRole, and
+	// that role is read elsewhere as "the file this row is" - a single click
+	// lays it over the diagram as a rule - so a folder cannot share it.
+	enum { FolderRole = Qt::UserRole + 1 };
+
 	void fill(QTreeWidgetItem* parent, const QString& path, int depth);
+	// show it in a file manager, picked out in the folder it is in
+	void showInExplorer(const QString& path);
+	// "Grp/classic/inverses exist.axiom.totopos": the name a rule goes by
+	// everywhere else, not where it happens to sit on this machine
+	static QString relativeToLibrary(const QString& path);
 
 	// what the last scan did, so a slow one can say where it went
 	int m_folders = 0;

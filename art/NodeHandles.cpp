@@ -29,8 +29,9 @@ NodeHandles::NodeHandles(QGraphicsItem* parent)
 
 NodeHandles::~NodeHandles()
 {
-	if (QGraphicsScene* board = scene())
-		board->removeItem(this);
+	// (Qt takes it out of the scene itself, in ~QGraphicsItem, with its own
+	// inDestructor flag set - doing it by hand from here reparents and calls
+	// back into a half-destroyed object instead.)
 }
 
 void NodeHandles::attach(Node* node, const QPointF& itemPos)

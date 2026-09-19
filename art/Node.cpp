@@ -96,23 +96,6 @@ Node::~Node()
 	// work. Deleting the label first would leave id() empty.
 	emit deleted(this);
 
-	// OUT OF THE SCENE WHILE WE ARE STILL SOMETHING THE SCENE CAN ASK.
-	//
-	// A QGraphicsItem stays in the scene's index until ~QGraphicsItem runs,
-	// which is LAST - but the object stops being a Node here, and stops
-	// being a QGraphicsObject after that. In that window boundingRect() is
-	// the pure virtual one, and anything that paints or measures in it -
-	// a repaint posted a moment ago, a listener of deleted() that touches
-	// the canvas - calls it and the runtime aborts the program outright
-	// ("Fatal program exit requested", inside effectiveBoundingRect).
-	//
-	// Taking ourselves out here closes that window: from this line on the
-	// scene neither draws us nor asks us anything, and the rest of the
-	// destruction happens where nothing can see it. It takes our children
-	// out with us, which is right - they are going too.
-	if (QGraphicsScene* board = scene())
-		board->removeItem(this);
-
 	if (m_idText != nullptr)
 	{
 		// Before it is destroyed, and before anything else: a label with the
@@ -181,6 +164,32 @@ void Node::setFill(const QBrush& fill)
 	m_fill = fill;
 	update();
 	emit styleChanged(this);
+}
+
+void Node::setFillRecorded(const QColor& colour)
+{
+	const QBrush fillBefore = m_fill;
+	const QPen borderBefore = m_border;
+	setFill(colour.isValid() ? QBrush(colour) : QBrush(Qt::NoBrush));
+	recordStyleChange(fillBefore, borderBefore);
+}
+
+void Node::setBorderRecorded(const QColor& colour)
+{
+	const QBrush fillBefore = m_fill;
+	const QPen borderBefore = m_border;
+	if (!colour.isValid())
+	{
+		setBorder(QPen(Qt::NoPen));
+	}
+	else
+	{
+		// keep the width it already had; only the colour is being asked about
+		QPen pen = m_border.style() == Qt::NoPen ? QPen(colour, 1.5) : m_border;
+		pen.setColor(colour);
+		setBorder(pen);
+	}
+	recordStyleChange(fillBefore, borderBefore);
 }
 
 bool Node::holdsAnything() const
@@ -341,6 +350,20 @@ int Node::nesting() const
 	return depth;
 }
 
+qreal Node::depthScale(int depth)
+{
+	// 0.63 a step: the ambient category is a node too, so an object drawn
+	// straight onto the canvas is already one level in and is drawn a little
+	// smaller than the canvas itself; an element inside such an object is
+	// smaller again. See the comment on the declaration.
+	return qMax(0.3, qPow(0.63, qMax(0, depth)));
+}
+
+qreal Node::depthScale() const
+{
+	return depthScale(nesting());
+}
+
 void Node::refreshDepthAppearance()
 {
 	applyDepthAppearance(nesting());
@@ -353,14 +376,23 @@ void Node::applyDepthAppearance(int depth)
 {
 	if (label() == nullptr)
 		return;
-	// the objects drawn in the ambient category keep the normal size; every
-	// level of nesting below that takes a little off
+	// THE SAME STEP AS EVERYTHING ELSE AT THIS DEPTH.
+	//
+	// A label is part of the drawing, not a caption on it: a node drawn at
+	// two thirds the weight with a full-size name on it reads as a small box
+	// someone has shouted at. So the text comes off the one factor that the
+	// line widths, the dots and the marks all come off (depthScale), and a
+	// thing deep in the nesting is small in every respect at once.
+	//
+	// The floor is the exception, and is deliberate: proportion is worth
+	// keeping right up to the point where the name can no longer be read, and
+	// no further.
 	qreal base = AppSettings::instance().labelPointSize();
 	if (base <= 0)
 		base = QApplication::font().pointSizeF();
 	if (base <= 0)
 		base = 9.0;
-	const qreal size = qMax(5.0, base * qPow(0.88, qMax(0, depth - 1)));
+	const qreal size = qMax(5.0, base * depthScale(depth));
 	QFont f = labelFont();
 	if (qFuzzyCompare(f.pointSizeF(), size))
 		return;
@@ -372,8 +404,20 @@ int Node::containedCount(const QGraphicsItem* except) const
 {
 	int n = 0;
 	for (QGraphicsItem* c : childItems())
-		if (c != except && dynamic_cast<Node*>(c) != nullptr)   // nodes only: never our own label
-			++n;
+	{
+		if (c == except)
+			continue;
+		if (dynamic_cast<Node*>(c) == nullptr)   // nodes only: never our own label
+			continue;
+		// Put away, or on its way out (MapsElements hides an image it is
+		// about to destroy and defers the delete): it does not hold our frame
+		// open - see childFrame(), which leaves it out for the same reason -
+		// and it must not make us COUNT as holding something either, or an
+		// object with nothing to see in it is drawn as a box round nothing.
+		if (!c->isVisible())
+			continue;
+		++n;
+	}
 	return n;
 }
 
@@ -567,6 +611,22 @@ void Node::refreshFrame()
 	update();
 	ancestorsUpdate();
 	settleLabelSoon();   // what we hold has changed, so our frame has a new shape
+
+	// AND WHATEVER IS ATTACHED TO US IS DRAWN FROM OUR FRAME, NOT OUR POSITION.
+	//
+	// An arrow joins the EDGES of the two things it runs between: where it
+	// leaves and where it arrives are read off their frames every time it is
+	// drawn. It followed them when they MOVED and not when they changed
+	// SHAPE - so an object that grew downwards as elements were drawn in it
+	// left its arrows attached where its edge used to be, with nothing to
+	// repaint the line: what stayed on the canvas was the old line, up by the
+	// first element, while the join it describes had long since moved to the
+	// middle of the taller box.
+	//
+	// A null delta is exactly that news: my geometry changed, I did not go
+	// anywhere. An arrow redraws itself; a mapping carrying positions across
+	// ignores it, because nothing moved to carry (MapsElements::onSourceMoved).
+	emit moved(this, QPointF());
 }
 
 namespace
@@ -880,10 +940,12 @@ void Node::populateContextMenu(QMenu& menu)
 	if (m_idText != nullptr)
 	{
 		const bool locked = labelIsLocked();
-		QAction* edit = menu.addAction(QString("%1  Edit main label")
+		QAction* edit = menu.addAction(QString("%1  Edit label")
 			.arg(locked ? Emoji::locked() : Emoji::rename()));
 		edit->setToolTip(locked ? labelLockTip()
-		                        : QStringLiteral("Type a new name for this. Escape puts back the old one."));
+		                        : QStringLiteral("Type a new name for this. Escape puts back the old one. "
+		                                         "(A double-click starts an arrow instead, so renaming is "
+		                                         "asked for here.)"));
 		QObject::connect(edit, &QAction::triggered, this, [this] {
 			// queued: the menu is still closing, and this puts the keyboard
 			// into an item of the scene underneath it
@@ -901,8 +963,8 @@ void Node::populateContextMenu(QMenu& menu)
 		if (auto* diagram = diagramOf(this))
 		{
 			QAction* draw = menu.addAction(QString("%1  Draw an arrow from here").arg(Emoji::to()));
-			draw->setToolTip(QString("Start an arrow at %1: click what it goes to. Esc cancels.")
-				.arg(contextTitle()));
+			draw->setToolTip(QString("Start an arrow at %1: click what it goes to. Esc cancels. "
+			                         "Double-clicking %1 does the same.").arg(contextTitle()));
 			QObject::connect(draw, &QAction::triggered, diagram, [diagram, this] {
 				// queued: the menu is still closing, and this hands the clicks
 				// to a tutor working in the scene the menu belongs to
@@ -914,55 +976,34 @@ void Node::populateContextMenu(QMenu& menu)
 		}
 	}
 
-	// 3. what it can do: each kind of node fills this in with submenus
+	// 3. WHAT THIS MENU IS NOT FOR.
+	//
+	// Three entries and no more: rename it, draw an arrow out of it, delete
+	// it. Those are the things you reach for WITH A PLACE IN MIND - this
+	// node, that spot on the line - and a menu that opens where you pointed
+	// is the right way to ask for them.
+	//
+	// Everything else a node can be asked - what it is claimed to be, what
+	// kind of arrow it is drawn as, its colours, exists-such, delete-on-apply
+	// - is a property of the thing and not of the point you clicked, and all
+	// of it now lives in the Properties panel, where the current answer is
+	// VISIBLE rather than having to be gone looking for behind a submenu. A
+	// menu that had grown to a dozen entries, four of them submenus, was a
+	// list of everything the program can do rather than of what this click
+	// might have meant.
+	//
+	// populateActions still runs: a subclass may have something here that is
+	// genuinely about the place clicked (a bend point in a line, an element
+	// placed at a spot inside an object).
 	populateActions(menu);
 
-	// 3. how it is drawn
-	QMenu* look = menu.addMenu(Emoji::appearance() + "  Appearance");
-	colourMenu("Fill", m_fill.style() == Qt::NoBrush ? QColor() : m_fill.color(), look, [this](const QColor& c) {
-		const QBrush before = m_fill;
-		const QPen borderBefore = m_border;
-		setFill(c.isValid() ? QBrush(c) : QBrush(Qt::NoBrush));
-		recordStyleChange(before, borderBefore);
-	});
-	colourMenu("Border", m_border.style() == Qt::NoPen ? QColor() : m_border.color(), look, [this](const QColor& c) {
-		const QBrush fillBefore = m_fill;
-		const QPen before = m_border;
-		if (!c.isValid())
-		{
-			setBorder(Qt::NoPen);
-		}
-		else
-		{
-			QPen p = m_border.style() == Qt::NoPen ? QPen(c, 1.5) : m_border;
-			p.setColor(c);
-			setBorder(p);
-		}
-		recordStyleChange(fillBefore, before);
-	});
-
-	// 4. what it asserts
-	QAction* exists = menu.addAction(Emoji::existsSuch() + "  Exists such");
-	exists->setCheckable(true);
-	exists->setChecked(m_existsSuch);
-	exists->setToolTip("Draw this dotted, and read it as the part that is claimed to EXIST: for all the "
-	                   "solid objects and arrows, there is such a one making the diagram commute.");
-	Node* self = this;
-	QObject::connect(exists, &QAction::toggled, &menu, [self](bool on) { self->setExistsSuchRecorded(on); });
-
-	QAction* cross = menu.addAction(Emoji::deleteMark() + "  Delete on apply");
-	cross->setCheckable(true);
-	cross->setChecked(m_deleteMark);
-	cross->setToolTip("Cross this out in red. Read as a rule, the diagram still has to FIND this - but "
-	                  "where the rule is applied, this is what gets taken out.");
-	QObject::connect(cross, &QAction::toggled, &menu, [self](bool on) { self->setDeleteMarkRecorded(on); });
-
-	// 5. and getting rid of it - last, and on its own, because it is the one
+	// 4. and getting rid of it - last, and on its own, because it is the one
 	// entry here that cannot be half-done. Queued: the menu is still closing
 	// when this runs, and this node is what the menu belongs to.
 	auto* diagram = dynamic_cast<DiagramScene*>(scene());
 	if (diagram != nullptr && diagram->ambientCategory() != this)
 	{
+		Node* self = this;
 		menu.addSeparator();
 		QAction* remove = menu.addAction(QString("%1  Delete %2")
 			.arg(Emoji::remove(), id().isEmpty() ? QStringLiteral("this node") : id()));
@@ -1212,6 +1253,54 @@ namespace
 	}
 }
 
+bool Node::labelMentions(const QString& text, const QString& name, const QStringList& otherNames)
+{
+	if (text.isEmpty() || name.isEmpty())
+		return false;
+
+	// A NAME MAY SIT AGAINST ANOTHER NAME: THAT IS WHAT JUXTAPOSITION IS.
+	//
+	// The plain rule - a name must have a non-name character either side of
+	// it - is what keeps a node called o from being found inside Hom. It also
+	// keeps y from being found inside xy^{-1}, which is exactly where a
+	// person most means it: writing two letters side by side is how a product
+	// is written, and has been since before any of this.
+	//
+	// So a name character beside the name is allowed when it is itself part
+	// of a name that is drawn here. In xy^{-1} the y is preceded by x, and x
+	// is an element, so the y is a mention. In Hom the o is preceded by H,
+	// and H is nothing, so it is not. The same reading bindLabelReferences
+	// makes as it walks a label; this asks it of one name at a time, because
+	// a rule has only labels to go on and not the nodes behind them.
+	// is some other name drawn here written exactly at [start, start + its
+	// length)? That is what makes the character beside the name a boundary
+	// rather than the middle of a word.
+	auto nameAt = [&](int start) {
+		for (const QString& other : otherNames)
+			if (!other.isEmpty() && start + other.size() <= text.size()
+			    && QStringView(text).mid(start, other.size()) == other)
+				return true;
+		return false;
+	};
+	auto nameEndingAt = [&](int end) {
+		for (const QString& other : otherNames)
+			if (const int start = end - int(other.size());
+			    !other.isEmpty() && start >= 0 && QStringView(text).mid(start, other.size()) == other)
+				return true;
+		return false;
+	};
+
+	for (int at = 0; (at = text.indexOf(name, at)) >= 0; at += name.size())
+	{
+		const int end = at + int(name.size());
+		const bool leftClear = at == 0 || !isNameChar(text.at(at - 1)) || nameEndingAt(at);
+		const bool rightClear = end >= text.size() || !isNameChar(text.at(end)) || nameAt(end);
+		if (leftClear && rightClear)
+			return true;
+	}
+	return false;
+}
+
 void Node::bindLabelReferences()
 {
 	const QString text = id();
@@ -1225,9 +1314,24 @@ void Node::bindLabelReferences()
 		return a->id().size() > b->id().size();
 	});
 
+	// the longest name drawn here that starts at that point, boundaries not
+	// considered: what the scan below is about to read next, asked one step
+	// ahead so that a name can be allowed to end against another name
+	auto nameStartingAt = [&](int pos) {
+		for (Node* candidate : candidates)
+			if (const QString name = candidate->id();
+			    !name.isEmpty() && QStringView(text).mid(pos).startsWith(name))
+				return true;
+		return false;
+	};
+
 	QString pattern;
 	QList<Node*> sources;
 	int at = 0;
+	// did the last thing read turn out to be a name? A name may begin against
+	// one that did - xy is x then y - and never against a mere letter, which
+	// is what keeps o from being found inside Hom (see labelMentions)
+	bool lastWasName = false;
 	while (at < text.size())
 	{
 		Node* found = nullptr;
@@ -1236,9 +1340,9 @@ void Node::bindLabelReferences()
 			const QString name = candidate->id();
 			if (name.isEmpty() || !QStringView(text).mid(at).startsWith(name))
 				continue;
-			// a whole name, not a piece of a longer word
-			const bool leftClear = at == 0 || !isNameChar(text.at(at - 1));
-			const bool rightClear = at + name.size() >= text.size() || !isNameChar(text.at(at + name.size()));
+			const int end = at + int(name.size());
+			const bool leftClear = at == 0 || !isNameChar(text.at(at - 1)) || lastWasName;
+			const bool rightClear = end >= text.size() || !isNameChar(text.at(end)) || nameStartingAt(end);
 			if (leftClear && rightClear)
 			{
 				found = candidate;
@@ -1249,8 +1353,10 @@ void Node::bindLabelReferences()
 		{
 			pattern += text.at(at);
 			++at;
+			lastWasName = false;
 			continue;
 		}
+		lastWasName = true;
 		int index = sources.indexOf(found);
 		if (index < 0)
 		{

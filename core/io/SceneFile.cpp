@@ -16,7 +16,7 @@
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
-	const quint16 kVersion = 18;   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+	const quint16 kVersion = 19;   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
 
 	// THE TWO MEANINGS OF VERSION 15.
 	//
@@ -552,6 +552,24 @@ bool SceneFile::save(DiagramScene* scene, const QString& path, QString* error)
 		out << qint32(steps.size());
 		for (Memento* memento : steps)
 			out << quint16(memento->typeTag()) << memento->describe() << memento->payload();
+
+		// version 19: HOW IT WAS BEING LOOKED AT, and where things were put
+		// while it was being looked at that way.
+		//
+		// Last in the body on purpose. Everything before this is read by two
+		// dialects of an older format (see the note on kVersion) and neither
+		// of them reaches here, so appending disturbs nothing that already
+		// works - a file written by this build still opens in the old way up
+		// to the point where the old way stops reading.
+		//
+		// The diagram itself is written exactly as before: there is one
+		// diagram, in the succinct notation, and the classical view is only
+		// ever a way of looking at it. What is saved here is the LOOKING.
+		scene->syncClassicalPositions();
+		const QHash<QString, QPointF> placed = scene->classicalPositions();
+		out << quint8(scene->isClassical() ? 1 : 0) << qint32(placed.size());
+		for (auto it = placed.constBegin(); it != placed.constEnd(); ++it)
+			out << it.key() << it.value();
 	}
 
 	QSaveFile file(path);
@@ -833,6 +851,30 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		scene->history()->record(new SealedStep(description, tag, payload, false));
 	}
 
+	// version 19: the layout the classical view was left in, and whether that
+	// is the view this diagram was last being read in. The positions go on
+	// first, so that switching over below finds them already there.
+	bool wasClassical = false;
+	if (version >= 19)
+	{
+		quint8 classical = 0;
+		qint32 placedCount = 0;
+		data >> classical >> placedCount;
+		QHash<QString, QPointF> placed;
+		for (qint32 i = 0; i < placedCount && data.status() == QDataStream::Ok; ++i)
+		{
+			QString key;
+			QPointF at;
+			data >> key >> at;
+			placed.insert(key, at);
+		}
+		if (data.status() == QDataStream::Ok)
+		{
+			scene->setClassicalPositions(placed);
+			wasClassical = classical != 0;
+		}
+	}
+
 	// The NAME says what this is. snake-lemma.theorem.totopos is a theorem
 	// whatever was last ticked in the panel before it was saved, so renaming a
 	// file is how a conjecture becomes a theorem.
@@ -842,6 +884,10 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 
 	ambient->refreshDepthAppearance();
 	ambient->refreshFrame();
+	// last of all: the classical view reads the finished diagram, so it can
+	// only be built once there is one
+	if (wasClassical)
+		scene->setNotation(DiagramScene::Notation::Classical);
 	return true;
 }
 

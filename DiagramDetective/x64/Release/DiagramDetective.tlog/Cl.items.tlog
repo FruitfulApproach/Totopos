@@ -6,6 +6,8 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\AtomicElement.cpp;C:\Use
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\Category.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\Category.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\DiagramScene.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\DiagramScene.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\Functor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\Functor.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\Implies.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\Implies.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\core\view\ClassicalView.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\ClassicalView.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\Node.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\Node.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\NodeHandles.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\NodeHandles.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\art\NodeLabel.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\NodeLabel.obj
@@ -54,6 +56,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\SetupTutor.cpp;C:\User
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\Tutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\Tutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\tutor\TutorSession.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\TutorSession.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\ApplicableRulesDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\ApplicableRulesDock.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\CanvasActionBar.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\CanvasActionBar.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\CommutativeEquationsDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\CommutativeEquationsDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\EnglishDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\EnglishDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\LibraryDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\LibraryDock.obj
@@ -68,6 +71,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Category.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Category.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_DiagramScene.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_DiagramScene.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Functor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Functor.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Implies.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Implies.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Node.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Node.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_NodeHandles.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_NodeHandles.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Object.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Object.obj
@@ -103,6 +107,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_SetupTutor.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_SetupTutor.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_TutorSession.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_TutorSession.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_ApplicableRulesDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_ApplicableRulesDock.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_CanvasActionBar.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_CanvasActionBar.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_CommutativeEquationsDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_CommutativeEquationsDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_EnglishDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_EnglishDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_LibraryDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_LibraryDock.obj

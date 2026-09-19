@@ -68,6 +68,17 @@ public:
 	// anywhere inside it.
 	QList<int> rootsNamed(const QString& label) const;
 
+	// EVERY category in here, the ambient one included: where a rule whose
+	// root is a VARIABLE could sit. "For any category C..." is about R-Mod,
+	// about Top, about a category drawn inside another one - about all of
+	// them, so the search is offered all of them.
+	QList<int> everyCategory() const;
+
+	// Is that the name of a built-in (R-Mod, Ab, Set, ...)? A rule root
+	// called one of those is about THAT category; a root called anything
+	// else - C, D, a letter - stands for any category at all.
+	static bool namesABuiltIn(const QString& label);
+
 	// how many premise objects a rule pattern holds (index 1 .. objectCount)
 	int objectCount() const { return m_objectCount; }
 	int arrowCount() const { return m_arrowCount; }

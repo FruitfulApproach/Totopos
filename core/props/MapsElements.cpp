@@ -2,6 +2,9 @@
 
 #include <QMenu>
 #include <QMap>
+#include <QSet>
+#include <QPair>
+#include <QList>
 #include <QUuid>
 #include <utility>
 #include "art/Arrow.h"
@@ -453,6 +456,56 @@ void MapsElements::onSourceDeleted(Node* source)
 	image->deleteLater();
 }
 
+bool MapsElements::closesALoop() const
+{
+	Arrow* F = arrow();
+	Node* dom = domain();
+	Object* cod = codomain();
+	if (F == nullptr || dom == nullptr || cod == nullptr)
+		return false;
+	if (dom == cod)
+		return true;   // its own domain: the first lap is already the second
+
+	auto* board = dynamic_cast<DiagramScene*>(F->scene());
+	if (board == nullptr)
+		return false;
+
+	// every OTHER live mapping, as an edge from what it reads to what it draws
+	QList<QPair<Node*, Node*>> edges;
+	for (QGraphicsItem* item : board->items())
+	{
+		auto* other = dynamic_cast<Arrow*>(item);
+		if (other == nullptr || other == F)
+			continue;
+		auto* maps = dynamic_cast<MapsElements*>(other->prop(MapsElements::Key()));
+		if (maps == nullptr || !maps->mirrorsGeometry())
+			continue;
+		Node* from = maps->domain();
+		Node* to = maps->codomain();
+		if (from != nullptr && to != nullptr)
+			edges.append(qMakePair(from, to));
+	}
+
+	// can what we draw into reach what we read from?
+	QSet<Node*> seen;
+	QList<Node*> front;
+	front << cod;
+	seen << cod;
+	for (int at = 0; at < front.size(); ++at)
+	{
+		for (const QPair<Node*, Node*>& edge : edges)
+		{
+			if (edge.first != front.at(at) || seen.contains(edge.second))
+				continue;
+			if (edge.second == dom)
+				return true;
+			seen << edge.second;
+			front << edge.second;
+		}
+	}
+	return false;
+}
+
 void MapsElements::sync()
 {
 	Arrow* F = arrow();
@@ -460,6 +513,25 @@ void MapsElements::sync()
 	Object* cod = codomain();
 	if (!m_mirror || F == nullptr || dom == nullptr || cod == nullptr || dom == cod || m_syncing)
 		return;
+
+	// Round in circles (see closesALoop): switched off rather than run. Not
+	// through setMirrorsGeometry - that would sync again from inside sync -
+	// but by hand, and the images already drawn are left exactly where they
+	// are. Turning it back on will refuse again until the loop is broken.
+	if (closesALoop())
+	{
+		m_mirror = false;
+		listen(false);
+		if (auto* board = dynamic_cast<DiagramScene*>(F->scene()))
+			QMetaObject::invokeMethod(board, "message", Qt::QueuedConnection,
+				Q_ARG(QString, QString("%1 is not kept live: %2 leads back round to %3, so what it "
+				                       "drew would come home as something new to draw, over and over. "
+				                       "Break the loop, or map it once by hand.")
+					.arg(F->id().isEmpty() ? QStringLiteral("That mapping") : F->id(),
+					     cod->id(), dom->id())));
+		emit settingsChanged();
+		return;
+	}
 
 	// The functor itself may have been taken out of the diagram - deleted, or
 	// undone. There is no mapping without it, so its images go too; they come
@@ -469,6 +541,24 @@ void MapsElements::sync()
 		removeImages();
 		return;
 	}
+
+	// AND A HARD FLOOR UNDER ALL OF IT.
+	//
+	// Mappings answer one another - what one draws is news to the next - and
+	// answering is what puts this on the stack. closesALoop() catches the
+	// shape that never ends; this catches anything else that starts to run
+	// away, whatever it is. Eight deep is far more than any chain of functors
+	// anyone draws; a ninth is a bug, and it stops here rather than in the
+	// middle of a repaint.
+	static int s_depth = 0;
+	if (s_depth >= 8)
+		return;
+	struct Depth
+	{
+		int& n;
+		explicit Depth(int& count) : n(count) { ++n; }
+		~Depth() { --n; }
+	} depth(s_depth);
 
 	m_syncing = true;
 	m_name = F->id();
@@ -531,7 +621,10 @@ void MapsElements::sync()
 		auto* source = dynamic_cast<Arrow*>(child);
 		if (source == nullptr)
 			continue;
-		if (source->id().isEmpty())
+		// An EQUALS is nameless for good: it says the two ends are the same
+		// thing and there is nothing else to call it. Everything else with no
+		// name is either being typed into or is not ours to carry across.
+		if (source->id().isEmpty() && source->style() != Arrow::Style::Equals)
 		{
 			if (source->isEditingLabel())
 				live << source->key();   // being typed into: not gone (see above)
@@ -545,15 +638,58 @@ void MapsElements::sync()
 		if (m_contravariant)
 			std::swap(from, to);
 		live << source->key();
+		// AN EQUALS CROSSES BECAUSE A MAP IS A MAP.
+		//
+		// x = y in M says the two are the same element, and a map sends the
+		// same element to the same value: f(x) = f(y), whatever f is. It is
+		// not something an R-linear map does over and above being a function -
+		// it is what a function IS - so this is handled here, once, at the
+		// level of elements, and every kind of arrow that carries elements
+		// across gets it: an R-module homomorphism because it is a map of
+		// sets in particular.
+		//
+		// It is drawn, never named: an equals has no label (see
+		// Arrow::Style::Equals), so unlike an image morphism there is nothing
+		// to apply the functor's name to, and nothing to rename later.
+		const bool equals = source->style() == Arrow::Style::Equals;
+
 		Node* img = imageOf(cod, name, source);
 		if (img == nullptr)
 		{
-			auto* codCat = dynamic_cast<Category*>(cod);
-			if (codCat == nullptr)
-				continue;   // elements of a module have no arrows between them
-			img = codCat->createArrow(applied(name, source->id()), from, to);
-			stamp(img, name, source);
-			img->setVisible(m_mirror);
+			if (equals)
+			{
+				// Not through Category::createArrow: the two ends are ELEMENTS,
+				// and what holds them is an object (a module), which is not a
+				// category and makes no morphisms. An equals between two of the
+				// things inside it is not a morphism either.
+				auto* drawn = new Arrow(QString(), from, to, cod);
+				drawn->setStyle(Arrow::Style::Equals);
+				drawn->setZValue(2);
+				drawn->refreshDepthAppearance();
+				drawn->refreshFrame();
+				img = drawn;
+				stamp(img, name, source);
+				img->setVisible(m_mirror);
+			}
+			else
+			{
+				auto* codCat = dynamic_cast<Category*>(cod);
+				if (codCat == nullptr)
+					continue;   // elements of a module have no arrows between them
+				img = codCat->createArrow(applied(name, source->id()), from, to);
+				stamp(img, name, source);
+				img->setVisible(m_mirror);
+			}
+		}
+		else if (equals)
+		{
+			// it may have been drawn as an ordinary image and then said to be
+			// an equals, or the other way about
+			if (auto* imageArrow = dynamic_cast<Arrow*>(img); imageArrow != nullptr
+			    && imageArrow->style() != Arrow::Style::Equals)
+				imageArrow->setStyle(Arrow::Style::Equals);
+			if (!img->id().isEmpty())
+				img->setId(QString());
 		}
 		else if (img->id() != applied(name, source->id()))
 		{

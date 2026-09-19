@@ -8,6 +8,7 @@
 #include "art/Category.h"
 #include "art/Arrow.h"
 #include "core/io/SceneFile.h"
+#include "core/rules/Pattern.h"   // Pattern::namesABuiltIn: one rule for both matchers
 
 // ---------------------------------------------------------------- reading a rule
 
@@ -100,11 +101,122 @@ void Rule::extract()
 		}
 	}
 
+	promoteTermsOverExistentials();
+
 	// parents before children, so a parent is always bound before its child
 	// is looked for
 	auto byDepth = [](Node* a, Node* b) { return depthOf(a) < depthOf(b); };
 	std::sort(m_premiseObjects.begin(), m_premiseObjects.end(), byDepth);
 	std::sort(m_conclusionObjects.begin(), m_conclusionObjects.end(), byDepth);
+}
+
+// NOTHING YOU MUST FIND CAN BE SPELT OUT OF SOMETHING THAT DOES NOT EXIST YET.
+//
+// "For every group G and element x there is a y with xy^{-1} = 1 = y^{-1}x."
+// Drawn, that is a solid x, a dashed y, and the terms xy^{-1} and y^{-1}x -
+// and those two terms are, on the face of it, drawn solid, because nobody
+// dashes every letter of a formula. Read literally that makes them part of
+// the PREMISE: the rule would go looking for a diagram in which xy^{-1} has
+// already been written down, and the axiom would fire nowhere, because the
+// whole point of it is that you have not got a y yet.
+//
+// A term that mentions y is not something you can be asked to find. It comes
+// into existence when y does, so it belongs on the same side of the
+// implication - which is what a person means by writing it there and what
+// "juxtaposition is defined elsewhere" takes for granted.
+//
+// So: any premise node whose label uses the name of something the rule merely
+// CLAIMS, as a whole name, is moved over to the conclusion; and so is anything
+// drawn inside it, and any arrow with an end that has moved, which cannot be
+// looked for once one of its ends is no longer there to look for. Run to a
+// fixed point, because a term can be spelt out of a term - z = xy^{-1} moves
+// because xy^{-1} did.
+//
+// This changes nothing for a rule that does not name its existentials in its
+// premise, which is nearly all of them.
+void Rule::promoteTermsOverExistentials()
+{
+	auto namesOf = [](const QList<Node*>& objects, const QList<Arrow*>& arrows) {
+		QStringList names;
+		for (Node* node : objects)
+			if (const QString id = node->id(); !id.isEmpty() && !Rule::isConstant(id))
+				names << id;
+		for (Arrow* arrow : arrows)
+			if (const QString id = arrow->id(); !id.isEmpty() && !Rule::isConstant(id))
+				names << id;
+		return names;
+	};
+
+	// Every label drawn in this rule, so that a name sitting against another
+	// name can be told from a name sitting inside a longer word: xy^{-1}
+	// mentions y because x is one of these, and Hom would not mention o
+	// unless H were (see Node::labelMentions).
+	QStringList everyName;
+	for (const QList<Node*>* list : { &m_premiseObjects, &m_conclusionObjects })
+		for (Node* node : *list)
+			if (const QString id = node->id(); !id.isEmpty() && !everyName.contains(id))
+				everyName << id;
+	for (const QList<Arrow*>* list : { &m_premiseArrows, &m_conclusionArrows })
+		for (Arrow* arrow : *list)
+			if (const QString id = arrow->id(); !id.isEmpty() && !everyName.contains(id))
+				everyName << id;
+
+	for (bool moved = true; moved; )
+	{
+		moved = false;
+		const QStringList claimed = namesOf(m_conclusionObjects, m_conclusionArrows);
+		if (claimed.isEmpty())
+			return;
+
+		// the objects first: an arrow can only follow an end that has gone
+		for (int i = m_premiseObjects.size() - 1; i >= 0; --i)
+		{
+			Node* node = m_premiseObjects.at(i);
+			const QString id = node->id();
+			bool spelt = false;
+			for (const QString& name : claimed)
+				if (Node::labelMentions(id, name, everyName))
+				{
+					spelt = true;
+					break;
+				}
+			// and anything drawn inside something that has moved goes with it
+			if (!spelt)
+				for (Node* gone : m_conclusionObjects)
+					if (node->parentItem() == gone)
+					{
+						spelt = true;
+						break;
+					}
+			if (!spelt)
+				continue;
+			m_premiseObjects.removeAt(i);
+			m_conclusionObjects << node;
+			m_deletedObjects.removeAll(node);
+			moved = true;
+		}
+
+		for (int i = m_premiseArrows.size() - 1; i >= 0; --i)
+		{
+			Arrow* arrow = m_premiseArrows.at(i);
+			const bool endGone = m_conclusionObjects.contains(arrow->domain())
+			                  || m_conclusionObjects.contains(arrow->codomain());
+			bool spelt = endGone;
+			if (!spelt)
+				for (const QString& name : claimed)
+					if (Node::labelMentions(arrow->id(), name, everyName))
+					{
+						spelt = true;
+						break;
+					}
+			if (!spelt)
+				continue;
+			m_premiseArrows.removeAt(i);
+			m_conclusionArrows << arrow;
+			m_deletedArrows.removeAll(arrow);
+			moved = true;
+		}
+	}
 }
 
 QHash<QString, QString> RuleMatch::bindings() const
@@ -284,14 +396,55 @@ QList<RuleMatch> RuleMatcher::find(const Rule& rule, DiagramScene* diagram, int 
 	if (!rule.isValid() || rule.root() == nullptr || diagram == nullptr || diagram->ambientCategory() == nullptr)
 		return none;
 
-	// The rule's own ambient category stands for a category of the SAME NAME
-	// in the diagram: a rule about R-Mod is about R-Mod, wherever R-Mod is
-	// drawn - the canvas itself, or a category drawn inside something.
+	// WHAT THE CATEGORY A RULE IS DRAWN IN STANDS FOR.
+	//
+	// A rule drawn in R-Mod is about R-Mod: it may use that modules have
+	// kernels, that 0 is an object, that a sum of maps is a map. It fires
+	// wherever R-Mod is drawn and nowhere else.
+	//
+	// A rule drawn in a category the user simply called C is not about any
+	// category in particular. C is a VARIABLE, exactly as X and f are
+	// variables inside it - "for any category C, and any composable f and g
+	// in it..." - and the whole point of drawing it that way is that it holds
+	// of Top, of Set, of a category drawn inside another one, of anything.
+	// Matching it by NAME meant it held of categories that happened to be
+	// called C and of nothing else, which is not what anybody draws.
+	//
+	// What a variable category does carry is the structure it was drawn WITH:
+	// a rule drawn in a category ticked as additive is a rule about additive
+	// categories, and has no business firing in one that has not been said to
+	// be. Same direction as claimsAgree - the diagram may say more than the
+	// rule asks, never less.
+	Category* pattern = rule.root();
+	const QString named = pattern->id();
+	// By NAME, not by class. A rule for any category is drawn by taking a
+	// fresh scene and calling it C - and a fresh scene starts in BigCat, so
+	// what is on the canvas is a BigCat wearing the name C. Asking the class
+	// would make that rule about BigCat and nothing else, which is the
+	// opposite of what writing C meant.
+	const bool aboutOne = Pattern::namesABuiltIn(named);
+	const QStringList wanted = pattern->properties();
+
+	auto standsFor = [&](Category* candidate) {
+		if (candidate == nullptr)
+			return false;
+		if (aboutOne)
+			return candidate->id() == named || candidate->builtInName() == named;
+		// a variable category: any at all, carrying whatever structure was
+		// ticked on it BY HAND. A built-in renamed to a letter carries its
+		// class's structure, which is not a claim anybody made about C.
+		if (pattern->builtInName().isEmpty())
+			for (const QString& key : wanted)
+				if (!candidate->has(key))
+					return false;
+		return true;
+	};
+
 	QList<Node*> roots;
-	if (diagram->ambientCategory()->id() == rule.root()->id())
+	if (standsFor(diagram->ambientCategory()))
 		roots << diagram->ambientCategory();
 	for (Node* node : diagram->labelledNodes())
-		if (auto* category = dynamic_cast<Category*>(node); category != nullptr && category->id() == rule.root()->id())
+		if (auto* category = dynamic_cast<Category*>(node); standsFor(category))
 			roots << category;
 
 	Search search(rule, diagram, cap);
@@ -319,6 +472,37 @@ namespace
 	// A conclusion label with the match's substitution made: every whole
 	// variable name that the match bound is replaced by what it stands for.
 	// "Ker f" with f standing for k becomes "Ker k"; a constant stays.
+	// A derived label with its sources filled in - the same reading
+	// Node::refreshDerivedLabel makes, worked out BEFORE the node exists so
+	// that the name it is going to have can be compared against what is
+	// already drawn.
+	QString filledIn(const QString& pattern, const QList<Node*>& sources)
+	{
+		QString text = pattern;
+		for (int i = 0; i < sources.size(); ++i)
+			text.replace("%" + QString::number(i + 1),
+			             sources.at(i) == nullptr ? QStringLiteral("?") : sources.at(i)->id());
+		return text;
+	}
+
+	// An arrow already drawn from `from` to `to` and going by `name`, or
+	// nullptr. Read by effectiveId so that an unlabelled arrow is compared by
+	// what its category CALLS an unlabelled arrow, exactly as the matcher
+	// compares them.
+	Arrow* arrowBetween(Category* into, Node* from, Node* to, const QString& name)
+	{
+		// `into` and not from->parentItem(): the arrow being considered is
+		// about to be drawn as a child of the category, which is where any
+		// arrow already running between these two would be as well.
+		if (into == nullptr || from == nullptr || to == nullptr || name.isEmpty())
+			return nullptr;
+		for (QGraphicsItem* child : into->childItems())
+			if (auto* arrow = dynamic_cast<Arrow*>(child))
+				if (arrow->domain() == from && arrow->codomain() == to && arrow->effectiveId() == name)
+					return arrow;
+		return nullptr;
+	}
+
 	QString substituted(const QString& label, const QHash<QString, QString>& bindings)
 	{
 		if (label.isEmpty() || Rule::isConstant(label))
@@ -418,30 +602,58 @@ QList<Node*> RuleMatcher::apply(const Rule& rule, const RuleMatch& match, Diagra
 		auto* into = dynamic_cast<Category*>(placed.value(patternParentOf(pattern)));
 		if (from == nullptr || to == nullptr || into == nullptr)
 			continue;
+
+		// WHAT THIS ARROW IS TO BE CALLED, decided BEFORE anything is drawn.
+		//
+		// A label built out of other labels is not a name the rule chose: it
+		// is "whatever those turn out to be called here", and it has the last
+		// word. Working the plain name out first and priming it - f becomes
+		// f' because the diagram already has an f - and only then applying the
+		// formula meant the prime was either wasted or, when the formula
+		// failed to resolve, left standing as the name. That is where f' and
+		// f'' came from.
+		QList<Node*> sources;
+		for (Node* source : pattern->labelSources())
+			if (Node* bound = placed.value(source))
+				sources << bound;
+		const bool derived = !pattern->labelPattern().isEmpty()
+		                  && !sources.isEmpty()
+		                  && sources.size() == pattern->labelSources().size();
+
 		QString name = substituted(pattern->id(), bindings);
-		if (!name.isEmpty() && !Rule::isConstant(name) && into->nameInUse(name))
+		// A name is only primed when it is this rule's own choice of name. A
+		// derived one is about to be overwritten, and a prime on it would be
+		// a prime on a name nobody asked for.
+		if (!derived && !name.isEmpty() && !Rule::isConstant(name) && into->nameInUse(name))
 		{
 			QString fresh = name;
 			for (int guard = 0; guard < 26 && into->nameInUse(fresh); ++guard)
 				fresh += QChar(0x2032);
 			name = fresh;
 		}
-		Arrow* arrow = into->createArrow(name, from, to);
-		arrow->setBends(pattern->bends());
-		// A label built out of other labels carries the formula over, tied to
-		// what those others stand for here - so a composite drawn as gf comes
-		// out named after the two arrows it was actually matched against. The
-		// same as for a conclusion object, and just as needed: without it a
-		// rule's composite would keep the rule's own letters.
-		if (!pattern->labelPattern().isEmpty())
+
+		// ALREADY THERE IS ALREADY THERE.
+		//
+		// The conclusion says there EXISTS an arrow of this name between these
+		// two. If the diagram already has one, the claim is made good and
+		// there is nothing to draw: drawing a second would assert a second,
+		// DIFFERENT morphism, which the rule does not say. Applying the same
+		// rule twice used to pile parallel copies on top of each other.
+		const QString wanted = derived ? filledIn(pattern->labelPattern(), sources) : name;
+		if (Arrow* already = arrowBetween(into, from, to, wanted))
 		{
-			QList<Node*> sources;
-			for (Node* source : pattern->labelSources())
-				if (Node* bound = placed.value(source))
-					sources << bound;
-			if (sources.size() == pattern->labelSources().size() && !sources.isEmpty())
-				arrow->setDerivedLabel(pattern->labelPattern(), sources);
+			placed.insert(pattern, already);
+			continue;
 		}
+
+		Arrow* arrow = into->createArrow(name, from, to);
+		// NOT the rule's bends. A bend is a point in the arrow's own frame,
+		// and that frame is the rule's category with the rule's objects at the
+		// rule's spacing - none of which this diagram shares. Carried over
+		// literally they pulled the line somewhere it had no business being
+		// and stranded the label out on its own with no line under it.
+		if (derived)
+			arrow->setDerivedLabel(pattern->labelPattern(), sources);
 		placed.insert(pattern, arrow);
 		made << arrow;
 	}

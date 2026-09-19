@@ -9,6 +9,8 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QComboBox>
+#include <QColorDialog>
+#include <QHBoxLayout>
 #include <QCheckBox>
 #include <QSignalBlocker>
 
@@ -111,6 +113,24 @@ void PropertiesDock::build()
 	                         "but where the rule is applied, this is what gets taken out.");
 	connect(m_deleteMark, &QAbstractButton::toggled, this, [this](bool on) { applyDeleteMark(on); });
 	nodeForm->addRow("Delete on apply", m_deleteMark);
+
+	// HOW IT IS DRAWN. Two buttons that open a colour dialog, each showing the
+	// colour it would change as its own swatch, and each able to say "none" -
+	// which is not the same as white: a node with no fill is transparent, and
+	// one with no border has none drawn at all.
+	auto* colours = new QWidget(m_nodeBox);
+	auto* colourRow = new QHBoxLayout(colours);
+	colourRow->setContentsMargins(0, 0, 0, 0);
+	m_fillColour = new QPushButton("Fill", colours);
+	m_fillColour->setToolTip("The colour inside. A colour chosen by hand is always drawn, even on a node "
+	                         "that holds nothing and would otherwise be just its label.");
+	connect(m_fillColour, &QAbstractButton::clicked, this, [this] { applyColour(true); });
+	colourRow->addWidget(m_fillColour);
+	m_borderColour = new QPushButton("Border", colours);
+	m_borderColour->setToolTip("The colour of the frame round it.");
+	connect(m_borderColour, &QAbstractButton::clicked, this, [this] { applyColour(false); });
+	colourRow->addWidget(m_borderColour);
+	nodeForm->addRow("Appearance", colours);
 	layout->addWidget(m_nodeBox);
 
 	// ---- what a CATEGORY is, and what the diagram drawn in it claims.
@@ -121,6 +141,23 @@ void PropertiesDock::build()
 	m_categoryBox = new QGroupBox("Diagram", body);
 	auto* categoryForm = new QFormLayout(m_categoryBox);
 
+	// WHICH CATEGORY THIS IS: SAID, NOT OFFERED.
+	//
+	// It used to be a dropdown. But a category settles the moment anything is
+	// drawn in it - everything inside is an object or an arrow OF it and would
+	// mean something else in another - so for all but the first moment of a
+	// diagram's life the control was a disabled combo wearing a padlock: a
+	// menu of choices none of which could be taken. That reads as something
+	// broken rather than as something decided.
+	//
+	// So it is a sentence now. The combo is kept below, commented out, because
+	// the question it asked is a real one and may want asking somewhere it can
+	// still be answered.
+	m_categoryName = new QLabel(m_categoryBox);
+	m_categoryName->setWordWrap(true);
+	categoryForm->addRow(m_categoryName);
+
+	/*
 	m_categoryKind = new QComboBox(m_categoryBox);
 	m_categoryKind->addItems(Category::builtInNames());
 	m_categoryKind->addItem(kCustom);   // last: defines a new one through the dialog
@@ -134,6 +171,7 @@ void PropertiesDock::build()
 		QMetaObject::invokeMethod(this, [this, name] { applyCategoryKind(name); }, Qt::QueuedConnection);
 	});
 	categoryForm->addRow("Category", m_categoryKind);
+	*/
 
 	m_subcategoryHint = new QLabel(m_categoryBox);
 	m_subcategoryHint->setWordWrap(true);
@@ -242,6 +280,39 @@ void PropertiesDock::build()
 		if (Arrow* arrow = soleArrow()) arrow->setEpicRecorded(on);
 	});
 	arrowForm->addRow("Epimorphism", m_epic);
+
+	// WHAT KIND OF ARROW IT IS DRAWN AS.
+	//
+	// Overlapping with the two switches above and deliberately not tied to
+	// them: those are claims about cancellation, this is the mark on the
+	// line. They are free to disagree - a diagram may draw a hooked tail
+	// without asserting anything, or assert monic without drawing a barb -
+	// and forcing them into step would take away a distinction people make.
+	m_arrowStyle = new QComboBox(m_arrowBox);
+	for (Arrow::Style option : Arrow::allStyles())
+		m_arrowStyle->addItem(Arrow::styleName(option), int(option));
+	m_arrowStyle->setToolTip("The mark on the line: a hooked tail for an inclusion, a barbed tail for a "
+	                         "monomorphism, a second head for an epimorphism, a tilde for an iso.");
+	connect(m_arrowStyle, &QComboBox::currentIndexChanged, this, [this](int index) {
+		if (m_updating || index < 0)
+			return;
+		if (Arrow* arrow = soleArrow())
+			arrow->setStyleRecorded(Arrow::Style(m_arrowStyle->itemData(index).toInt()));
+	});
+	arrowForm->addRow("Style", m_arrowStyle);
+
+	// THE SHAPE OF THE LINE. Adding a bend needs a point to put it at, and the
+	// panel has none - that one stays on the right-click menu of the line
+	// itself, where the cursor says where. Taking them all out again needs no
+	// point at all, so it belongs here.
+	m_straighten = new QPushButton("Straighten", m_arrowBox);
+	m_straighten->setToolTip("Take every bend out of the line. Add a bend by right-clicking the line "
+	                         "where you want it, which is the one thing here that needs a place.");
+	connect(m_straighten, &QAbstractButton::clicked, this, [this] {
+		if (Arrow* arrow = soleArrow())
+			arrow->straightenRecorded();
+	});
+	arrowForm->addRow("Shape", m_straighten);
 	layout->addWidget(m_arrowBox);
 
 	// ---- what an arrow does to what is drawn in its domain
@@ -481,6 +552,28 @@ void PropertiesDock::refresh()
 		allStruck = allStruck && node->markedForDeletion();
 	m_deleteMark->setChecked(allStruck);
 
+	// each colour button wears the colour it would change, so the panel shows
+	// what is there rather than only offering to alter it
+	{
+		Node* first = nodes.first();
+		const QColor fill = first->fill().style() == Qt::NoBrush ? QColor() : first->fill().color();
+		const QColor border = first->border().style() == Qt::NoPen ? QColor() : first->border().color();
+		m_fillColour->setText(fill.isValid() ? QStringLiteral("Fill") : QStringLiteral("Fill: none"));
+		m_borderColour->setText(border.isValid() ? QStringLiteral("Border") : QStringLiteral("Border: none"));
+		auto swatch = [](const QColor& colour) {
+			if (!colour.isValid())
+				return QString();
+			// black on a light colour, white on a dark one, so the word on the
+			// button can still be read whatever it is sitting on
+			const bool dark = colour.lightness() < 128 && colour.alpha() > 96;
+			return QString("background-color: rgba(%1,%2,%3,%4); color: %5;")
+				.arg(colour.red()).arg(colour.green()).arg(colour.blue()).arg(colour.alpha())
+				.arg(dark ? "white" : "black");
+		};
+		m_fillColour->setStyleSheet(swatch(fill));
+		m_borderColour->setStyleSheet(swatch(border));
+	}
+
 	m_objectBox->setVisible(!objects.isEmpty());
 	if (!objects.isEmpty())
 	{
@@ -499,6 +592,10 @@ void PropertiesDock::refresh()
 		// being something that can be argued with
 		m_monic->setEnabled(!soleA->isInclusion());
 		m_epic->setChecked(soleA->isEpic());
+		if (const int index = m_arrowStyle->findData(int(soleA->style())); index >= 0)
+			m_arrowStyle->setCurrentIndex(index);
+		// nothing to straighten on a line that is already straight
+		m_straighten->setEnabled(!soleA->bends().isEmpty());
 	}
 
 	refreshCategoryBox(soleCategory());
@@ -671,6 +768,24 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 
 	m_categoryBox->setTitle(QString("Diagram in %1").arg(category->id()));
 
+	// WHICH CATEGORY IT IS, in a sentence. A built-in answers with its own
+	// name; one the user defined has only the name it was given, and the two
+	// are the same thing to say out loud. The name it is DRAWN under goes in
+	// too when it differs - a built-in R-Mod renamed to C is still R-Mod, and
+	// that is worth being able to see.
+	{
+		QString kind = category->builtInName();
+		if (kind.isEmpty())
+			kind = category->id();
+		m_categoryName->setText(kind == category->id()
+			? QString("Diagram in category \"%1\".").arg(kind)
+			: QString("Diagram in category \"%1\", drawn as %2.").arg(kind, category->id()));
+		m_categoryName->setToolTip(QString("Everything drawn in here is an object or an arrow of %1. "
+		                                   "That settles as soon as anything is placed: what is drawn in "
+		                                   "one category would mean something else in another.").arg(kind));
+	}
+
+	/*
 	// which category it is. A built-in answers with its own name; one the
 	// user defined is not in the list, so its label goes in before Custom...
 	{
@@ -704,6 +819,7 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 			: QStringLiteral("Which category this is. It can be chosen while the category is "
 			                 "still empty."));
 	}
+	*/
 
 	if (category->isSubcategory())
 	{
@@ -741,6 +857,39 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 		form->setRowVisible(m_rowsExact, exact);
 		form->setRowVisible(m_columnsExact, exact);
 	}
+}
+
+void PropertiesDock::applyColour(bool fill)
+{
+	if (m_updating)
+		return;
+	const QList<Node*> nodes = selection();
+	if (nodes.isEmpty())
+		return;
+
+	// the colour the dialog opens on: whatever the first one selected has, so
+	// nudging a colour starts from the colour rather than from black
+	Node* first = nodes.first();
+	const QColor current = fill
+		? (first->fill().style() == Qt::NoBrush ? QColor() : first->fill().color())
+		: (first->border().style() == Qt::NoPen ? QColor() : first->border().color());
+
+	// ShowAlphaChannel because a fill that cannot be made see-through is no
+	// use for a box drawn round other boxes, which is most of them here.
+	QColorDialog dialog(current.isValid() ? current : QColor(Qt::white), this);
+	dialog.setOption(QColorDialog::ShowAlphaChannel, fill);
+	dialog.setWindowTitle(fill ? QStringLiteral("Fill") : QStringLiteral("Border"));
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+
+	for (Node* node : nodes)
+	{
+		if (fill)
+			node->setFillRecorded(dialog.currentColor());
+		else
+			node->setBorderRecorded(dialog.currentColor());
+	}
+	refresh();
 }
 
 void PropertiesDock::applyExistsSuch(bool on)

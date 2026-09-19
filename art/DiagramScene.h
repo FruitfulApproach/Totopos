@@ -12,8 +12,8 @@
 #include "art/Arrow.h"   // noteArrowStyle names Arrow::Style, so the type must be complete
 #include "core/rules/Rule.h"
 
+class ClassicalView;
 class NodeHandles;
-class ArrowHandle;
 class SceneHistory;
 class QGraphicsLineItem;
 class QKeyEvent;
@@ -50,6 +50,45 @@ public:
 	void toggleChase();
 	void setChasing(bool chasing);
 	const QList<QPointer<Node>>& hypotheses() const { return m_hypotheses; }
+
+	// ---------------------------------------------------------------- how it is written
+	//
+	// HOW THIS DIAGRAM IS WRITTEN DOWN, which is not what it says.
+	//
+	// Succinct is the notation this program is built on and the only one it
+	// stores: one picture, solid for what is given and dashed for what there
+	// then is. Classical is the same statement set out the way it is set out
+	// on paper - the givens in one box, the conclusion in another, and a
+	// double arrow between them carrying the rule's name.
+	//
+	// Switching is a way of LOOKING, never a way of editing: the diagram is
+	// the same diagram either way, and what is saved, matched and reasoned
+	// about is always the succinct one. See core/view/ClassicalView.h.
+	enum class Notation
+	{
+		Succinct,    // one picture: dashed means "there exists"
+		Classical,   // two pictures: givens ==> conclusion
+	};
+	Notation notation() const { return m_notation; }
+	bool isClassical() const { return m_notation == Notation::Classical; }
+	void setNotation(Notation notation);
+	void toggleNotation();
+
+	// WHERE THINGS WERE PUT IN THE CLASSICAL VIEW.
+	//
+	// Two boxes want a different arrangement from one picture, so the two
+	// notations keep their layouts apart: the succinct positions are the
+	// nodes' own, and these are the classical ones. Dragging things about in
+	// one notation never disturbs the other, and switching back and forth
+	// finds each arrangement as it was left. Keyed by side and by the identity
+	// of the node a thing is a copy of (see ClassicalView), so they survive a
+	// relabelling and a reopening of the file, and are saved with it.
+	const QHash<QString, QPointF>& classicalPositions() const { return m_classicalPositions; }
+	void setClassicalPositions(const QHash<QString, QPointF>& positions) { m_classicalPositions = positions; }
+	// Read the positions back off the classical view, if it is up. Switching
+	// notations does this by itself; saving has to ask, because the file is
+	// written while the view is still standing.
+	void syncClassicalPositions();
 
 	// Whether this diagram is asserted to commute. With it on, the statement
 	// reads "... such that the diagram commutes".
@@ -244,6 +283,9 @@ public:
 	// arrows are begun by double-clicking - so there is nothing else a drag
 	// can become, save carrying a copy off (which the move branch handles).
 	enum class Gesture { None, Move };
+	// A scene point in the coordinates a node's pos() is measured in: its
+	// parent's, or - for a node hanging off the scene itself - the scene's.
+	static QPointF inParentOf(const Node* node, const QPointF& scenePos);
 	void beginPress(Node* node, const QPointF& scenePos, Gesture gesture);
 	bool isMoving() const { return m_gesture == Gesture::Move && !m_pressed.isNull(); }
 	void cancelMove();   // put it back where it was
@@ -260,33 +302,20 @@ public:
 	QGraphicsItem* hitItem(const QPointF& scenePos) const;
 	// the node at a scene point (a label counts for its node), or nullptr
 	Node* nodeAt(const QPointF& scenePos) const;
+	// the node a PRESS there is about: the same as nodeAt, except that an
+	// arrow pressed near one of its ends stands aside for what is under it
+	// (Arrow::takesPressAt)
+	Node* nodeForPress(const QPointF& scenePos) const;
 	// is the keyboard in a label right now?
 	bool isEditingLabel() const;
 
-	// Drawing an arrow: started from a node's handle, then guided by the arrow
-	// tutor (quietly, when tutor mode is off). The surrounding category makes
-	// the arrow, so what gets drawn is its business (a functor, in BigCat).
-	// The button that appears under the cursor when it comes near a node's
-	// border: pressing it draws an arrow out of that node. Kept up to date as
-	// the mouse moves, and put away whenever something else is going on.
-	void refreshArrowHandle(const QPointF& scenePos);
-	// the dwell finished: put the button up where the mouse has been resting
-	void showArrowHandleNow();
-	// its time is up: take it away, and do not offer it again until the mouse
-	// has been somewhere else
-	void expireArrowHandle();
-	// +, - or draw-an-arrow: what this node can be asked to do from the
-	// button that appears at its border
-	QList<int> handleButtonsFor(const Node* node) const;
 	// begin adding or subtracting, from the element `from`
 	// What can be done with an ELEMENT, once a second one has been pointed at:
 	// x + y and x - y build a new element, x = y joins the two that are there.
 	// Started from the element's own right-click menu (AtomicElement).
 	enum class ElementOp { Plus, Minus, Equals };
 	void beginElementOp(Node* from, ElementOp operation);
-	void hideArrowHandle();
 	// the node whose border is nearest this point, within `within`, or nullptr
-	Node* nodeWithBorderNear(const QPointF& scenePos, qreal within) const;
 
 	void beginArrow(Node* from);
 	void cancelArrow();
@@ -313,6 +342,8 @@ signals:
 	// something worth a line in the status bar
 	void message(const QString& text);
 	void chasingChanged(bool chasing);
+	// the diagram is now being shown the other way round (see Notation)
+	void notationChanged(bool classical);
 	void commutesChanged(bool commutes);
 	void statementKindChanged(int kind, const QString& name);
 	// something the diagram cannot mean; empty when it is put right
@@ -353,28 +384,15 @@ private:
 	Category* m_ambientCategory = nullptr;
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;
-	ArrowHandle* m_arrowHandle = nullptr;
-	// ASKED FOR BY HOLDING STILL, AND IT TAKES ITSELF AWAY AGAIN.
-	//
-	// m_handleDwell runs while the mouse rests near a border and puts the
-	// button up when it finishes; any real movement away restarts or stops
-	// it. m_handleLife then runs while the button is up and takes it away, so
-	// nothing is left standing over the diagram. Both lengths are settings
-	// (AppSettings::arrowButtonDelay, arrowButtonLife).
-	QTimer* m_handleDwell = nullptr;
-	QTimer* m_handleLife = nullptr;
-	QPointer<Node> m_handleWaitingOn;   // the node the dwell is counting for
-	QPointF m_handleWaitingAt;          // and where the cursor was, in the scene
-	// The node whose button has already had its time and gone. Without this,
-	// a hand left resting on a border would have the button appear, expire,
-	// and appear again for ever. Cleared by moving off that border - which is
-	// also how it is asked for a second time.
-	QPointer<Node> m_handleSpent;
 	QPointer<Node> m_arrowFrom;
 	// The arrow being placed: a real Arrow with no codomain, running to the
 	// cursor. QPointer because it hangs off its domain and goes with it.
 	QPointer<Arrow> m_pending;
 	SceneHistory* m_history = nullptr;
+	// the classical view, while it is up; null the rest of the time
+	std::unique_ptr<ClassicalView> m_classical;
+	Notation m_notation = Notation::Succinct;
+	QHash<QString, QPointF> m_classicalPositions;
 	bool m_chasing = false;
 	bool m_commutes = false;
 	QString m_cycleError;

@@ -2,6 +2,7 @@
 
 #include <QGraphicsObject>
 #include <QList>
+#include <QStringList>
 #include <QSet>
 #include <QPointer>
 #include <QPainter>
@@ -60,6 +61,15 @@ public:
 	// them: rename B to C and it says Hom(X,C) of its own accord. Whole names
 	// only - a node called "o" is not found inside "Hom".
 	void bindLabelReferences();
+	// Does `text` use `name` as a name? xy^{-1} mentions y - two letters side
+	// by side is a product - while Hom(X,B) does not mention a node called o.
+	// Telling those apart is what `otherNames` is for: it is the other labels
+	// drawn in the same place, and a name character beside the name counts as
+	// a boundary when it is itself part of one of them. The same reading
+	// bindLabelReferences makes, offered on its own because a rule has only
+	// labels to go on and not the nodes behind them (core/rules/Rule.cpp).
+	static bool labelMentions(const QString& text, const QString& name,
+	                          const QStringList& otherNames = QStringList());
 	QString labelPattern() const { return m_labelPattern; }
 	QList<Node*> labelSources() const;
 
@@ -73,6 +83,12 @@ public:
 	const QPen& border() const { return m_border; }
 	void setFill(const QBrush& fill);
 	void setBorder(const QPen& border);
+	// Set it AND put it in the scene's history, which is also what marks the
+	// colour as CHOSEN (see hasChosenStyle). An invalid colour means none: no
+	// fill, or no border at all. These are what the Properties panel calls;
+	// nothing outside this class can reach recordStyleChange.
+	void setFillRecorded(const QColor& colour);
+	void setBorderRecorded(const QColor& colour);
 
 	// Was the fill or the border chosen by hand (the colour chips)? A frame
 	// that was asked for is always drawn; one that is merely the default is
@@ -215,6 +231,21 @@ public:
 
 	// how many nodes this one sits inside (0 at the top)
 	int nesting() const;
+	// HOW BIG EVERYTHING ABOUT THIS NODE SHOULD BE.
+	//
+	// A line width, a dot, a cross, the label's point size: all written for an
+	// outermost node, and all taken down a step for every node this one is
+	// drawn inside. One factor for the lot, so that a thing deep in the
+	// nesting is small in every respect at once rather than being a small box
+	// with a full-size name on it. Floored, or the deepest nodes end up drawn
+	// with nothing and named in nothing.
+	//
+	// This is for what the drawing INVENTS - dotted for "exists such", red for
+	// an error, the green of a highlight, the size text is set in. A width or
+	// a size asked for by hand is what was asked for and is not scaled.
+	qreal depthScale() const;
+	// the same for a depth already in hand (applyDepthAppearance is given one)
+	static qreal depthScale(int depth);
 
 	// Where this node sits, as the indexes to walk down from the topmost node
 	// (the ambient category), counting only the objects - arrows are not
@@ -394,7 +425,10 @@ protected:
 	// shove the neighbours this node has just moved into
 	void pushSiblings(const QPointF& delta);
 
-	// the nodes this node contains (its child items other than its own label)
+	// The nodes this node contains: its child items other than its own label,
+	// and only the ones you can SEE - a hidden child is not part of the frame
+	// (childFrame) and does not make this node count as holding anything.
+	// Arrows are nodes too, so an arrow drawn inside this one counts.
 	int containedCount(const QGraphicsItem* except = nullptr) const;
 	// a node that contains others shows its id in bold
 	void refreshLabelWeight(int contained);

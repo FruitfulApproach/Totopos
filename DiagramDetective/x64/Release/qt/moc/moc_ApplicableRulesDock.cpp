@@ -43,6 +43,7 @@ template <> constexpr inline auto ApplicableRulesDock::qt_create_metaobjectdata<
         "message",
         "",
         "text",
+        "pinnedChanged",
         "onUpdated",
         "QList<ApplicableRule>",
         "rules",
@@ -55,14 +56,16 @@ template <> constexpr inline auto ApplicableRulesDock::qt_create_metaobjectdata<
         QtMocHelpers::SignalData<void(const QString &)>(1, 2, QMC::AccessPublic, QMetaType::Void, {{
             { QMetaType::QString, 3 },
         }}),
+        // Signal 'pinnedChanged'
+        QtMocHelpers::SignalData<void()>(4, 2, QMC::AccessPublic, QMetaType::Void),
         // Slot 'onUpdated'
-        QtMocHelpers::SlotData<void(const QList<ApplicableRule> &)>(4, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 5, 6 },
+        QtMocHelpers::SlotData<void(const QList<ApplicableRule> &)>(5, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 6, 7 },
         }}),
         // Slot 'onSearching'
-        QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onSelectionChanged'
         QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onSelectionChanged'
+        QtMocHelpers::SlotData<void()>(9, 2, QMC::AccessPrivate, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -87,16 +90,17 @@ void ApplicableRulesDock::qt_static_metacall(QObject *_o, QMetaObject::Call _c, 
     if (_c == QMetaObject::InvokeMetaMethod) {
         switch (_id) {
         case 0: _t->message((*reinterpret_cast<std::add_pointer_t<QString>>(_a[1]))); break;
-        case 1: _t->onUpdated((*reinterpret_cast<std::add_pointer_t<QList<ApplicableRule>>>(_a[1]))); break;
-        case 2: _t->onSearching(); break;
-        case 3: _t->onSelectionChanged(); break;
+        case 1: _t->pinnedChanged(); break;
+        case 2: _t->onUpdated((*reinterpret_cast<std::add_pointer_t<QList<ApplicableRule>>>(_a[1]))); break;
+        case 3: _t->onSearching(); break;
+        case 4: _t->onSelectionChanged(); break;
         default: ;
         }
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
         switch (_id) {
         default: *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType(); break;
-        case 1:
+        case 2:
             switch (*reinterpret_cast<int*>(_a[1])) {
             default: *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType(); break;
             case 0:
@@ -107,6 +111,8 @@ void ApplicableRulesDock::qt_static_metacall(QObject *_o, QMetaObject::Call _c, 
     }
     if (_c == QMetaObject::IndexOfMethod) {
         if (QtMocHelpers::indexOfMethod<void (ApplicableRulesDock::*)(const QString & )>(_a, &ApplicableRulesDock::message, 0))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (ApplicableRulesDock::*)()>(_a, &ApplicableRulesDock::pinnedChanged, 1))
             return;
     }
 }
@@ -130,14 +136,14 @@ int ApplicableRulesDock::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 4)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 4;
+        _id -= 5;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 4)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 4;
+        _id -= 5;
     }
     return _id;
 }
@@ -146,5 +152,11 @@ int ApplicableRulesDock::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
 void ApplicableRulesDock::message(const QString & _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 0, nullptr, _t1);
+}
+
+// SIGNAL 1
+void ApplicableRulesDock::pinnedChanged()
+{
+    QMetaObject::activate(this, &staticMetaObject, 1, nullptr);
 }
 QT_WARNING_POP

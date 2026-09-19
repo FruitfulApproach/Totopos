@@ -14,6 +14,7 @@ class QLabel;
 class QPushButton;
 class QPropertyAnimation;
 class ToggleSwitch;
+class CanvasActionBar;
 
 // The view of a sketch. Over the canvas, top-right, floats a toggle button; it
 // opens a small panel of controls that stays until toggled again. Only the
@@ -38,6 +39,9 @@ public:
 	static QStringList builtInCategories();
 
 	bool isMenuOpen() const { return m_open; }
+
+	// the pills along the foot of the canvas; the window fills them in
+	CanvasActionBar* actionBar() const { return m_actions; }
 
 	// the current zoom factor (1 = 100%)
 	QPointF sceneCentre() const;
@@ -77,6 +81,9 @@ signals:
 	// a piece is being held over this view: the category it would land in, or
 	// empty when it has gone away again
 	void dropTargetChanged(const QString& category);
+	// a pill along the foot of the canvas was pressed; the id is whatever the
+	// window put there (see CanvasActionBar)
+	void canvasActionTriggered(const QString& id);
 
 public slots:
 	// The scene has a piece of itself to carry off (Ctrl and drag). A drag has
@@ -137,6 +144,9 @@ private:
 	QPushButton* m_chase = nullptr;
 	QLabel* m_mode = nullptr;
 	QLabel* m_statement = nullptr;
+	// the row of pills along the foot of the canvas, over the statement bar:
+	// what the diagram is offering right now (see CanvasActionBar)
+	CanvasActionBar* m_actions = nullptr;
 	QComboBox* m_kind = nullptr;
 	QLineEdit* m_statementName = nullptr;
 	QPropertyAnimation* m_anim = nullptr;

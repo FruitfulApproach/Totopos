@@ -4,6 +4,8 @@
 #include <QPainter>
 #include <QGraphicsScene>
 #include <QCursor>
+#include "art/GraphicsHelpers.h"
+#include <QDebug>
 
 namespace
 {
@@ -28,8 +30,10 @@ ArrowHandle::ArrowHandle(QGraphicsItem* parent)
 
 ArrowHandle::~ArrowHandle()
 {
-	if (QGraphicsScene* board = scene())
-		board->removeItem(this);
+	qDebug() << "ArrowHandle::~ArrowHandle this=" << this << "scene=" << static_cast<void*>(scene());
+	// (Qt takes it out of the scene itself, in ~QGraphicsItem, with its own
+	// inDestructor flag set - doing it by hand from here reparents and calls
+	// back into a half-destroyed object instead.)
 }
 
 void ArrowHandle::showFor(Node* from, const QList<Button>& buttons, const QPointF& scenePos)

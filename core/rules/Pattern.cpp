@@ -68,6 +68,21 @@ QList<int> Pattern::rootsNamed(const QString& label) const
 	return roots;
 }
 
+QList<int> Pattern::everyCategory() const
+{
+	QList<int> roots;
+	for (int i = 0; i < m_nodes.size(); ++i)
+		if (i == 0 || m_nodes.at(i).isCategory)
+			roots << i;
+	return roots;
+}
+
+bool Pattern::namesABuiltIn(const QString& label)
+{
+	// a plain list of names, read on the search thread: no scene, no items
+	return Category::builtInNames().contains(label);
+}
+
 Pattern Pattern::fromDiagram(Category* ambient, QList<Node*>* liveNodes)
 {
 	Pattern pattern;
@@ -294,7 +309,21 @@ QList<PatternMatch> PatternMatcher::find(const Pattern& pattern, const Pattern& 
 	// The rule's own ambient category stands for a category of the SAME NAME
 	// in the diagram: a rule about R-Mod is about R-Mod, wherever R-Mod is
 	// drawn - the canvas itself, or a category drawn inside something.
-	for (int root : diagram.rootsNamed(pattern.at(0).label))
+	// WHAT THE CATEGORY A RULE IS DRAWN IN STANDS FOR.
+	//
+	// Named after a built-in - R-Mod, Ab, Top - the rule is about that one:
+	// it may use what that category is made of, and fires only where it is
+	// drawn. Named anything else, the root is a VARIABLE, exactly as X and f
+	// are variables inside it: "for any category C, and any composable f and
+	// g in it...". Matching it by name meant such a rule fired only in
+	// categories that happened to be called C, which is nobody's intention -
+	// and it is the reason a composition rule drawn in C sat there while
+	// R-Mod, an example of a category if ever there was one, went unmatched.
+	const QString rootLabel = pattern.at(0).label;
+	const QList<int> roots = Pattern::namesABuiltIn(rootLabel)
+		? diagram.rootsNamed(rootLabel)
+		: diagram.everyCategory();
+	for (int root : roots)
 	{
 		search.current.objects.insert(0, root);
 		search.matchObjects(0);

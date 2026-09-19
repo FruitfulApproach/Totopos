@@ -10,6 +10,8 @@
 #include <QStyleOptionGraphicsItem>
 #include <QPainterPath>
 #include "core/AppSettings.h"
+#include "art/GraphicsHelpers.h"
+#include <QDebug>
 
 Object::Object(const QString& id, QGraphicsItem *parent)
 	: Node(id, parent)
@@ -29,6 +31,11 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	// the label is the handle you move it by, and says so
 	if (NodeLabel* text = labelItem())
 		text->setCursor(Qt::SizeAllCursor);
+}
+
+Object::~Object()
+{
+	safeRemoveAndLog(this, "Object");
 }
 
 QRectF Object::boxRect() const
@@ -63,6 +70,9 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 
 	QPen pen = border();
 	QBrush brush = fill();
+	// every mark this function invents is written for an outermost node and
+	// taken down a step for each node this one sits inside
+	const qreal scale = depthScale();
 
 	// An object with nothing drawn inside it is just its label - an R-module
 	// is the letter M, not a box with M in it. The frame is what says there is
@@ -79,21 +89,21 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	{
 		// dots around the border: this object is asserted to exist
 		if (pen.style() == Qt::NoPen)
-			pen = QPen(QColor(60, 60, 70), 1.6);
+			pen = QPen(QColor(60, 60, 70), 1.6 * scale);
 		pen.setStyle(Qt::DotLine);
 	}
 	if (hasError())
 	{
 		// part of something the diagram cannot mean: shown, not hidden
 		const Qt::PenStyle style = pen.style() == Qt::DotLine ? Qt::DotLine : Qt::SolidLine;
-		pen = QPen(QColor(255, 0, 0), 2.5);
+		pen = QPen(QColor(255, 0, 0), 2.5 * scale);
 		pen.setStyle(style);
 	}
 	if (isHighlighted())
 	{
 		// last word: whatever this object is painted with, right now it is
 		// being pointed at
-		pen = QPen(QColor(22, 163, 74), 3.0);
+		pen = QPen(QColor(22, 163, 74), 3.0 * scale);
 		brush = QBrush(QColor(34, 197, 94, 70));
 	}
 
@@ -113,7 +123,7 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 			brush = QBrush(c);
 		}
 		if (existsSuch() && pen.style() != Qt::NoPen)
-			pen.setWidthF(pen.widthF() + 1.6);
+			pen.setWidthF(pen.widthF() + 1.6 * scale);
 	}
 
 	painter->setBrush(brush);
@@ -125,7 +135,7 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	if (selected && !existsSuch())
 	{
 		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(QColor(99, 102, 241), 1.0, Qt::DashLine));
+		painter->setPen(QPen(QColor(99, 102, 241), 1.0 * scale, Qt::DashLine));
 		painter->drawRoundedRect(boxRect(), cornerRadius(), cornerRadius());
 	}
 
@@ -135,10 +145,10 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	if (markedForDeletion())
 	{
 		const QRectF frame = boxRect();
-		const qreal reach = qMin(qreal(11.0), qMin(frame.width(), frame.height()) / 2);
+		const qreal reach = qMin(qreal(11.0) * scale, qMin(frame.width(), frame.height()) / 2);
 		const QPointF at = frame.center();
 		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(QColor(220, 38, 38), 2.5, Qt::SolidLine, Qt::RoundCap));
+		painter->setPen(QPen(QColor(220, 38, 38), 2.5 * scale, Qt::SolidLine, Qt::RoundCap));
 		painter->drawLine(at + QPointF(-reach, -reach), at + QPointF(reach, reach));
 		painter->drawLine(at + QPointF(-reach, reach), at + QPointF(reach, -reach));
 	}

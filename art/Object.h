@@ -10,7 +10,7 @@ class Object  : public Node
 
 public:
 	Object(const QString& id, QGraphicsItem *parent=nullptr);
-	~Object() {}
+	~Object() override;
 
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 

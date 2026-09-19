@@ -59,6 +59,10 @@ public:
 
 private:
 	void extract();
+	// A term spelt out of something the rule only CLAIMS is part of what is
+	// claimed, not part of what must be found: see the comment on the
+	// definition. Run as the last step of extract().
+	void promoteTermsOverExistentials();
 
 	QString m_path;
 	QString m_name;

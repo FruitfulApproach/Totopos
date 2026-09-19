@@ -11,6 +11,7 @@
 #include "core/Emoji.h"
 #include <QVariantAnimation>
 #include <QPainter>
+#include <QDebug>
 
 NodeLabel::NodeLabel(const QString& text, Node* node)
 	: QGraphicsTextItem(node)
@@ -38,8 +39,10 @@ NodeLabel::~NodeLabel()
 	// The same window Node::~Node closes: a text item in a scene is painted
 	// until ~QGraphicsItem removes it, and by then it is no longer a
 	// QGraphicsTextItem. Out first, unmade afterwards.
-	if (QGraphicsScene* board = scene())
-		board->removeItem(this);
+	qDebug() << "NodeLabel::~NodeLabel this=" << this << "scene=" << static_cast<void*>(scene());
+	// (Qt takes it out of the scene itself, in ~QGraphicsItem, with its own
+	// inDestructor flag set - doing it by hand from here reparents and calls
+	// back into a half-destroyed object instead.)
 }
 
 QVariant NodeLabel::itemChange(GraphicsItemChange change, const QVariant& value)

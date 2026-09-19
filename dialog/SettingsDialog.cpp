@@ -118,12 +118,6 @@ void SettingsDialog::buildPages()
 			"How thick the two strokes of the head are drawn.");
 		addDouble(p, "Click width", AppSettings::ArrowHitWidth, 4.0, 60.0, 2.0, " px",
 			"How near the line the mouse has to be to hit it. Wider is easier to grab and to bend.");
-		addDouble(p, "Draw-arrow button: wait", AppSettings::ArrowButtonDelay, 0.0, 3000.0, 100.0, " ms",
-			"How long the mouse has to REST near a node border before the draw-an-arrow button appears. "
-			"It answers a deliberate pause, so passing over a border shows nothing.");
-		addDouble(p, "Draw-arrow button: stays", AppSettings::ArrowButtonLife, 200.0, 10000.0, 100.0, " ms",
-			"How long it then stays before taking itself away. Hovering the button itself holds it there "
-			"for as long as you need to press it.");
 	}
 	{
 		Page& p = addPage("Diagram", "Commuting", "A diagram that is asserted to commute is read by comparing "

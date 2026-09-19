@@ -10,6 +10,9 @@
 #include <QDesktopServices>
 #include <QElapsedTimer>
 #include <QUrl>
+#include <QProcess>
+#include <QClipboard>
+#include <QGuiApplication>
 
 #include "art/DiagramScene.h"
 #include "core/rules/Library.h"
@@ -121,6 +124,14 @@ void LibraryDock::fill(QTreeWidgetItem* parent, const QString& path, int depth)
 	{
 		++m_folders;
 		auto* branch = new QTreeWidgetItem(parent, { entry.fileName(), QString() });
+		// A FOLDER'S PATH GOES IN A ROLE OF ITS OWN.
+		//
+		// Not in UserRole: that role means "the file this row is", and a
+		// single click on it lays that file over the diagram as a rule. Give
+		// a folder a path there and clicking one would try to read a
+		// directory as a rule. The two entries that work on either - showing
+		// it in Explorer, copying its path - read this one instead.
+		branch->setData(0, FolderRole, entry.absoluteFilePath());
 		fill(branch, entry.absoluteFilePath(), depth + 1);
 		if (branch->childCount() == 0)
 			delete branch;   // nothing of ours down there
@@ -156,20 +167,87 @@ void LibraryDock::showContextMenu(const QPoint& at)
 	if (item == nullptr)
 		return;
 	const QString path = item->data(0, Qt::UserRole).toString();
-	if (path.isEmpty())
-		return;   // a folder, not a file
+	// a folder has no file path, but it is still somewhere on the disk, and
+	// the two entries at the bottom work on either
+	const QString onDisk = path.isEmpty() ? item->data(0, FolderRole).toString() : path;
+	if (onDisk.isEmpty())
+		return;
 
 	QMenu menu(this);
-	QAction* rename = menu.addAction(QString("Rename %1...").arg(QFileInfo(path).fileName()));
-	connect(rename, &QAction::triggered, this, [this, path] { renameFile(path); });
+	if (!path.isEmpty())
+	{
+		QAction* rename = menu.addAction(QString("Rename %1...").arg(QFileInfo(path).fileName()));
+		connect(rename, &QAction::triggered, this, [this, path] { renameFile(path); });
 
-	menu.addSeparator();
-	QAction* remove = menu.addAction(QString("%1  Remove %2 from the library")
-		.arg(Emoji::remove(), QFileInfo(path).fileName()));
-	remove->setToolTip("Take this file out of the library and off the disk.");
-	connect(remove, &QAction::triggered, this, [this, path] { removeFile(path); });
+		menu.addSeparator();
+		QAction* remove = menu.addAction(QString("%1  Remove %2 from the library")
+			.arg(Emoji::remove(), QFileInfo(path).fileName()));
+		remove->setToolTip("Take this file out of the library and off the disk.");
+		connect(remove, &QAction::triggered, this, [this, path] { removeFile(path); });
+		menu.addSeparator();
+	}
+
+	QAction* reveal = menu.addAction(QStringLiteral("Open in Explorer"));
+	reveal->setToolTip("Show this in a file manager window, with it picked out.");
+	connect(reveal, &QAction::triggered, this, [this, onDisk] { showInExplorer(onDisk); });
+
+	QAction* copy = menu.addAction(QStringLiteral("Copy path"));
+	copy->setToolTip("Put its path on the clipboard, written from the library folder down.");
+	connect(copy, &QAction::triggered, this, [this, onDisk] {
+		const QString relative = relativeToLibrary(onDisk);
+		QGuiApplication::clipboard()->setText(relative);
+		m_where->setText(QString("Copied: %1").arg(relative));
+	});
 
 	menu.exec(m_tree->viewport()->mapToGlobal(at));
+}
+
+QString LibraryDock::relativeToLibrary(const QString& path)
+{
+	// From the library folder down - "Grp/classic/inverses exist.axiom.totopos" -
+	// because that is the name a rule goes by everywhere else in the program:
+	// it is what a proof records as the rule it cited, and what the file it
+	// proves is named by. An absolute path would be no use for either.
+	//
+	// Forward slashes: that is how the paths already stored in files are
+	// written, and Windows takes them everywhere it takes backslashes.
+	const QString root = Library::root();
+	if (root.isEmpty())
+		return QDir::toNativeSeparators(path);
+	const QString relative = QDir(root).relativeFilePath(path);
+	// a path that climbs out of the library is not a library path: say where
+	// it really is rather than spelling it as ../../somewhere
+	return relative.startsWith(QLatin1String("..")) ? QDir::toNativeSeparators(path) : relative;
+}
+
+void LibraryDock::showInExplorer(const QString& path)
+{
+	const QFileInfo info(path);
+	if (!info.exists())
+	{
+		m_where->setText(QString("%1 is no longer there. Refresh to see what is.").arg(info.fileName()));
+		return;
+	}
+
+#ifdef Q_OS_WIN
+	// /select, picks the file OUT in its folder rather than merely opening the
+	// folder. It wants native separators and it wants the argument unquoted by
+	// us - QProcess does the quoting - and it is the only way to get the
+	// highlight, which is the whole point of showing it rather than listing it.
+	const QStringList arguments{ QStringLiteral("/select,") + QDir::toNativeSeparators(info.absoluteFilePath()) };
+	if (QProcess::startDetached(QStringLiteral("explorer.exe"), arguments))
+	{
+		m_where->setText(QString("Showing %1 in Explorer.").arg(info.fileName()));
+		return;
+	}
+#endif
+	// No Explorer, or it refused: open the containing folder the portable way.
+	// A folder shows itself; a file shows the folder it is in.
+	const QString folder = info.isDir() ? info.absoluteFilePath() : info.absolutePath();
+	if (QDesktopServices::openUrl(QUrl::fromLocalFile(folder)))
+		m_where->setText(QString("Opened %1.").arg(QDir::toNativeSeparators(folder)));
+	else
+		m_where->setText(QString("Could not open %1.").arg(QDir::toNativeSeparators(folder)));
 }
 
 void LibraryDock::renameFile(const QString& path)

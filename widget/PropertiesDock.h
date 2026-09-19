@@ -55,6 +55,9 @@ private:
 	// the one category selected on its own, ambient or not
 	Category* soleCategory() const;
 
+	// open a colour dialog and give what comes back to every node selected;
+	// `fill` picks which of the two colours is being changed
+	void applyColour(bool fill);
 	void applyExistsSuch(bool on);
 	void applyDeleteMark(bool on);
 	void applyRounding(int radius);
@@ -86,13 +89,19 @@ private:
 	QLabel* m_typeHint = nullptr;
 	ToggleSwitch* m_exists = nullptr;
 	ToggleSwitch* m_deleteMark = nullptr;
+	// what the Appearance submenu of the right-click menu used to offer
+	QPushButton* m_fillColour = nullptr;
+	QPushButton* m_borderColour = nullptr;
 
 	// Everything a CATEGORY is asked about: which one it is, whether the
 	// diagram drawn in it commutes, what that diagram is put forward as, and
 	// the chase. The same questions for the canvas and for a subcategory
 	// eight levels down, because they are the same kind of thing.
 	QGroupBox* m_categoryBox = nullptr;
-	QComboBox* m_categoryKind = nullptr;
+	// "Diagram in category "R-Mod"." - what the dropdown below used to offer,
+	// said instead of offered (see refreshCategoryBox)
+	QLabel* m_categoryName = nullptr;
+	QComboBox* m_categoryKind = nullptr;   // commented out in the .cpp; kept for its question
 
 	QComboBox* m_statementKind = nullptr;
 
@@ -108,6 +117,9 @@ private:
 	ToggleSwitch* m_monic = nullptr;
 	ToggleSwitch* m_inclusion = nullptr;
 	ToggleSwitch* m_epic = nullptr;
+	// what the Style and Shape submenus of the right-click menu used to offer
+	QComboBox* m_arrowStyle = nullptr;
+	QPushButton* m_straighten = nullptr;
 
 	// the diagram drawn INSIDE the selected node, when there is one
 

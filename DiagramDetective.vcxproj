@@ -118,6 +118,8 @@
     <ClCompile Include="art\Category.cpp" />
     <ClCompile Include="art\DiagramScene.cpp" />
     <ClCompile Include="art\Functor.cpp" />
+    <ClCompile Include="art\Implies.cpp" />
+    <ClCompile Include="core\view\ClassicalView.cpp" />
     <ClCompile Include="art\Node.cpp" />
     <ClCompile Include="art\NodeHandles.cpp" />
     <ClCompile Include="art\NodeLabel.cpp" />
@@ -166,6 +168,7 @@
     <ClCompile Include="tutor\Tutor.cpp" />
     <ClCompile Include="tutor\TutorSession.cpp" />
     <ClCompile Include="widget\ApplicableRulesDock.cpp" />
+    <ClCompile Include="widget\CanvasActionBar.cpp" />
     <ClCompile Include="widget\CommutativeEquationsDock.cpp" />
     <ClCompile Include="widget\EnglishDock.cpp" />
     <ClCompile Include="widget\LibraryDock.cpp" />
@@ -181,6 +184,7 @@
     <QtMoc Include="art\Category.h" />
     <QtMoc Include="art\DiagramScene.h" />
     <QtMoc Include="art\Functor.h" />
+    <QtMoc Include="art\Implies.h" />
     <QtMoc Include="art\Node.h" />
     <QtMoc Include="art\NodeHandles.h" />
     <QtMoc Include="art\Object.h" />
@@ -216,6 +220,7 @@
     <QtMoc Include="tutor\SetupTutor.h" />
     <QtMoc Include="tutor\TutorSession.h" />
     <QtMoc Include="widget\ApplicableRulesDock.h" />
+    <QtMoc Include="widget\CanvasActionBar.h" />
     <QtMoc Include="widget\CommutativeEquationsDock.h" />
     <QtMoc Include="widget\EnglishDock.h" />
     <QtMoc Include="widget\LibraryDock.h" />
@@ -224,6 +229,8 @@
     <QtMoc Include="widget\ToggleSwitch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="core\view\ClassicalView.h" />
+    <ClInclude Include="art\GraphicsHelpers.h" />
     <ClInclude Include="art\NodeLabel.h" />
     <ClInclude Include="core\Emoji.h" />
     <ClInclude Include="core\NodeKind.h" />

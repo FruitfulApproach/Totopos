@@ -1,4 +1,4 @@
-#include "DiagramDetective.h"
+﻿#include "DiagramDetective.h"
 #include "art/DiagramScene.h"
 #include "core/AppSettings.h"
 #include "dialog/SettingsDialog.h"
@@ -28,6 +28,18 @@
 #include <QMenu>
 #include <QKeySequence>
 #include <QSignalBlocker>
+#include "widget/SketchView.h"
+#include "widget/CanvasActionBar.h"
+#include "art/Arrow.h"
+#include "core/props/MapsElements.h"
+
+namespace
+{
+    // the ids the pills come back with. A rule's is its name, prefixed, so
+    // one string carries both which kind of pill it was and which rule.
+    const QString kMapElements = QStringLiteral("map-elements");
+    const QString kRulePrefix = QStringLiteral("rule:");
+}
 
 QString Document::title() const
 {
@@ -115,6 +127,8 @@ void DiagramDetective::buildDocks()
         statusBar()->setStyleSheet(QString());
         statusBar()->showMessage(text, 6000);
     });
+    // a pin was turned on or off, or what fits has changed under the pins
+    connect(m_applicable, &ApplicableRulesDock::pinnedChanged, this, &DiagramDetective::refreshCanvasActions);
 
     m_properties->setWindowTitle(Emoji::properties() + "  Properties");
     m_equations->setWindowTitle(Emoji::equations() + "  Equations");
@@ -165,6 +179,16 @@ void DiagramDetective::buildDocks()
     });
 
     connect(m_library, &LibraryDock::opened, this, [this](const QString& path) {
+        // ALREADY OPEN MEANS ALREADY OPEN. A second tab onto one file is two
+        // diagrams that are both it, each with its own history, each able to
+        // save over the other. Bring the one that exists to the front instead.
+        if (Document* already = documentFor(path))
+        {
+            ui->tabs->setCurrentIndex(m_documents.indexOf(already));
+            statusBar()->showMessage(QString("%1 is already open.").arg(SceneFile::baseNameOf(path)), 5000);
+            return;
+        }
+
         Document* document = current();
         // an untouched Untitled tab is the place for it; otherwise a new one
         if (document == nullptr || !document->path.isEmpty()
@@ -314,6 +338,25 @@ void DiagramDetective::buildMenus()
         }
     });
 
+    // HOW THE DIAGRAM IS WRITTEN DOWN - one tick per diagram, not one for the
+    // window. Each tab is read in whichever notation it was left in, and the
+    // tick follows whichever tab is in front (see bindCurrent).
+    view->addSeparator();
+    // the arrow is built rather than typed: a double arrow in a narrow string
+    // literal depends on the compiler's code page, and this does not
+    m_classicalNotation = view->addAction(QStringLiteral("Classical &notation:  givens  ")
+                                          + QChar(0x21D2) + QStringLiteral("  conclusion"));
+    m_classicalNotation->setCheckable(true);
+    m_classicalNotation->setShortcut(QKeySequence("Ctrl+Shift+N"));
+    m_classicalNotation->setStatusTip("Set the diagram out the long way: what is given in one box, what follows "
+                                      "in another, and the rule's name over the arrow between them. The diagram "
+                                      "itself does not change - each notation remembers its own layout.");
+    connect(m_classicalNotation, &QAction::triggered, this, [this](bool on) {
+        if (DiagramScene* scene = currentScene())
+            scene->setNotation(on ? DiagramScene::Notation::Classical : DiagramScene::Notation::Succinct);
+        syncNotationAction();
+    });
+
     // One entry per layout algorithm, built from the list rather than written
     // out, so a new GraphLayoutThread subclass appears here by being added to
     // GraphLayouts::all() and nowhere else.
@@ -388,6 +431,29 @@ Document* DiagramDetective::current() const
     return index >= 0 && index < m_documents.size() ? m_documents.at(index) : nullptr;
 }
 
+Document* DiagramDetective::documentFor(const QString& path) const
+{
+    if (path.isEmpty())
+        return nullptr;
+    // canonicalFilePath resolves the separators, the case and any link, so
+    // that two spellings of one file are recognised as one file. It is empty
+    // for a file that is not there, which is why the plain path is the
+    // fallback rather than the other way round.
+    const QFileInfo wanted(path);
+    const QString canonical = wanted.canonicalFilePath();
+    for (Document* document : m_documents)
+    {
+        if (document == nullptr || document->path.isEmpty())
+            continue;
+        const QFileInfo open(document->path);
+        if (!canonical.isEmpty() && open.canonicalFilePath() == canonical)
+            return document;
+        if (canonical.isEmpty() && open.absoluteFilePath() == wanted.absoluteFilePath())
+            return document;
+    }
+    return nullptr;
+}
+
 DiagramScene* DiagramDetective::currentScene() const
 {
     Document* document = current();
@@ -435,6 +501,35 @@ void DiagramDetective::wire(Document* document)
         if (!isInFront(document))
             return;
         showError(text);
+    });
+
+    // the pills along the foot of the canvas follow the selection, and a
+    // press on one is handed to whatever that pill stands for
+    connect(scene, &QGraphicsScene::selectionChanged, this, [this, document] {
+        if (isInFront(document))
+            refreshCanvasActions();
+    });
+    connect(view, &SketchView::canvasActionTriggered, this, [this](const QString& id) {
+        if (id == kMapElements)
+        {
+            DiagramScene* scene = currentScene();
+            const QList<Node*> picked = scene != nullptr ? scene->selectedNodes() : QList<Node*>();
+            if (picked.size() != 1)
+                return;
+            if (auto* arrow = dynamic_cast<Arrow*>(picked.first()))
+                if (auto* maps = dynamic_cast<MapsElements*>(arrow->prop(MapsElements::Key())))
+                    maps->mapDiagram();
+            return;
+        }
+        if (id.startsWith(kRulePrefix) && m_applicable != nullptr)
+            m_applicable->applyPinned(id.mid(kRulePrefix.size()));
+    });
+
+    // the scene can change notation without being clicked - opening a file
+    // saved in the classical view, or clearing the diagram out from under it
+    connect(scene, &DiagramScene::notationChanged, this, [this, document](bool) {
+        if (isInFront(document))
+            syncNotationAction();
     });
 
     // a piece being carried in: say where it would land
@@ -546,6 +641,63 @@ void DiagramDetective::bindCurrent()
 
     updateTitle();
     syncEditActions();
+    syncNotationAction();
+    refreshCanvasActions();
+}
+
+void DiagramDetective::refreshCanvasActions()
+{
+    Document* document = current();
+    if (document == nullptr || document->view == nullptr)
+        return;
+    CanvasActionBar* bar = document->view->actionBar();
+    if (bar == nullptr)
+        return;
+
+    QList<CanvasActionBar::Action> actions;
+
+    // ---- what the selection is offering
+    //
+    // One arrow, picked out on its own. Not two, and not an arrow among other
+    // things: "map the elements over" is about a particular arrow, and with
+    // several selected there is no answer to WHICH.
+    if (DiagramScene* scene = document->scene)
+    {
+        const QList<Node*> picked = scene->selectedNodes();
+        if (picked.size() == 1)
+            if (auto* arrow = dynamic_cast<Arrow*>(picked.first()))
+                if (auto* maps = dynamic_cast<MapsElements*>(arrow->prop(MapsElements::Key())))
+                    if (maps->domain() != nullptr && maps->codomain() != nullptr)
+                        actions << CanvasActionBar::Action{
+                            kMapElements,
+                            QString("Map elements by %1").arg(arrow->effectiveId()),
+                            QString("Carry the elements drawn in %1 over into %2, along %3.")
+                                .arg(maps->domain()->id(), maps->codomain()->id(), arrow->effectiveId()) };
+    }
+
+    // ---- and what is pinned AND fits
+    if (m_applicable != nullptr)
+        for (const ApplicableRule& rule : m_applicable->pinnedRules())
+            actions << CanvasActionBar::Action{
+                kRulePrefix + rule.name,
+                rule.recognises ? QString("Cite %1").arg(rule.name)
+                                : QString("Apply %1").arg(rule.name),
+                rule.recognises
+                    ? QString("Record that %1 holds here.").arg(rule.name)
+                    : QString("Draw what %1 says there is, at the first place it fits.").arg(rule.name) };
+
+    bar->setActions(actions);
+    document->view->updateGeometry();
+}
+
+void DiagramDetective::syncNotationAction()
+{
+    if (m_classicalNotation == nullptr)
+        return;
+    DiagramScene* scene = currentScene();
+    m_classicalNotation->setEnabled(scene != nullptr);
+    QSignalBlocker quiet(m_classicalNotation);   // setting the tick is not a click
+    m_classicalNotation->setChecked(scene != nullptr && scene->isClassical());
 }
 
 void DiagramDetective::currentTabChanged(int index)

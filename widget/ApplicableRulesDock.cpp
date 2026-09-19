@@ -1,9 +1,10 @@
-#include "widget/ApplicableRulesDock.h"
+﻿#include "widget/ApplicableRulesDock.h"
 
 #include <QTreeWidget>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFontMetrics>
@@ -95,7 +96,63 @@ QWidget* ApplicableRulesDock::rowFor(const ApplicableRule& rule, int index)
 	connect(apply, &QPushButton::clicked, this, [this, index] { applyAt(index); });
 	line->addWidget(apply, 0);
 
+	// PINNED: keep this one where the work is.
+	//
+	// A rule you are using repeatedly should not need a trip to this dock
+	// every time. Pin it and it also appears as a pill along the foot of the
+	// canvas, for as long as it goes on fitting - unpin it, or change the
+	// diagram so it no longer fits, and the pill goes.
+	//
+	// Pinned by NAME, not by place. A rule fits wherever it fits, and which
+	// of those places is the third one in a list is not something anybody
+	// means to remember: the list is rebuilt from scratch every time the
+	// diagram changes, so an index would pin a different place by morning.
+	auto* pin = new QToolButton(row);
+	pin->setCheckable(true);
+	pin->setChecked(m_pinned.contains(rule.name));
+	pin->setText(QString(QChar(0x1F4CC)));   // a pushpin
+	pin->setAutoRaise(true);
+	pin->setToolTip(QString("Keep %1 to hand: pinned, it also sits along the foot of the canvas "
+	                        "whenever it fits the diagram.").arg(rule.name));
+	const QString name = rule.name;
+	connect(pin, &QToolButton::toggled, this, [this, name](bool on) {
+		if (on)
+			m_pinned.insert(name);
+		else
+			m_pinned.remove(name);
+		emit pinnedChanged();
+	});
+	line->addWidget(pin, 0);
+
 	return row;
+}
+
+QList<ApplicableRule> ApplicableRulesDock::pinnedRules() const
+{
+	// The first place each pinned rule fits, and only the first: a pill is
+	// one button, and "apply this rule" with no place named can only sensibly
+	// mean the first place it fits. The dock is where you choose BETWEEN
+	// places, and it is still there for that.
+	QList<ApplicableRule> found;
+	QSet<QString> seen;
+	for (const ApplicableRule& rule : m_rules)
+		if (m_pinned.contains(rule.name) && !seen.contains(rule.name))
+		{
+			seen.insert(rule.name);
+			found << rule;
+		}
+	return found;
+}
+
+void ApplicableRulesDock::applyPinned(const QString& name)
+{
+	for (int i = 0; i < m_rules.size(); ++i)
+		if (m_rules.at(i).name == name)
+		{
+			applyAt(i);
+			return;
+		}
+	emit message(QString("%1 no longer fits this diagram.").arg(name));
 }
 
 void ApplicableRulesDock::onUpdated(const QList<ApplicableRule>& rules)
@@ -106,6 +163,7 @@ void ApplicableRulesDock::onUpdated(const QList<ApplicableRule>& rules)
 	if (rules.isEmpty())
 	{
 		m_state->setText("No rule in the library fits this diagram.");
+		emit pinnedChanged();   // nothing fits, so nothing pinned fits either
 		return;
 	}
 
@@ -145,6 +203,10 @@ void ApplicableRulesDock::onUpdated(const QList<ApplicableRule>& rules)
 	m_state->setText(QString("%1 rule%2 fit%3 here, in %4 place%5.")
 		.arg(names).arg(names == 1 ? "" : "s", names == 1 ? "s" : "")
 		.arg(rules.size()).arg(rules.size() == 1 ? "" : "s"));
+
+	// What fits has just changed, so what is pinned AND fits may have changed
+	// with it - even though nobody touched a pin.
+	emit pinnedChanged();
 }
 
 void ApplicableRulesDock::onSelectionChanged()
