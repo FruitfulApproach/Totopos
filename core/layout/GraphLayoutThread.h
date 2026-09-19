@@ -22,6 +22,14 @@ struct LayoutNode
 	int codomain = -1;
 	QPointF pos;           // where it sits now, in its PARENT's coordinates
 	QRectF box;            // its frame, in its OWN coordinates (boxRect)
+
+	// WHERE THE USER PUT IT, as against where something has just appeared.
+	//
+	// A tidy-up after a rule should not rearrange the diagram somebody has
+	// already arranged: it should find a place for what has just been drawn
+	// in and leave everything else alone. Anything that was already on the
+	// canvas is settled; only what this step made is not.
+	bool settled = true;
 };
 
 struct LayoutGraph

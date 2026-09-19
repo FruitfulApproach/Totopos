@@ -61,6 +61,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\PropertiesDock.cpp;C:
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\SketchView.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\SketchView.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\widget\ToggleSwitch.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\ToggleSwitch.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\rcc\qrc_DiagramDetective.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qrc_DiagramDetective.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_DiagramDetective.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_DiagramDetective.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Arrow.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Arrow.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_ArrowHandle.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_ArrowHandle.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_AtomicElement.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_AtomicElement.obj
@@ -89,6 +90,7 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_CategoryProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_CategoryProp.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_CategoryProps.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_CategoryProps.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Constructions.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Constructions.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_MapsElements.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_MapsElements.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_Prop.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_Prop.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_SketchProp.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_SketchProp.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_RuleSearch.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_RuleSearch.obj
@@ -104,8 +106,6 @@ C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_CommutativeEquationsDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_CommutativeEquationsDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_EnglishDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_EnglishDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_LibraryDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_LibraryDock.obj
+C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_PropertiesDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_PropertiesDock.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_SketchView.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_SketchView.obj
 C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_ToggleSwitch.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_ToggleSwitch.obj
-C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_DiagramDetective.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_DiagramDetective.obj
-C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_MapsElements.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_MapsElements.obj
-C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\qt\moc\moc_PropertiesDock.cpp;C:\Users\Administrator\Desktop\AbalienDiagramChaser\DiagramDetective\x64\Release\moc_PropertiesDock.obj

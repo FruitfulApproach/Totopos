@@ -9,6 +9,7 @@
 #include <QKeyEvent>
 #include <QFrame>
 #include <QLabel>
+#include <QScrollArea>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -122,11 +123,18 @@ void TutorSession::start()
 		bold.setBold(true);
 		title->setFont(bold);
 		layout->addWidget(title);
-		m_text = new QLabel(m_bubble);
+		m_text = new QLabel;
 		m_text->setWordWrap(true);
-		m_text->setMaximumWidth(460);
-		m_text->setVisible(Tutor::isEnabled());   // tutor off: the strip is just title + buttons
-		layout->addWidget(m_text);
+		m_text->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+		m_scroll = new QScrollArea(m_bubble);
+		m_scroll->setWidget(m_text);
+		m_scroll->setWidgetResizable(true);
+		m_scroll->setFrameShape(QFrame::NoFrame);
+		m_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		m_scroll->viewport()->setAutoFillBackground(false);
+		m_scroll->setStyleSheet("QScrollArea { background: transparent; }");
+		m_scroll->setVisible(Tutor::isEnabled());   // tutor off: the strip is just title + buttons
+		layout->addWidget(m_scroll);
 		auto* buttons = new QHBoxLayout();
 		// tips can be switched off from here, and back on from the sketch panel
 		// or Tools > Settings > Tutor
@@ -139,8 +147,8 @@ void TutorSession::start()
 			AppSettings::instance().setValue(AppSettings::TutorEnabled, false);
 			AppSettings::instance().apply();
 			tipsBtn->hide();
-			if (m_text != nullptr)
-				m_text->hide();
+			if (m_scroll != nullptr)
+				m_scroll->hide();
 			if (m_pointer != nullptr)
 				m_pointer->hide();
 			placeBubble();
@@ -163,6 +171,8 @@ void TutorSession::start()
 	m_pointer->hide();
 
 	m_scene->installEventFilter(this);   // clicks become picks, Enter / Esc Done / Cancel
+	if (view != nullptr)
+		view->installEventFilter(this);   // and the view, so a resize re-places the bubble
 	m_timer.start();
 	m_tutor->onBegin(*this);
 	placeBubble();
@@ -174,7 +184,8 @@ void TutorSession::say(const QString& remark, QGraphicsItem* pointAt)
 	if (m_text != nullptr)
 	{
 		m_text->setText(remark);
-		m_text->setVisible(coaching);
+		if (m_scroll != nullptr)
+			m_scroll->setVisible(coaching);
 	}
 	// everything drawn here is a QGraphicsObject, which is what lets a
 	// QPointer watch it; anything else is not followed
@@ -188,10 +199,44 @@ void TutorSession::placeBubble()
 {
 	if (m_bubble.isNull())
 		return;
-	m_bubble->adjustSize();
 	QWidget* view = m_bubble->parentWidget();
-	if (view != nullptr)
-		m_bubble->move((view->width() - m_bubble->width()) / 2, 10);
+	if (view == nullptr)
+		return;
+
+	// IT HAS TO FIT IN THE WINDOW IT IS EXPLAINING.
+	//
+	// The bubble used to be laid out at whatever width its text wanted and
+	// then centred: (width - its width) / 2, which goes NEGATIVE the moment
+	// the view is narrower than the bubble - so the welcome, the longest
+	// remark there is, opened half off the left edge with its first words
+	// cut away. It is now given the room there actually is, and never asked
+	// to sit at a negative coordinate.
+	const int margin = 12;
+	const int roomW = qMax(160, view->width() - 2 * margin);
+	const int roomH = qMax(120, view->height() - 2 * margin);
+
+	// Measured from scratch every time: a clamp left over from when the window
+	// was small would keep the remark short after it had been made big again.
+	if (m_scroll != nullptr)
+		m_scroll->setMaximumHeight(QWIDGETSIZE_MAX);
+	m_bubble->setMaximumWidth(qMin(490, roomW));
+	m_bubble->adjustSize();
+	if (m_bubble->layout() != nullptr)
+		m_bubble->layout()->activate();   // so the heights below are real
+
+	// Too tall for the window: the REMARK gives up the difference and scrolls,
+	// because the buttons under it are how the step is answered and they have
+	// to stay on screen. (Qt reports a scroll area's wanted height through the
+	// bubble, so the slack is taken from what the bubble is over by.)
+	if (m_bubble->height() > roomH && m_scroll != nullptr && m_scroll->isVisible())
+	{
+		const int over = m_bubble->height() - roomH;
+		m_scroll->setMaximumHeight(qMax(48, m_scroll->height() - over));
+		m_bubble->adjustSize();
+	}
+
+	m_bubble->move(qMax(margin, (view->width() - m_bubble->width()) / 2),
+	               qMax(margin, qMin(10, roomH - m_bubble->height() + margin)));
 }
 
 void TutorSession::tick()
@@ -231,6 +276,16 @@ void TutorSession::addBadge(Node* node)
 
 bool TutorSession::eventFilter(QObject* watched, QEvent* event)
 {
+	// The view resizing - including the one it does as the window is first
+	// laid out, which is why the welcome was measured against a width it no
+	// longer had - moves the bubble back into the middle of it.
+	if (!m_bubble.isNull() && watched == m_bubble->parentWidget())
+	{
+		if (event->type() == QEvent::Resize || event->type() == QEvent::Show)
+			placeBubble();
+		return QObject::eventFilter(watched, event);
+	}
+
 	if (watched != m_scene || m_finished)
 		return QObject::eventFilter(watched, event);
 
@@ -338,6 +393,8 @@ void TutorSession::finish()
 		return;
 	m_finished = true;
 	m_timer.stop();
+	if (!m_bubble.isNull() && m_bubble->parentWidget() != nullptr)
+		m_bubble->parentWidget()->removeEventFilter(this);   // the view, watched for resizes
 	if (m_scene != nullptr)
 	{
 		m_scene->removeEventFilter(this);

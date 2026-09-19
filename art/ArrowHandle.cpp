@@ -2,6 +2,7 @@
 #include "art/Node.h"
 
 #include <QPainter>
+#include <QGraphicsScene>
 #include <QCursor>
 
 namespace
@@ -23,6 +24,12 @@ ArrowHandle::ArrowHandle(QGraphicsItem* parent)
 	setAcceptHoverEvents(false);
 	setCursor(QCursor(Qt::PointingHandCursor));
 	hide();
+}
+
+ArrowHandle::~ArrowHandle()
+{
+	if (QGraphicsScene* board = scene())
+		board->removeItem(this);
 }
 
 void ArrowHandle::showFor(Node* from, const QList<Button>& buttons, const QPointF& scenePos)

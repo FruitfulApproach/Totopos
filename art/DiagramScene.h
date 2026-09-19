@@ -213,9 +213,11 @@ public:
 	// step of the history - so a tidy-up can be undone like anything else.
 	// Nothing is blocked while it runs; an answer about a diagram that has
 	// changed underneath is dropped.
-	void layOut(const QString& kindId);
+	// `fresh` is what has JUST been drawn in - the rest of the diagram is
+	// taken as arranged, and is left where it is when it is already tidy.
+	void layOut(const QString& kindId, const QList<Node*>& fresh = QList<Node*>());
 	// tidy up once a rule has finished drawing itself in
-	void layOutAfterRule();
+	void layOutAfterRule(const QList<Node*>& made);
 
 	// A rule from the library laid over the diagram. Every place its premise
 	// is found - as a subdiagram, the rule's variables standing for whatever

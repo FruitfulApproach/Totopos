@@ -65,6 +65,20 @@ void GridLayoutThread::fanArrowsOf(const LayoutGraph& graph, int parent, const L
 		QList<int> group = it.value();
 		if (group.size() < 2)
 			continue;   // alone between its two ends: its shape is its own
+
+		// And an arrangement that was left alone keeps its arrows as they
+		// were drawn: bowing them apart is part of placing things, not
+		// something to be done again to a diagram nobody has moved. It runs
+		// when one of these arrows is new, or when the objects under them
+		// have just been placed.
+		bool worthDoing = false;
+		for (int a : group)
+			if (!graph.nodes.at(a).settled)
+				worthDoing = true;
+		if (!worthDoing)
+			worthDoing = places.contains(it.key().first) || places.contains(it.key().second);
+		if (!worthDoing)
+			continue;
 		std::sort(group.begin(), group.end());   // the same fan every time
 
 		const QPointF from = centreOf(graph, places, it.key().first);
@@ -92,12 +106,98 @@ void GridLayoutThread::fanArrowsOf(const LayoutGraph& graph, int parent, const L
 	}
 }
 
+namespace
+{
+	// Is that coordinate on the grid, give or take the rounding a position
+	// picks up from being mapped about? A grid that is switched off cannot
+	// answer, and says yes.
+	bool sitsOnGrid(const QPointF& at, qreal unit)
+	{
+		if (unit <= 0)
+			return true;
+		const qreal dx = qAbs(at.x() - qRound(at.x() / unit) * unit);
+		const qreal dy = qAbs(at.y() - qRound(at.y() / unit) * unit);
+		return dx < 0.5 && dy < 0.5;
+	}
+
+	// where a node's frame sits among its siblings
+	QRectF frameOf(const LayoutGraph& graph, int index)
+	{
+		const LayoutNode& node = graph.nodes.at(index);
+		return node.box.translated(node.pos);
+	}
+}
+
 void GridLayoutThread::placeChildrenOf(const LayoutGraph& graph, int parent,
                                        LayoutPlaces& places) const
 {
 	const QList<int> kids = objectsIn(graph, parent);
 	if (kids.size() < 2)
 		return;   // one thing is already wherever it should be
+
+	// AN ARRANGEMENT THAT IS ALREADY AN ARRANGEMENT IS LEFT ALONE.
+	//
+	// A tidy-up after a rule is not a request to redraw the diagram. If what
+	// was already here sits on the grid and nothing overlaps anything, then
+	// it is arranged - whatever shape the person gave it, a triangle, a
+	// square, a row - and the grid has no business flattening that into its
+	// own idea of the same diagram. Only what has just been drawn in needs a
+	// place, and it is given one beside where it already is.
+	//
+	// The full grid still runs when the tidy-up is asked for by hand (nothing
+	// is settled then), and when what is here is genuinely untidy: off the
+	// grid, or sitting on top of itself.
+	QList<int> unsettled;
+	bool tidy = true;
+	for (int k : kids)
+	{
+		if (!graph.nodes.at(k).settled)
+		{
+			unsettled << k;
+			continue;
+		}
+		if (!sitsOnGrid(graph.nodes.at(k).pos, graph.gridUnit))
+			tidy = false;
+	}
+	for (int i = 0; tidy && i < kids.size(); ++i)
+		for (int j = i + 1; tidy && j < kids.size(); ++j)
+			if (graph.nodes.at(kids.at(i)).settled && graph.nodes.at(kids.at(j)).settled
+			 && frameOf(graph, kids.at(i)).intersects(frameOf(graph, kids.at(j))))
+				tidy = false;
+
+	if (tidy && unsettled.size() < kids.size())
+	{
+		// Nothing new here at all - a rule that only drew an arrow, and an
+		// arrow needs no place: it follows its ends.
+		if (unsettled.isEmpty())
+			return;
+
+		// Something new, and everything else where the person put it: the
+		// newcomer is snapped to the grid and then moved down out of whatever
+		// it landed on, and nothing else stirs.
+		for (int k : unsettled)
+		{
+			const LayoutNode& node = graph.nodes.at(k);
+			QPointF at(onGrid(node.pos.x(), graph.gridUnit), onGrid(node.pos.y(), graph.gridUnit));
+			const qreal step = onGrid(node.box.height() + kGapY, graph.gridUnit);
+			for (int guard = 0; guard < 40; ++guard)
+			{
+				const QRectF want = node.box.translated(at);
+				bool clear = true;
+				for (int other : kids)
+					if (other != k && want.intersects(frameOf(graph, other)))
+					{
+						clear = false;
+						break;
+					}
+				if (clear)
+					break;
+				at.setY(at.y() + qMax(step, qreal(1.0)));
+			}
+			places.insert(k, at);
+		}
+		return;
+	}
 
 	const QList<int> arrows = arrowsAmong(graph, parent, kids);
 

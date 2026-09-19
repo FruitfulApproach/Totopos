@@ -96,6 +96,23 @@ Node::~Node()
 	// work. Deleting the label first would leave id() empty.
 	emit deleted(this);
 
+	// OUT OF THE SCENE WHILE WE ARE STILL SOMETHING THE SCENE CAN ASK.
+	//
+	// A QGraphicsItem stays in the scene's index until ~QGraphicsItem runs,
+	// which is LAST - but the object stops being a Node here, and stops
+	// being a QGraphicsObject after that. In that window boundingRect() is
+	// the pure virtual one, and anything that paints or measures in it -
+	// a repaint posted a moment ago, a listener of deleted() that touches
+	// the canvas - calls it and the runtime aborts the program outright
+	// ("Fatal program exit requested", inside effectiveBoundingRect).
+	//
+	// Taking ourselves out here closes that window: from this line on the
+	// scene neither draws us nor asks us anything, and the rest of the
+	// destruction happens where nothing can see it. It takes our children
+	// out with us, which is right - they are going too.
+	if (QGraphicsScene* board = scene())
+		board->removeItem(this);
+
 	if (m_idText != nullptr)
 	{
 		// Before it is destroyed, and before anything else: a label with the
@@ -405,6 +422,7 @@ void Node::setLabelOffset(const QPointF& offset)
 {
 	if (m_labelOffset == offset)
 		return;
+	const QPointF was = m_labelOffset;
 	prepareGeometryChange();
 	ancestorsPrepareGeometryChange();
 	m_labelOffset = offset;
@@ -412,6 +430,7 @@ void Node::setLabelOffset(const QPointF& offset)
 	rememberLabelBox();   // this is where it belongs against the frame as it stands
 	update();
 	ancestorsUpdate();
+	emit labelOffsetChanged(this, m_labelOffset - was);
 }
 
 void Node::labelMoved(const QPointF& pos)
@@ -429,7 +448,7 @@ void Node::labelMoved(const QPointF& pos)
 	update();
 	ancestorsUpdate();
 	if (m_labelOffset != was)
-		emit labelDragged(this, m_labelOffset - was);
+		emit labelOffsetChanged(this, m_labelOffset - was);
 }
 
 void Node::labelDragFinished(const QPointF& fromPos)

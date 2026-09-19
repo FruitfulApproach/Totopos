@@ -454,7 +454,19 @@ void DiagramDetective::wire(Document* document)
     };
     if (scene->history() != nullptr)
         connect(scene->history(), &SceneHistory::changed, view, settleCategory);
+    // Every way a node can arrive or leave, not only the ones that make a step
+    // of the history: a functor's image, a rule drawing with history
+    // suspended, and the swap itself all change whether this is settled.
+    connect(scene, &DiagramScene::nodesAdded, view, [settleCategory](const QList<Node*>&) { settleCategory(); });
     connect(scene, &DiagramScene::nodesRemoved, view, [settleCategory](const QList<Node*>&) { settleCategory(); });
+    // and the dropdown follows the scene rather than the other way round: a
+    // switch the scene REFUSES (the category is settled) answers with the
+    // category it still is, and the combo goes back to showing that
+    connect(scene, &DiagramScene::ambientCategoryChanged, view, [view, settleCategory](Category* ambient) {
+        if (ambient != nullptr)
+            view->setCategory(ambient->id());
+        settleCategory();
+    });
     settleCategory();
 
     // the panel's Category dropdown drives the scene's ambient category

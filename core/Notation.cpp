@@ -361,22 +361,52 @@ QString Notation::autoCorrect(const QString& text)
 			}
 		}
 
-		bool found = false;
-		for (const Command& command : kCommands)
+		// THE LONGEST RUN OF LETTERS IS WHERE THE NAME ENDS, NOT WHAT IT IS.
+		//
+		// Taking every letter after the backslash is what keeps \subseteq from
+		// being read as \subset - but a composite is written g\circf, and
+		// there the run is "circf", which is not a command at all. So the run
+		// is tried whole first, then a letter shorter, and so on: the LONGEST
+		// prefix that is a command wins, and whatever letters are left over go
+		// on as the text they are. \subseteq still beats \subset, because the
+		// whole run is tried before any prefix of it.
+		int matched = 0;   // how many letters the command took
+		ushort code = 0;
+		for (int take = name.size(); take > 0 && matched == 0; --take)
 		{
-			if (name == QLatin1String(command.name))
+			const QString candidate = name.left(take);
+			for (const Command& command : kCommands)
 			{
-				out += QChar(command.code);
-				found = true;
-				break;
+				if (candidate == QLatin1String(command.name))
+				{
+					code = command.code;
+					matched = take;
+					break;
+				}
 			}
 		}
-		if (!found)
+
+		if (matched > 0)
 		{
-			// not one of ours: leave it exactly as typed. Someone may simply
-			// have a backslash in a name.
-			out += text.mid(at, end - at);
+			out += QChar(code);
+			at = at + 1 + matched;
+			// A SPACE THAT ONLY ENDED THE NAME IS NOT A SPACE IN THE NAME.
+			//
+			// g\circ f and g\circf are the same thing written two ways: in the
+			// first the space is there to say where \circ stops, which is how
+			// it is written everywhere else, and keeping it left g∘ f with a
+			// gap the label never asked for. One space goes; a second is a
+			// space someone meant.
+			if (at < text.size() && text.at(at) == QLatin1Char(' '))
+				++at;
+			// and the letters the command did not take are text: f in g\circf
+			out += name.mid(matched);
+			continue;
 		}
+
+		// not one of ours: leave it exactly as typed. Someone may simply
+		// have a backslash in a name.
+		out += text.mid(at, end - at);
 		at = end;
 	}
 	return normalise(out);

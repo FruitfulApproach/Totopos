@@ -48,7 +48,7 @@ template <> constexpr inline auto Node::qt_create_metaobjectdata<qt_meta_tag_ZN4
         "moved",
         "QPointF",
         "delta",
-        "labelDragged",
+        "labelOffsetChanged",
         "styleChanged"
     };
 
@@ -65,7 +65,7 @@ template <> constexpr inline auto Node::qt_create_metaobjectdata<qt_meta_tag_ZN4
         QtMocHelpers::SignalData<void(Node *, const QPointF &)>(7, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 3, 4 }, { 0x80000000 | 8, 9 },
         }}),
-        // Signal 'labelDragged'
+        // Signal 'labelOffsetChanged'
         QtMocHelpers::SignalData<void(Node *, const QPointF &)>(10, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 3, 4 }, { 0x80000000 | 8, 9 },
         }}),
@@ -99,7 +99,7 @@ void Node::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void *
         case 0: _t->idChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
         case 1: _t->deleted((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
         case 2: _t->moved((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
-        case 3: _t->labelDragged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
+        case 3: _t->labelOffsetChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPointF>>(_a[2]))); break;
         case 4: _t->styleChanged((*reinterpret_cast<std::add_pointer_t<Node*>>(_a[1]))); break;
         default: ;
         }
@@ -151,7 +151,7 @@ void Node::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void *
             return;
         if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * , const QPointF & )>(_a, &Node::moved, 2))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * , const QPointF & )>(_a, &Node::labelDragged, 3))
+        if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * , const QPointF & )>(_a, &Node::labelOffsetChanged, 3))
             return;
         if (QtMocHelpers::indexOfMethod<void (Node::*)(Node * )>(_a, &Node::styleChanged, 4))
             return;
@@ -208,7 +208,7 @@ void Node::moved(Node * _t1, const QPointF & _t2)
 }
 
 // SIGNAL 3
-void Node::labelDragged(Node * _t1, const QPointF & _t2)
+void Node::labelOffsetChanged(Node * _t1, const QPointF & _t2)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 3, nullptr, _t1, _t2);
 }

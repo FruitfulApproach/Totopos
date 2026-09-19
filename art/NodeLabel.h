@@ -14,6 +14,8 @@ class NodeLabel : public QGraphicsTextItem
 {
 public:
 	NodeLabel(const QString& text, Node* node);
+	// out of the scene before the vtable decays - see Node::~Node
+	~NodeLabel() override;
 
 	// A label holds TWO strings. m_source is what was typed - v_{x}, F^{op} -
 	// and it is the node's id: what gets saved, matched and edited. What the

@@ -580,9 +580,13 @@ void Arrow::setLabelOffset(const QPointF& offset)
 {
 	if (m_labelOffset == offset)
 		return;
+	const QPointF was = m_labelOffset;
 	m_labelOffset = offset;
 	rememberLabelPlacement();
 	refreshGeometry();
+	// said out loud, so a mapping downstream of this one carries it on (see
+	// Node::labelOffsetChanged)
+	emit labelOffsetChanged(this, m_labelOffset - was);
 }
 
 void Arrow::labelMoved(const QPointF& pos)
@@ -597,7 +601,7 @@ void Arrow::labelMoved(const QPointF& pos)
 	update();
 	ancestorsUpdate();
 	if (m_labelOffset != was)
-		emit labelDragged(this, m_labelOffset - was);
+		emit labelOffsetChanged(this, m_labelOffset - was);
 }
 
 void Arrow::labelDragFinished(const QPointF& fromPos)

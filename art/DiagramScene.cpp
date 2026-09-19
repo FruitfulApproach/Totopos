@@ -99,12 +99,55 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	if (m_ambientCategory != nullptr && m_ambientCategory->id() == name)
 		return;
 
-	// Whatever is pointing into the old canvas - a tutor's arrow, the handle
-	// bar, a half-drawn arrow - has to let go before it is taken away.
+	// SETTLED ONCE ANYTHING IS DRAWN IN IT - SAID HERE, NOT ONLY IN THE COMBOS.
+	//
+	// Everything on the canvas is an object or an arrow OF this category and
+	// would mean something else in another, which is why both dropdowns wear
+	// a padlock the moment something is drawn (SketchView::setCategoryLocked,
+	// PropertiesDock::refreshCategoryBox). Those are two widgets that have to
+	// be told; this is the rule. A disabled combo is a courtesy, not a
+	// guarantee - it is refreshed from signals that do not fire for every way
+	// a node can appear - and the swap it guards is the most destructive
+	// thing in the program: it reparents every node in the diagram and then
+	// destroys the canvas they were drawn on.
+	if (m_ambientCategory != nullptr && m_ambientCategory->holdsAnything())
+	{
+		emit message(QString("%1 already holds something, so what it is has settled: what is drawn "
+		                     "in it would mean something else in %2. Start a new diagram to draw in %2.")
+			.arg(m_ambientCategory->id(), name));
+		emit ambientCategoryChanged(m_ambientCategory);   // put the dropdowns back
+		return;
+	}
+
+	// EVERYTHING POINTING INTO THE OLD CANVAS LETS GO FIRST.
+	//
+	// What follows reparents every node and then takes the old canvas out of
+	// the scene and destroys it. Anything still holding one of those nodes -
+	// or drawing a decoration over it - is holding it while the ground moves,
+	// and the scene walks the result on its next repaint. That is how this
+	// came to abort inside effectiveBoundingRect: a pure virtual call is the
+	// scene painting an item that is no longer a whole object.
 	if (!m_session.isNull())
 		m_session->cancel();
+	if (isMoving())
+		cancelMove();
 	hideHandles();
+	hideArrowHandle();   // and its dwell/expiry timers, which hold a node
 	hideArrowPreview();
+
+	// The rule overlay keeps RAW pointers into the diagram (RuleMatch holds
+	// QHash<Node*, Node*>), and the matches it found are about a diagram in
+	// the category that is going away. They are not translated to the new
+	// one - they are dropped.
+	clearRuleOverlay();
+	m_matches.clear();
+
+	// And nothing stays selected across the swap. A selection is a set of
+	// pointers the scene holds on its own account, and every one of them is
+	// about to be reparented out from under it; the properties panel reads
+	// that set on every change, so it must not be left naming the old canvas
+	// either.
+	clearSelection();
 
 	// a built-in is its own subclass (it knows what it is made of); anything
 	// else is a plain category the user defined
@@ -130,6 +173,10 @@ void DiagramScene::setAmbientCategory(const QString& name)
 				continue;   // the category's own label
 			fresh->adopt(node, child->scenePos());
 		}
+		// Out of the scene BEFORE anything else can look at it again: from
+		// here it is no longer drawn, hit-tested or indexed, so the turn of
+		// the event loop it spends waiting to be destroyed is spent outside
+		// the scene entirely.
 		removeItem(m_ambientCategory);
 		// deleteLater, not delete: this runs from a combo box's signal, and
 		// destroying a QObject inside the signal that asked for it is asking
@@ -1721,12 +1768,24 @@ void DiagramScene::setDefines(const QString& term)
 	emit statementChanged(statementText());
 }
 
-void DiagramScene::layOutAfterRule()
+void DiagramScene::layOutAfterRule(const QList<Node*>& made)
 {
+	// Guarded pointers: between here and the queued call the rule still has
+	// its deletions to do, and one of these may be carried off by them.
+	QList<QPointer<Node>> drawn;
+	drawn.reserve(made.size());
+	for (Node* node : made)
+		drawn << QPointer<Node>(node);
+
 	// Queued: a rule draws its conclusion in and then takes its deletions out,
 	// and the tidy-up wants the diagram as it ends up, not half way through.
-	QMetaObject::invokeMethod(this, [this] { layOut(QStringLiteral("grid")); },
-	                          Qt::QueuedConnection);
+	QMetaObject::invokeMethod(this, [this, drawn] {
+		QList<Node*> fresh;
+		for (const QPointer<Node>& node : drawn)
+			if (!node.isNull())
+				fresh << node.data();
+		layOut(QStringLiteral("grid"), fresh);
+	}, Qt::QueuedConnection);
 }
 
 void DiagramScene::recordRuleApplication(const QString& description, const QList<Node*>& made,
@@ -1742,7 +1801,10 @@ void DiagramScene::recordRuleApplication(const QString& description, const QList
 	if (!made.isEmpty())
 		emit nodesAdded(made);
 	emit statementChanged(statementText());
-	layOutAfterRule();   // a rule draws where the rule was drawn; tidy it into place
+	// a rule draws where the RULE was drawn, not where this diagram wants it:
+	// what it made is tidied into place, and what was here already is not
+	// rearranged around it
+	layOutAfterRule(made);
 }
 
 QList<DiagramScene::ProofStep> DiagramScene::proofSteps() const
@@ -1871,7 +1933,7 @@ QList<DiagramScene::Component> DiagramScene::components() const
 	return found;
 }
 
-void DiagramScene::layOut(const QString& kindId)
+void DiagramScene::layOut(const QString& kindId, const QList<Node*>& fresh)
 {
 	if (m_ambientCategory == nullptr)
 		return;
@@ -1899,11 +1961,16 @@ void DiagramScene::layOut(const QString& kindId)
 				walk << node;
 			}
 
+	const QSet<Node*> justDrawn(fresh.constBegin(), fresh.constEnd());
+
 	graph.nodes.reserve(walk.size());
 	for (int i = 0; i < walk.size(); ++i)
 	{
 		Node* node = walk.at(i);
 		LayoutNode record;
+		// asked for by hand (the Layout menu) means nothing is settled: tidy
+		// the lot. After a rule, only what the rule drew is unsettled.
+		record.settled = !fresh.isEmpty() && !justDrawn.contains(node);
 		record.parent = i == 0 ? -1 : indexOf.value(dynamic_cast<Node*>(node->parentItem()), -1);
 		record.pos = node->pos();
 		record.box = node->boxRect();

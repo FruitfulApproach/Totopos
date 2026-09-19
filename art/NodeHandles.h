@@ -24,6 +24,7 @@ public:
 	enum Button { Chase };
 
 	explicit NodeHandles(QGraphicsItem* parent = nullptr);
+	~NodeHandles() override;   // out of the scene first - see Node::~Node
 
 	void attach(Node* node, const QPointF& itemPos);
 	void detach();

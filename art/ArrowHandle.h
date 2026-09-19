@@ -34,6 +34,7 @@ public:
 	};
 
 	explicit ArrowHandle(QGraphicsItem* parent = nullptr);
+	~ArrowHandle() override;   // out of the scene first - see Node::~Node
 
 	// Put the row at `scenePos`, offering these, on behalf of `from`.
 	// A row that staysPut() is placed once and then left alone, however

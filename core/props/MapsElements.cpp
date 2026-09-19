@@ -521,8 +521,8 @@ void MapsElements::sync()
 		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
 		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
 		connect(img, &Node::moved, this, &MapsElements::onImageMoved, Qt::UniqueConnection);
-		connect(source, &Node::labelDragged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
-		connect(img, &Node::labelDragged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
+		connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+		connect(img, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
 	}
 
 	// the arrows, between the images of their ends
@@ -570,8 +570,8 @@ void MapsElements::sync()
 			if (imageArrow->codomain() != to)
 				imageArrow->setCodomain(to);
 			connect(imageArrow, &Arrow::bendsChanged, this, &MapsElements::onImageBends, Qt::UniqueConnection);
-			connect(source, &Node::labelDragged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
-			connect(imageArrow, &Node::labelDragged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
+			connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+			connect(imageArrow, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
 			if (imageArrow->bends() != source->bends())
 				imageArrow->setBends(source->bends());
 		}

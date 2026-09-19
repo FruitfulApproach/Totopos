@@ -4,6 +4,7 @@
 #include "core/Emoji.h"
 
 #include <QPainter>
+#include <QGraphicsScene>
 #include <QCursor>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneHoverEvent>
@@ -24,6 +25,12 @@ NodeHandles::NodeHandles(QGraphicsItem* parent)
 	setAcceptHoverEvents(true);
 	setCursor(QCursor(Qt::PointingHandCursor));
 	hide();
+}
+
+NodeHandles::~NodeHandles()
+{
+	if (QGraphicsScene* board = scene())
+		board->removeItem(this);
 }
 
 void NodeHandles::attach(Node* node, const QPointF& itemPos)

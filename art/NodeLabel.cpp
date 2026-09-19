@@ -33,6 +33,15 @@ NodeLabel::NodeLabel(const QString& text, Node* node)
 	setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
+NodeLabel::~NodeLabel()
+{
+	// The same window Node::~Node closes: a text item in a scene is painted
+	// until ~QGraphicsItem removes it, and by then it is no longer a
+	// QGraphicsTextItem. Out first, unmade afterwards.
+	if (QGraphicsScene* board = scene())
+		board->removeItem(this);
+}
+
 QVariant NodeLabel::itemChange(GraphicsItemChange change, const QVariant& value)
 {
 	// ONLY while the user is dragging it. Every other move of this label is

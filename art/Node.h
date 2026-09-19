@@ -276,11 +276,17 @@ signals:
 	void idChanged(Node* thisNode, const QString& id);
 	void deleted(Node* thisNode);
 	void moved(Node* thisNode, const QPointF& delta);
-	// the label was dragged clear of where it would otherwise sit, BY THIS
-	// MUCH. Only a drag: a label placed by the node itself, or by a mapping
-	// keeping two sides in step, says nothing - that is what stops two
-	// mirrored labels from answering each other for ever.
-	void labelDragged(Node* thisNode, const QPointF& delta);
+	// The label has been moved clear of where it would otherwise sit, BY THIS
+	// MUCH - dragged by hand, or written by a mapping keeping two sides in
+	// step. Both, for the same reason `moved` is emitted for both: a chain of
+	// functors C -> D -> E carries a change along by each mapping hearing
+	// what the one before it did. A mapping holds m_syncing while it writes,
+	// so its OWN answer never comes back round, but the next mapping along is
+	// a different one and hears it.
+	//
+	// Not emitted when the node merely re-places its own label (a reframe, an
+	// arrow redrawn): that is the same placement worked out again, not a move.
+	void labelOffsetChanged(Node* thisNode, const QPointF& delta);
 	void styleChanged(Node* thisNode);
 
 protected:

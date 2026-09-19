@@ -12,6 +12,7 @@ class Node;
 class QGraphicsItem;
 class QFrame;
 class QLabel;
+class QScrollArea;
 class TutorPointer;
 
 // One run of a Tutor: the remark bubble over the view (with Done / Cancel),
@@ -66,6 +67,10 @@ private:
 	QList<QGraphicsItem*> m_badges;
 	QPointer<QFrame> m_bubble;
 	QLabel* m_text = nullptr;
+	// The remark scrolls when there is more of it than there is window. The
+	// buttons are below it, and a bubble that grew past the bottom of the
+	// view took Cancel and Done with it.
+	QScrollArea* m_scroll = nullptr;
 	QTimer m_timer;
 	qreal m_phase = 0;
 	bool m_finished = false;
