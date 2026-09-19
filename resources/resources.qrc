@@ -1,0 +1,11 @@
+<RCC>
+    <!-- Everything the program carries inside itself, filed by what it is.
+         The paths here are the paths on disk, read from this file's own
+         folder, so ":/img/TotoposLogo.png" is resources/img/TotoposLogo.png
+         and there is nothing to keep in step but the folder name. -->
+    <qresource prefix="/img">
+        <file alias="TotoposLogo.png">img/TotoposLogo.png</file>
+        <file alias="TotoposWindowIcon.png">img/TotoposWindowIcon.png</file>
+        <file alias="TotoposTaskbarIcon.png">img/TotoposTaskbarIcon.png</file>
+    </qresource>
+</RCC>

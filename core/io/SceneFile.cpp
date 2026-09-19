@@ -9,6 +9,7 @@
 #include "art/Arrow.h"
 #include "art/Functor.h"
 #include "art/AtomicElement.h"
+#include "art/RModule.h"
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
 #include "core/props/MapsElements.h"
@@ -16,7 +17,7 @@
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
-	const quint16 kVersion = 19;   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+	const quint16 kVersion = 20;   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
 
 	// THE TWO MEANINGS OF VERSION 15.
 	//
@@ -40,6 +41,10 @@ namespace
 		if (dynamic_cast<Functor*>(node) != nullptr)       return QStringLiteral("Functor");
 		if (dynamic_cast<Arrow*>(node) != nullptr)         return QStringLiteral("Arrow");
 		if (dynamic_cast<AtomicElement*>(node) != nullptr) return QStringLiteral("Element");
+		// before Object, which it is one of. An older build reading this file
+		// does not know the word and makes a plain object of it, which is what
+		// it was before modules were a kind of their own.
+		if (dynamic_cast<RModule*>(node) != nullptr)       return QStringLiteral("Module");
 		if (dynamic_cast<Category*>(node) != nullptr)      return QStringLiteral("Category");
 		return QStringLiteral("Object");
 	}
@@ -104,6 +109,11 @@ namespace
 			out << category->builtInName() << category->isSubcategory();
 			// and what the diagram drawn in it is put forward as
 			out << category->commutes() << qint32(category->statementKind()) << category->statementName();
+		}
+		else if (auto* module = dynamic_cast<RModule*>(node))
+		{
+			// version 20: which ring it is a module over. R unless said otherwise.
+			out << module->ring();
 		}
 		else if (auto* arrow = dynamic_cast<Arrow*>(node))
 		{
@@ -348,6 +358,17 @@ namespace
 		else if (kind == "Element")
 		{
 			node = new AtomicElement(id, parent);
+		}
+		else if (kind == "Module")
+		{
+			auto* module = new RModule(id, parent);
+			if (version >= 20)
+			{
+				QString ring;
+				in >> ring;
+				module->setRing(ring);
+			}
+			node = module;
 		}
 		else
 		{

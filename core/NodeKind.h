@@ -21,6 +21,7 @@ namespace NodeKind
 	// A built-in category is "category:R-Mod"; the bare "category" is one the
 	// user defined, carrying whatever structure was ticked for it.
 	QString object();         // "object"      - an object of the category it is in
+	QString module();         // "module"      - an R-module, which has a zero and scales
 	QString element();        // "element"     - an element of the node it is in
 	QString subcategory();    // "subcategory" - a subcategory of the category it is in
 	QString category();       // "category"    - a category of its own

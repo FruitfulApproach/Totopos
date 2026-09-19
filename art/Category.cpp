@@ -509,9 +509,61 @@ Arrow* Category::createCanvasArrow(Node* from, Node* to)
 	return createArrow(nextArrowName(), from, to);
 }
 
+QRectF Category::emptyFrame()
+{
+	// A sheet, centred on the category's own origin: room for a square of
+	// four objects and the arrows between them, which is the diagram most
+	// people draw first. Nothing depends on the exact numbers - the frame is
+	// the union of what is held the moment anything is held.
+	return QRectF(-260, -180, 520, 360);
+}
+
+QRectF Category::boxRect() const
+{
+	const QRectF held = contentFrame().adjusted(-9, -9, 9, 9);
+	if (containedCount() != 0)
+		return held;
+
+	// Empty: the room, taken down a step for each category this one sits
+	// inside - a subcategory drawn in a category should not be bigger than
+	// somewhere to put two or three things, and at full size it would push
+	// the category holding it out to fit. The name is unioned in as well, in
+	// case it has been dragged clear of the room.
+	const qreal scale = depthScale();
+	QRectF room = emptyFrame();
+	room.setWidth(room.width() * scale);
+	room.setHeight(room.height() * scale);
+	room.moveCenter(emptyFrame().center());
+	return room | held;
+}
+
+void Category::becameAmbient()
+{
+	// At the origin, which is where the canvas begins: not above a frame,
+	// because there is no frame drawn for it to be above.
+	setLabelOffset(QPointF());
+	refreshLabelWeight(containedCount());
+	refreshDepthAppearance();   // no fill and no border, now that it is the canvas
+	refreshFrame();
+}
+
 void Category::applyDepthAppearance(int depth)
 {
 	Node::applyDepthAppearance(depth);
+	if (isAmbient())
+	{
+		// THE CANVAS IS NOT A THING DRAWN ON THE CANVAS.
+		//
+		// Everything here is drawn IN the ambient category, so a box round it
+		// would be a box round the whole picture - a border on the paper,
+		// saying nothing, and a wash of colour behind every object that made
+		// the objects' own fills harder to tell apart. Its name in bold at
+		// the origin says which world this is, and that is the whole of what
+		// needs saying.
+		setFill(QBrush(Qt::NoBrush));
+		setBorder(QPen(Qt::NoPen));
+		return;
+	}
 	if (m_subcategory)
 	{
 		// A subcategory is a PART of the category it is drawn in, not a thing

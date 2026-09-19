@@ -20,3 +20,29 @@ Category* Category::createBuiltIn(const QString& name, QGraphicsItem* parent)
 	if (name == "Vect") return new Vect(parent);
 	return nullptr;   // not built in: the caller makes a plain Category
 }
+
+namespace
+{
+	// The letters of a name, in order, with everything a person varies freely
+	// taken out: case, spaces, hyphens, underscores and full stops. R-Mod,
+	// R-mod, RMod and "R Mod" all come out "rmod".
+	QString bones(const QString& name)
+	{
+		QString out;
+		for (QChar c : name)
+			if (c.isLetterOrNumber())
+				out += c.toLower();
+		return out;
+	}
+}
+
+QString Category::builtInNamed(const QString& label)
+{
+	const QString want = bones(label);
+	if (want.isEmpty())
+		return QString();
+	for (const QString& name : builtInNames())
+		if (bones(name) == want)
+			return name;
+	return QString();
+}

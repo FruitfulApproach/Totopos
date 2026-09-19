@@ -1,4 +1,4 @@
-﻿#include "art/DiagramScene.h"
+#include "art/DiagramScene.h"
 #include "core/categories/BuiltInCategories.h"
 #include "tutor/TutorSession.h"
 #include "core/AppSettings.h"
@@ -262,6 +262,9 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	}
 
 	m_ambientCategory = fresh;
+	// Only now can it tell that it IS the canvas, and draw itself as one:
+	// its name in bold at the origin, and no frame round the whole picture.
+	fresh->becameAmbient();
 	emit ambientCategoryChanged(fresh);
 	emit statementChanged(statementText());
 }

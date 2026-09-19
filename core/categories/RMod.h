@@ -11,6 +11,10 @@ public:
 
 	QString builtInName() const override { return QStringLiteral("R-Mod"); }
 
+	// An object of R-Mod is an R-MODULE, not a bag of elements that happens
+	// to sit here: it has a zero and its elements can be scaled (see RModule).
+	Object* makeObject(const QString& name) override;
+
 public:
 	QString objectName() const override { return QStringLiteral("R-module"); }
 	QString implicitArrowName() const override { return QStringLiteral("0"); }   // the zero map

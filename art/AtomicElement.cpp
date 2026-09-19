@@ -1,8 +1,10 @@
 #include "art/AtomicElement.h"
 #include "art/Category.h"
+#include "art/RModule.h"
 #include "art/DiagramScene.h"
 #include "core/props/CategoryProps.h"
 
+#include <QInputDialog>
 #include <QMenu>
 
 AtomicElement::AtomicElement(const QString& id, QGraphicsItem* parent)
@@ -70,6 +72,41 @@ void AtomicElement::populateActions(QMenu& menu)
 		why->setToolTip(QString("Elements can only be added and subtracted where they live in "
 		                        "something ADDITIVE, and %1 is not said to be.")
 			.arg(home != nullptr ? home->id() : QStringLiteral("this category")));
+	}
+
+	// SCALED BY A RING ELEMENT, where what this is an element of is a MODULE.
+	//
+	// Not a gesture like + and -, because the second thing here is not
+	// something drawn on the canvas to be pointed at: it is a scalar, which
+	// lives in the ring and is written rather than picked. So it is asked for
+	// and the answer is drawn.
+	if (auto* module = dynamic_cast<RModule*>(parentItem()); module != nullptr && diagram != nullptr)
+	{
+		const QString dot = QStringLiteral(" · ");
+		const QString shown = module->scalarOnLeft()
+			? QString("r%1%2").arg(dot, name)
+			: QString("%2%1r").arg(dot, name);
+		QAction* scale = menu.addAction(QString("·  %1...").arg(shown));
+		scale->setToolTip(QString("Multiply %1 by a scalar of %2: name the scalar, and %3 is drawn "
+		                          "beside %1. Its label is built from %1, so renaming %1 renames it too.")
+			.arg(name, module->ring(), shown));
+		auto* self = const_cast<AtomicElement*>(this);
+		QObject::connect(scale, &QAction::triggered, diagram, [diagram, module, self] {
+			// queued: the menu is still closing, and this opens a dialog over
+			// the very scene the menu belongs to
+			QMetaObject::invokeMethod(diagram, [diagram, module, self] {
+				bool said = false;
+				const QString scalar = QInputDialog::getText(
+					nullptr, QStringLiteral("Multiply by a scalar"),
+					QString("Multiply %1 by which element of %2?").arg(self->id(), module->ring()),
+					QLineEdit::Normal, QStringLiteral("r"), &said);
+				if (!said)
+					return;
+				if (AtomicElement* made = module->createScalarMultiple(scalar, self))
+					diagram->recordCreation(
+						QString("Put %1 in %2").arg(made->id(), module->id()), { made });
+			}, Qt::QueuedConnection);
+		});
 	}
 
 	// Equality needs nothing of the category: two elements are the same

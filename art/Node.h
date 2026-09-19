@@ -229,6 +229,16 @@ public:
 	// and its ancestors, repaints them, and refreshes the bold labels.
 	void refreshFrame();
 
+	// MY SHAPE CHANGED, I DID NOT GO ANYWHERE.
+	//
+	// A null delta is that news, and everything that draws itself from this
+	// node's FRAME rather than its position needs it: an arrow joins the
+	// edges of its two ends, so a box that grows or shrinks moves the join
+	// without moving the box. Cheap enough to say on every step of a drag,
+	// which is when it is most needed - unlike refreshFrame, which re-indexes
+	// and re-settles labels and is for a change that has finished.
+	void announceShapeChange() { emit moved(this, QPointF()); }
+
 	// how many nodes this one sits inside (0 at the top)
 	int nesting() const;
 	// HOW BIG EVERYTHING ABOUT THIS NODE SHOULD BE.
@@ -431,7 +441,7 @@ protected:
 	// Arrows are nodes too, so an arrow drawn inside this one counts.
 	int containedCount(const QGraphicsItem* except = nullptr) const;
 	// a node that contains others shows its id in bold
-	void refreshLabelWeight(int contained);
+	virtual void refreshLabelWeight(int contained);
 
 private:
 	// keep the label centred on the item's origin, so setPos() positions the node's CENTRE

@@ -26,6 +26,19 @@ public:
 	// a fresh built-in by name, or nullptr when the name is not built in
 	static Category* createBuiltIn(const QString& name, QGraphicsItem* parent = nullptr);
 
+	// WHICH BUILT-IN DOES THIS LABEL MEAN? Empty when it means none of them.
+	//
+	// Somebody who types R-Mod on a category means the R-Mod that knows what
+	// an R-module is - not a category that happens to be spelt that way and
+	// knows nothing. So the name is read as the choice it plainly is, and the
+	// node becomes that built-in.
+	//
+	// Said loosely on purpose: R-Mod, R-mod, RMod and "R Mod" are one name
+	// written four ways, and nobody typing the third of them meant something
+	// else by it. Case, spaces, hyphens and underscores are all ignored; the
+	// letters in order are what is compared.
+	static QString builtInNamed(const QString& label);
+
 	// Which built-in this category IS, by the name the registry knows it
 	// under: "R-Mod", "BigCat", ... Empty for one the user defined, which is
 	// a plain Category carrying whatever structure was ticked. This is not
@@ -183,8 +196,34 @@ public:
 	Object* createNamedChild(const QString& name, const QPointF& scenePos) override
 	{ return createObject(name, scenePos); }
 
-	// a category frames its objects with more room than a plain object gives its label
-	QRectF boxRect() const override { return contentFrame().adjusted(-9, -9, 9, 9); }
+	// a category frames its objects with more room than a plain object gives
+	// its label - and an empty one is a ROOM rather than a name (see the note
+	// on emptyFrame)
+	QRectF boxRect() const override;
+
+	// THE SIZE OF AN EMPTY CATEGORY: somewhere to put things, not a caption.
+	//
+	// A category with nothing in it used to be its own name with nine points
+	// of air round it, which is the right answer for an object - an object IS
+	// its name - and the wrong one for a category. A category is the place
+	// its objects go, and a place you are meant to double-click into should
+	// look like one before anything is in it: a sheet of it, plainly big
+	// enough to hold a diagram, rather than a word you would not think to aim
+	// at. It stops mattering the moment anything is drawn inside, because
+	// from then on the frame is the union of what it holds.
+	static QRectF emptyFrame();
+
+	// THE SCENE HAS JUST MADE THIS ONE THE CANVAS.
+	//
+	// The ambient category is not a thing drawn on the diagram - it is what
+	// the diagram is drawn IN - so it is not drawn as one: no fill, no
+	// border, just its name in bold at the origin. Every other category is a
+	// box you can see, because it is a thing standing somewhere.
+	//
+	// Called by the scene once isAmbient() would answer yes, which is the
+	// earliest this can be put right: until then this category has no way of
+	// knowing what it has become.
+	void becameAmbient();
 
 	// "Category C", or "Subcategory S of R-Mod" when it is one
 	QString contextTitle() const override;
@@ -231,6 +270,17 @@ protected:
 
 	// nested categories fade, so the yellow does not pile up level on level
 	void applyDepthAppearance(int depth) override;
+
+	// The canvas's name stays at the origin, in bold: there is no frame for
+	// it to sit above, and nothing to settle it against.
+	bool labelFollowsBox() const override { return !isAmbient() && Object::labelFollowsBox(); }
+
+	// The canvas's name is bold whether or not anything has been drawn on it:
+	// it is the name of the world everything here is in, and an empty world
+	// is still that world. Every other node earns its bold by holding
+	// something.
+	void refreshLabelWeight(int contained) override
+	{ Node::refreshLabelWeight(isAmbient() ? qMax(1, contained) : contained); }
 
 	// an empty subcategory still shows its dotted frame: being one is a
 	// claim about the diagram, not a look that waits for something to frame

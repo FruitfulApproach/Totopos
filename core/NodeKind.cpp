@@ -4,6 +4,7 @@
 #include "art/Object.h"
 #include "art/Category.h"
 #include "art/AtomicElement.h"
+#include "art/RModule.h"
 #include "art/Arrow.h"
 #include "art/DiagramScene.h"
 #include "core/history/SceneHistory.h"
@@ -17,6 +18,7 @@ namespace
 }
 
 QString NodeKind::object()      { return QStringLiteral("object"); }
+QString NodeKind::module()      { return QStringLiteral("module"); }
 QString NodeKind::element()     { return QStringLiteral("element"); }
 QString NodeKind::subcategory() { return QStringLiteral("subcategory"); }
 QString NodeKind::category()    { return QStringLiteral("category"); }
@@ -40,6 +42,9 @@ QString NodeKind::of(const Node* node)
 {
 	if (dynamic_cast<const AtomicElement*>(node) != nullptr)
 		return element();
+	// before Object, which it is one of
+	if (dynamic_cast<const RModule*>(node) != nullptr)
+		return module();
 	if (auto* cat = dynamic_cast<const Category*>(node))
 	{
 		if (cat->isSubcategory())
@@ -52,6 +57,7 @@ QString NodeKind::of(const Node* node)
 QString NodeKind::label(const QString& id)
 {
 	if (id == object())      return QStringLiteral("Generic object");
+	if (id == module())      return QStringLiteral("R-module");
 	if (id == element())     return QStringLiteral("Atomic element");
 	if (id == subcategory()) return QStringLiteral("Subcategory");
 	if (id == category())    return QStringLiteral("Category");
@@ -67,6 +73,10 @@ QList<NodeKind::Choice> NodeKind::choices(const Node* node)
 
 	list << Choice{ object(), label(object()),
 		QStringLiteral("An object of the category it is drawn in, and nothing more is claimed about it.") };
+	list << Choice{ module(), label(module()),
+		QStringLiteral("A module over a ring: an object with a zero, whose elements can be added and "
+		               "multiplied by a scalar. What an object of R-Mod is, and what anything drawn "
+		               "in R-Mod is made as.") };
 	list << Choice{ element(), label(element()),
 		QStringLiteral("An element of the node it is drawn in: x in M. It holds nothing, so it is where "
 		               "the nesting stops, and it is drawn with a dot beside its name.") };
@@ -100,6 +110,8 @@ Node* NodeKind::create(const QString& kindId, const QString& name, Node* like)
 		return new AtomicElement(name);
 	if (kindId == object())
 		return new Object(name);
+	if (kindId == module())
+		return new RModule(name);
 	if (kindId == subcategory())
 	{
 		// A subcategory of R-Mod has to BE an R-Mod, or what is placed in it
@@ -151,6 +163,11 @@ void NodeKind::transplant(Node* from, Node* to)
 		if (value.isValid())
 			to->setData(key, value);
 	}
+
+	// ---- 2. what only two modules have in common: which ring they are over
+	if (auto* fromModule = dynamic_cast<RModule*>(from))
+		if (auto* toModule = dynamic_cast<RModule*>(to))
+			toModule->setRing(fromModule->ring());
 
 	// ---- 2. what only two categories have in common
 	Category* fromCat = dynamic_cast<Category*>(from);

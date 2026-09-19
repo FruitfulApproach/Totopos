@@ -1,4 +1,4 @@
-﻿#include "art/Node.h"
+#include "art/Node.h"
 #include "art/Category.h"
 #include "art/Arrow.h"
 
@@ -15,6 +15,7 @@
 #include "core/AppSettings.h"
 #include "core/Emoji.h"
 #include "core/Notation.h"
+#include "core/NodeKind.h"
 #include "core/props/MapsElements.h"
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
@@ -566,6 +567,15 @@ QVariant Node::itemChange(GraphicsItemChange change, const QVariant& value)
 		const QPointF delta = p - m_lastPos;
 		m_lastPos = p;
 		emit moved(this, delta);
+		// Everything we sit inside is the union of what it holds, so our move
+		// changed ITS shape too - and an arrow ending on one of them joins its
+		// EDGE, which has just moved even though the box has not. The line is
+		// worked out afresh every time it is drawn, but the label beside it is
+		// placed when the arrow is told to refresh, and without this it is
+		// never told: it stayed where the old line was.
+		for (QGraphicsItem* up = parentItem(); up != nullptr; up = up->parentItem())
+			if (auto* node = dynamic_cast<Node*>(up))
+				node->announceShapeChange();
 		pushSiblings(delta);
 		break;
 	}
@@ -1106,6 +1116,32 @@ void Node::finishLabelEdit(const QString& before, const QString& typed)
 		diagram->history()->record(new Renamed(
 			QString("Renamed %1 to %2").arg(before.isEmpty() ? QStringLiteral("a node") : before, after),
 			this, before, after));
+
+	// WRITING R-Mod ON A CATEGORY MEANS THE R-Mod THAT KNOWS WHAT AN R-MODULE IS.
+	//
+	// Nobody types the name of a built-in category on a category and means a
+	// category that is merely spelt that way: the name is the choice, said the
+	// shortest way there is. So it is taken as one, and the node becomes that
+	// built-in - which is what makes an object placed in it an R-module and an
+	// arrow between two of them an R-linear map.
+	//
+	// Only a category that is not already a built-in, and only when the name
+	// is not what it already goes by: renaming R-Mod to R-Mod is not a change,
+	// and a built-in renamed to something else is a person naming their copy,
+	// not asking for a different category.
+	if (auto* self = dynamic_cast<Category*>(this); self != nullptr && self->builtInName().isEmpty())
+	{
+		const QString means = Category::builtInNamed(after);
+		if (!means.isEmpty())
+		{
+			// Queued, and for the same reason the Type combo queues it: this
+			// runs from the label's own edit, and retyping takes the node -
+			// and the label - out of the scene.
+			QMetaObject::invokeMethod(this, [self, means] {
+				NodeKind::retype(self, NodeKind::builtIn(means));
+			}, Qt::QueuedConnection);
+		}
+	}
 }
 
 // ---------------------------------------------------------------- labels made of labels

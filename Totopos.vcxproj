@@ -124,6 +124,7 @@
     <ClCompile Include="art\NodeHandles.cpp" />
     <ClCompile Include="art\NodeLabel.cpp" />
     <ClCompile Include="art\Object.cpp" />
+    <ClCompile Include="art\RModule.cpp" />
     <ClCompile Include="core\AppSettings.cpp" />
     <ClCompile Include="core\Emoji.cpp" />
     <ClCompile Include="core\NodeKind.cpp" />
@@ -168,6 +169,7 @@
     <ClCompile Include="tutor\Tutor.cpp" />
     <ClCompile Include="tutor\TutorSession.cpp" />
     <ClCompile Include="widget\ApplicableRulesDock.cpp" />
+    <ClCompile Include="widget\SplashScreen.cpp" />
     <ClCompile Include="widget\CanvasActionBar.cpp" />
     <ClCompile Include="widget\CommutativeEquationsDock.cpp" />
     <ClCompile Include="widget\EnglishDock.cpp" />
@@ -188,6 +190,7 @@
     <QtMoc Include="art\Node.h" />
     <QtMoc Include="art\NodeHandles.h" />
     <QtMoc Include="art\Object.h" />
+    <QtMoc Include="art\RModule.h" />
     <QtMoc Include="core\AppSettings.h" />
     <QtMoc Include="core\categories\Ab.h" />
     <QtMoc Include="core\categories\BigCat.h" />
@@ -220,6 +223,8 @@
     <QtMoc Include="tutor\SetupTutor.h" />
     <QtMoc Include="tutor\TutorSession.h" />
     <QtMoc Include="widget\ApplicableRulesDock.h" />
+    <QtMoc Include="widget\SplashScreen.h" />
+    <ClInclude Include="core\Version.h" />
     <QtMoc Include="widget\CanvasActionBar.h" />
     <QtMoc Include="widget\CommutativeEquationsDock.h" />
     <QtMoc Include="widget\EnglishDock.h" />
@@ -250,8 +255,9 @@
     <QtUic Include="Totopos.ui" />
     <QtUic Include="dialog\CategoryDialog.ui" />
     <QtRcc Include="Totopos.qrc" />
+    <QtRcc Include="resources\resources.qrc" />
     <ResourceCompile Include="Totopos.rc" />
-    <None Include="Totopos.ico" />
+    <None Include="resources\icons\Totopos.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
