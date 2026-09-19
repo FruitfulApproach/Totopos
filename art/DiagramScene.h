@@ -71,6 +71,19 @@ public:
 	};
 	Notation notation() const { return m_notation; }
 	bool isClassical() const { return m_notation == Notation::Classical; }
+
+	// THE COLOUR OF THE PAPER.
+	//
+	// The ambient category is not drawn as a box any more (see
+	// Category::becameAmbient), so the wash of colour that used to stand for
+	// "this is the canvas" has nowhere to go - and it belongs to the canvas
+	// anyway rather than to a node standing on it. This is that colour, asked
+	// for and set exactly the way a node's fill is, on the same page.
+	//
+	// An invalid colour means the default: whatever the view's palette says,
+	// which is what a scene paints when nobody has chosen.
+	QColor background() const { return m_background; }
+	void setBackground(const QColor& colour);
 	void setNotation(Notation notation);
 	void toggleNotation();
 
@@ -344,6 +357,8 @@ signals:
 	void chasingChanged(bool chasing);
 	// the diagram is now being shown the other way round (see Notation)
 	void notationChanged(bool classical);
+	// the paper is a different colour now
+	void backgroundChanged(const QColor& colour);
 	void commutesChanged(bool commutes);
 	void statementKindChanged(int kind, const QString& name);
 	// something the diagram cannot mean; empty when it is put right
@@ -381,6 +396,7 @@ private:
 	// line that follows the cursor while an arrow is being drawn
 	void showHandles(Node* node, const QPointF& itemPos);
 
+	QColor m_background;   // invalid: the view's own palette
 	Category* m_ambientCategory = nullptr;
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;

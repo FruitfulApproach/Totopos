@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QSplashScreen>
 #include <QString>
 
@@ -28,7 +29,18 @@ public:
 	// the caller goes back to the work it is announcing.
 	void say(const QString& what);
 
+	// HOLD IT UP LONG ENOUGH TO BE READ, then let the window take over.
+	//
+	// Starting up is fast, which is the problem: a splash screen that is
+	// gone in fifty milliseconds is a flash of something nobody saw, and
+	// reads as a glitch rather than as the program opening. This waits out
+	// whatever is left of a decent minimum before handing over - and waits
+	// for nothing at all when the work really did take that long.
+	void finishWhenRead(QWidget* window);
+
 protected:
+	void showEvent(QShowEvent* event) override;
+
 	void drawContents(QPainter* painter) override;
 
 private:
@@ -37,4 +49,5 @@ private:
 	static QPixmap plate();
 
 	QString m_saying;
+	QElapsedTimer m_up;   // since it appeared
 };

@@ -24,6 +24,11 @@ const char* AppSettings::ArrowHitWidth = "arrow/hitWidth";
 const char* AppSettings::LabelPointSize = "label/pointSize";
 const char* AppSettings::ComposeWithRing = "notation/composeWithRing";
 const char* AppSettings::EnglishSelectionOnly = "english/selectionOnly";
+const char* AppSettings::NodeCornerRadius = "node/cornerRadius";
+const char* AppSettings::NodeFill = "node/fill";
+const char* AppSettings::NodeBorder = "node/border";
+const char* AppSettings::ArrowFill = "arrow/fill";
+const char* AppSettings::ArrowBorder = "arrow/border";
 
 namespace
 {
@@ -99,6 +104,11 @@ QVariant AppSettings::defaultValue(const char* key)
 	if (k == LabelPointSize) return 11.0;
 	if (k == ComposeWithRing) return true;
 	if (k == EnglishSelectionOnly) return false;
+	if (k == NodeCornerRadius) return 13.0;
+	// A default QColor is INVALID, and that is the answer wanted: nothing has
+	// been chosen, so whatever placed the node keeps its own look.
+	if (k == NodeFill || k == NodeBorder || k == ArrowFill || k == ArrowBorder)
+		return QColor();
 	return QVariant();
 }
 

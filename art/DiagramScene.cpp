@@ -87,6 +87,19 @@ DiagramScene::DiagramScene(QObject* parent)
 	});
 }
 
+void DiagramScene::setBackground(const QColor& colour)
+{
+	if (m_background == colour)
+		return;
+	m_background = colour;
+	// An invalid colour is "none chosen", which is a brush of nothing: the
+	// scene then paints whatever the view's palette says, as it did before
+	// anybody asked for a colour.
+	setBackgroundBrush(colour.isValid() ? QBrush(colour) : QBrush(Qt::NoBrush));
+	update();
+	emit backgroundChanged(colour);
+}
+
 void DiagramScene::drawBackground(QPainter* painter, const QRectF& rect)
 {
 	QGraphicsScene::drawBackground(painter, rect);

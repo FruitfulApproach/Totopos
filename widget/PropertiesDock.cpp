@@ -173,6 +173,18 @@ void PropertiesDock::build()
 	categoryForm->addRow("Category", m_categoryKind);
 	*/
 
+	// THE COLOUR OF THE PAPER, asked for the way a node's fill is.
+	//
+	// Only on the canvas's own page: every other category is a node, and a
+	// node's colour is the Fill chip above. The canvas is not a node - it has
+	// no fill to set - and the thing that answers to "what colour is this" for
+	// the canvas is the scene's background.
+	m_background = new QPushButton("Background", m_categoryBox);
+	m_background->setToolTip("The colour of the paper everything is drawn on. Cleared with \"None\" in "
+	                         "the dialog, which gives it back the colour the window is drawn in.");
+	connect(m_background, &QAbstractButton::clicked, this, &PropertiesDock::applyBackgroundColour);
+	categoryForm->addRow("Appearance", m_background);
+
 	m_subcategoryHint = new QLabel(m_categoryBox);
 	m_subcategoryHint->setWordWrap(true);
 	m_subcategoryHint->setEnabled(false);
@@ -569,18 +581,8 @@ void PropertiesDock::refresh()
 		const QColor border = first->border().style() == Qt::NoPen ? QColor() : first->border().color();
 		m_fillColour->setText(fill.isValid() ? QStringLiteral("Fill") : QStringLiteral("Fill: none"));
 		m_borderColour->setText(border.isValid() ? QStringLiteral("Border") : QStringLiteral("Border: none"));
-		auto swatch = [](const QColor& colour) {
-			if (!colour.isValid())
-				return QString();
-			// black on a light colour, white on a dark one, so the word on the
-			// button can still be read whatever it is sitting on
-			const bool dark = colour.lightness() < 128 && colour.alpha() > 96;
-			return QString("background-color: rgba(%1,%2,%3,%4); color: %5;")
-				.arg(colour.red()).arg(colour.green()).arg(colour.blue()).arg(colour.alpha())
-				.arg(dark ? "white" : "black");
-		};
-		m_fillColour->setStyleSheet(swatch(fill));
-		m_borderColour->setStyleSheet(swatch(border));
+		m_fillColour->setStyleSheet(colourSwatch(fill));
+		m_borderColour->setStyleSheet(colourSwatch(border));
 	}
 
 	m_objectBox->setVisible(!objects.isEmpty());
@@ -799,6 +801,16 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 		                                   "one category would mean something else in another.").arg(kind));
 	}
 
+	// The paper is the canvas's, so the chip is only on the canvas's page.
+	const bool isCanvas = category->isAmbient() && m_scene != nullptr;
+	m_background->setVisible(isCanvas);
+	if (auto* row = m_categoryBox->layout(); row != nullptr)
+		if (auto* form = qobject_cast<QFormLayout*>(row))
+			if (QWidget* label = form->labelForField(m_background); label != nullptr)
+				label->setVisible(isCanvas);
+	if (isCanvas)
+		m_background->setStyleSheet(colourSwatch(m_scene->background()));
+
 	/*
 	// which category it is. A built-in answers with its own name; one the
 	// user defined is not in the list, so its label goes in before Custom...
@@ -871,6 +883,38 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 		form->setRowVisible(m_rowsExact, exact);
 		form->setRowVisible(m_columnsExact, exact);
 	}
+}
+
+QString PropertiesDock::colourSwatch(const QColor& colour)
+{
+	// A chip wears the colour it would change, so the page shows what is set
+	// without anybody having to open the dialog to find out.
+	if (!colour.isValid())
+		return QString();
+	// black on a light colour, white on a dark one, so the word on the button
+	// can still be read whatever it is sitting on
+	const bool dark = colour.lightness() < 128 && colour.alpha() > 96;
+	return QString("background-color: rgba(%1,%2,%3,%4); color: %5;")
+		.arg(colour.red()).arg(colour.green()).arg(colour.blue()).arg(colour.alpha())
+		.arg(dark ? "white" : "black");
+}
+
+void PropertiesDock::applyBackgroundColour()
+{
+	if (m_updating || m_scene == nullptr)
+		return;
+
+	// Opens on the colour already set, so nudging a shade starts from the
+	// shade rather than from black. No alpha: there is nothing behind the
+	// paper for it to be see-through against.
+	const QColor current = m_scene->background();
+	QColorDialog dialog(current.isValid() ? current : QColor(Qt::white), this);
+	dialog.setOption(QColorDialog::ShowAlphaChannel, false);
+	dialog.setWindowTitle(QStringLiteral("Background"));
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+	m_scene->setBackground(dialog.currentColor());
+	refresh();
 }
 
 void PropertiesDock::applyColour(bool fill)

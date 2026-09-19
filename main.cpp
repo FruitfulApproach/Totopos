@@ -1,4 +1,4 @@
-#include "Totopos.h"
+﻿#include "Totopos.h"
 #include "core/Emoji.h"
 #include "core/AppSettings.h"
 #include "core/Version.h"
@@ -33,6 +33,8 @@ int main(int argc, char *argv[])
 
     splash.say(QStringLiteral("Opening the canvas"));
     window.show();
-    splash.finish(&window);   // stays up until the window is actually painted
+    // stays up until the window is painted AND until it has been up long
+    // enough to have been read (see finishWhenRead)
+    splash.finishWhenRead(&window);
     return app.exec();
 }

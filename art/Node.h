@@ -505,7 +505,9 @@ private:
 	bool m_componentRowsExact = false;
 	bool m_componentColumnsExact = false;
 	bool m_styleChosen = false;
-	qreal m_cornerRadius = 5.0;
+	// how round its corners are; the default is a setting, so a diagram drawn
+	// today looks like the last one (see AppSettings::NodeCornerRadius)
+	qreal m_cornerRadius = 0.0;
 	QPointF m_lastPos;
 	QPointF m_contextPos;
 	bool m_frameRefreshQueued = false;

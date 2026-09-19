@@ -58,6 +58,9 @@ private:
 	// open a colour dialog and give what comes back to every node selected;
 	// `fill` picks which of the two colours is being changed
 	void applyColour(bool fill);
+	void applyBackgroundColour();
+	// the stylesheet that makes a chip wear its own colour; empty for none
+	static QString colourSwatch(const QColor& colour);
 	void applyExistsSuch(bool on);
 	void applyDeleteMark(bool on);
 	void applyRounding(int radius);
@@ -101,6 +104,9 @@ private:
 	// "Diagram in category "R-Mod"." - what the dropdown below used to offer,
 	// said instead of offered (see refreshCategoryBox)
 	QLabel* m_categoryName = nullptr;
+	// the colour of the paper, on the canvas's own page (see
+	// DiagramScene::background)
+	QPushButton* m_background = nullptr;
 	QComboBox* m_categoryKind = nullptr;   // commented out in the .cpp; kept for its question
 
 	QComboBox* m_statementKind = nullptr;

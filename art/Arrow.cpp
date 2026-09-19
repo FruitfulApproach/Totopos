@@ -38,6 +38,20 @@ Arrow::Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *par
 {
 	setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemSendsGeometryChanges);   // never dragged: the ends place it
 	setDefaultLook(QBrush(Qt::NoBrush), QPen(QColor(30, 144, 255), 1.5));
+
+	// AND WHAT WAS ASKED FOR, which wins over the look above.
+	//
+	// "Set default" on the Properties page stores the colours the next one
+	// placed should start in. Written through setFill/setBorder, so it DOES
+	// count as chosen: somebody picked these, and a node picked out that way
+	// shows its frame whether or not it holds anything, exactly as one
+	// coloured by hand does.
+	const QColor wantedFill = AppSettings::instance().defaultFill(true);
+	const QColor wantedBorder = AppSettings::instance().defaultBorder(true);
+	if (wantedFill.isValid())
+		setFill(QBrush(wantedFill));
+	if (wantedBorder.isValid())
+		setBorder(QPen(wantedBorder, AppSettings::instance().arrowLineWidth()));
 	// an arrow's label gets in the way of whatever the line crosses, so it can
 	// be picked up and put somewhere clearer
 	if (NodeLabel* text = labelItem())
@@ -745,6 +759,165 @@ QRectF Arrow::boxRect() const
 	return r.adjusted(-margin, -margin, margin, margin);
 }
 
+Arrow::Marks Arrow::markGeometry(const QPainterPath& path) const
+{
+	Marks marks;
+	if (path.isEmpty())
+		return marks;
+
+	// An arrow drawn inside something is drawn smaller, and every mark on it
+	// by the same step: one number, so it stays in proportion with itself.
+	marks.scale = depthScale();
+	marks.headLength = AppSettings::instance().arrowHeadLength() * marks.scale;
+	marks.headWidth  = AppSettings::instance().arrowHeadWidth()  * marks.scale;
+
+	// The head sits along the curve AS IT ARRIVES, not along the straight
+	// line between the two ends: on a bent arrow those point different ways.
+	marks.tip = path.pointAtPercent(1.0);
+	marks.dir = marks.tip - path.pointAtPercent(0.96);
+	const qreal len = norm(marks.dir);
+	marks.dir /= (len > 1e-6 ? len : 1);
+	marks.normal = QPointF(-marks.dir.y(), marks.dir.x());
+
+	marks.tail = path.pointAtPercent(0.0);
+	marks.tailDir = path.pointAtPercent(0.04) - marks.tail;
+	const qreal tailLen = norm(marks.tailDir);
+	marks.tailDir /= (tailLen > 1e-6 ? tailLen : 1);
+
+	// HOW FAR BACK THE SECOND HEAD OF AN EPI SITS. A stroke runs from the tip
+	// along (-L, W); shifting a second copy back by d along the line moves it
+	// d*W/hypot(L, W) sideways OF ITSELF, so for a wanted gap g the step back
+	// is g*hypot(L, W)/W. See the longer note where this is drawn.
+	const qreal headLineWidth = AppSettings::instance().arrowHeadLineWidth() * marks.scale;
+	const qreal wantedGap = qMax(2.0 * marks.scale, headLineWidth * 1.5);
+	const qreal spread = qMax(0.5, marks.headWidth);
+	marks.secondHeadBack = wantedGap
+		* qSqrt(marks.headLength * marks.headLength + spread * spread) / spread;
+	return marks;
+}
+
+QPainterPath Arrow::figure() const
+{
+	const QPainterPath path = curve();
+	if (path.isEmpty())
+		return path;
+	const Marks m = markGeometry(path);
+
+	// The same shapes paint() draws, in the same places, with no pen on them:
+	// what is wanted here is where the arrow IS, not how it is coloured.
+	QPainterPath drawn;
+	if (drawsDoubleLine())
+	{
+		QPointF run = m.tip - m.tail;
+		const qreal span = norm(run);
+		run = span > 1e-6 ? run / span : QPointF(1, 0);
+		const qreal gap = doubleLineGap() * m.scale;
+		const QPointF sideways(-run.y() * gap, run.x() * gap);
+		qreal cut = 0.0;
+		if (drawsHead() && m.headWidth > 1e-6)
+			cut = m.headLength * gap / m.headWidth;
+		const QPainterPath shaft = cut > 0.0 ? trimmedAtEnd(path, cut) : path;
+		drawn.addPath(shaft.translated(sideways));
+		drawn.addPath(shaft.translated(-sideways));
+	}
+	else
+	{
+		drawn.addPath(path);
+	}
+
+	const auto stroke = [&drawn](const QPointF& from, const QPointF& to) {
+		drawn.moveTo(from);
+		drawn.lineTo(to);
+	};
+	const auto frameAt = [](const QPointF& at, const QPointF& along) {
+		QTransform frame;
+		frame.translate(at.x(), at.y());
+		frame.rotate(qRadiansToDegrees(qAtan2(along.y(), along.x())));
+		return frame;
+	};
+
+	if (drawsHead())
+	{
+		stroke(m.tip, m.tip - m.dir * m.headLength + m.normal * m.headWidth);
+		stroke(m.tip, m.tip - m.dir * m.headLength - m.normal * m.headWidth);
+	}
+
+	switch (m_style)
+	{
+	case Style::Inclusion:
+	{
+		const qreal r = qMax(3.0, m.headWidth * 0.8);
+		QPainterPath hook;
+		hook.moveTo(0, 2 * r);
+		hook.cubicTo(-1.34 * r, 2 * r, -1.34 * r, 0, 0, 0);
+		drawn.addPath(frameAt(m.tail, m.tailDir).map(hook));
+		break;
+	}
+	case Style::Mono:
+	{
+		const QTransform frame = frameAt(m.tail, m.tailDir);
+		const QPointF vertex = frame.map(QPointF(0, 0));
+		stroke(vertex, frame.map(QPointF(-m.headLength, m.headWidth)));
+		stroke(vertex, frame.map(QPointF(-m.headLength, -m.headWidth)));
+		break;
+	}
+	case Style::Epi:
+	{
+		const QPointF back = m.tip - m.dir * m.secondHeadBack;
+		stroke(back, back - m.dir * m.headLength + m.normal * m.headWidth);
+		stroke(back, back - m.dir * m.headLength - m.normal * m.headWidth);
+		break;
+	}
+	case Style::Iso:
+	{
+		const QPointF mid = path.pointAtPercent(0.5);
+		QPointF midDir = path.pointAtPercent(0.54) - path.pointAtPercent(0.46);
+		const qreal midLen = norm(midDir);
+		midDir /= (midLen > 1e-6 ? midLen : 1);
+		QPointF midNormal(-midDir.y(), midDir.x());
+		if (midNormal.y() < 0)
+			midNormal = -midNormal;
+		QPainterPath tilde;
+		tilde.moveTo(-6, 2);
+		tilde.cubicTo(-4, -3, -2, -3, 0, 0);
+		tilde.cubicTo(2, 3, 4, 3, 6, -2);
+		drawn.addPath(frameAt(mid + midNormal * 9.0, midDir).map(tilde));
+		break;
+	}
+	case Style::Equals:
+	case Style::Plain:
+		break;
+	}
+
+	// asserted, as against drawn as a style: an arrow told it is epic both
+	// ways carries both marks, and both are part of it
+	if (isEpic())
+	{
+		const QPointF back = m.tip - m.dir * m.secondHeadBack;
+		stroke(back, back - m.dir * m.headLength + m.normal * m.headWidth);
+		stroke(back, back - m.dir * m.headLength - m.normal * m.headWidth);
+	}
+	if (isMonic())
+	{
+		const QPointF tailNormal(-m.tailDir.y(), m.tailDir.x());
+		if (isInclusion())
+		{
+			const qreal r = qMax(3.0, m.headWidth * 0.8);
+			QPainterPath hook;
+			hook.moveTo(0, 2 * r);
+			hook.cubicTo(-1.34 * r, 2 * r, -1.34 * r, 0, 0, 0);
+			drawn.addPath(frameAt(m.tail, m.tailDir).map(hook));
+		}
+		else
+		{
+			const QPointF back = m.tail - m.tailDir * m.headLength;
+			stroke(m.tail, back + tailNormal * m.headWidth);
+			stroke(m.tail, back - tailNormal * m.headWidth);
+		}
+	}
+	return drawn;
+}
+
 QRectF Arrow::boundingRect() const
 {
 	// the line together with the label, which hangs beside it and so is very
@@ -754,12 +927,23 @@ QRectF Arrow::boundingRect() const
 
 QPainterPath Arrow::shape() const
 {
-	const QPainterPath path = curve();
-	if (path.isEmpty())
-		return path;
+	// AN ARROW IS ITS LINE AND ITS MARKS.
+	//
+	// This used to stroke the curve alone, so a press, a double-click or a
+	// right-click that landed on the head - or on the hook of an inclusion,
+	// or on the second head of an epi - went straight past the arrow to
+	// whatever was behind it. The whole drawn figure is stroked instead, each
+	// piece of it fattened by the same "how near counts as on it" width, and
+	// the overlapping strokes are merged into one outline so the result is a
+	// single region rather than a stack of them.
+	const QPainterPath drawn = figure();
+	if (drawn.isEmpty())
+		return drawn;
 	QPainterPathStroker stroker;
 	stroker.setWidth(AppSettings::instance().arrowHitWidth());   // how near counts as on it
-	QPainterPath hit = stroker.createStroke(path);
+	stroker.setCapStyle(Qt::RoundCap);
+	stroker.setJoinStyle(Qt::RoundJoin);
+	QPainterPath hit = stroker.createStroke(drawn).simplified();
 	for (const QPointF& bend : m_bends)
 		hit.addEllipse(bend, 9, 9);   // and its bends are grabbable
 	return hit;
@@ -776,7 +960,10 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// the canvas, and by the same step as everything else at that depth: the
 	// line, the head, and whatever mark the style puts on the tail all come
 	// off this one number, so an arrow stays in proportion with itself.
-	const qreal scale = depthScale();
+	// where every mark on this arrow goes, worked out once and shared with
+	// shape(), so what is drawn and what can be clicked are the same figure
+	const Marks marks = markGeometry(path);
+	const qreal scale = marks.scale;
 
 	QPen pen = border();
 	if (pen.style() == Qt::NoPen)
@@ -807,8 +994,8 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		pen.setWidthF(pen.widthF() + 1.5 * scale);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
-	const qreal headLengthAhead = AppSettings::instance().arrowHeadLength() * scale;
-	const qreal headWidthAhead = AppSettings::instance().arrowHeadWidth() * scale;
+	const qreal headLengthAhead = marks.headLength;
+	const qreal headWidthAhead = marks.headWidth;
 
 	if (drawsDoubleLine())
 	{
@@ -848,11 +1035,9 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 
 	// the head: a filled triangle at the codomain end, along the curve as it
 	// arrives rather than along the straight line between the ends
-	const QPointF tip = path.pointAtPercent(1.0);
-	QPointF dir = tip - path.pointAtPercent(0.96);
-	const qreal len = qSqrt(dir.x() * dir.x() + dir.y() * dir.y());
-	dir /= (len > 1e-6 ? len : 1);
-	const QPointF normal(-dir.y(), dir.x());
+	const QPointF tip = marks.tip;
+	const QPointF dir = marks.dir;
+	const QPointF normal = marks.normal;
 	// Two strokes back from the tip, not a filled triangle: an arrowhead is
 	// drawn, not blocked in. The spread and the length together are its angle.
 	const qreal headLength = headLengthAhead;
@@ -873,9 +1058,7 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// d along the line moves it d*W/hypot(L, W) sideways OF ITSELF, so for a
 	// wanted gap g the step back is g*hypot(L, W)/W.
 	const qreal headLineWidth = AppSettings::instance().arrowHeadLineWidth() * scale;
-	const qreal wantedGap = qMax(2.0 * scale, headLineWidth * 1.5);
-	const qreal spread = qMax(0.5, headWidth);
-	const qreal secondHeadBack = wantedGap * qSqrt(headLength * headLength + spread * spread) / spread;
+	const qreal secondHeadBack = marks.secondHeadBack;
 
 	QPen headPen(pen.color(),
 	             headLineWidth + (selected ? 1.5 * scale : 0.0),
@@ -903,10 +1086,8 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 			return frame;
 		};
 
-		const QPointF tail = path.pointAtPercent(0.0);
-		QPointF tailDir = path.pointAtPercent(0.04) - tail;   // into the line
-		const qreal tailLen = qSqrt(tailDir.x() * tailDir.x() + tailDir.y() * tailDir.y());
-		tailDir /= (tailLen > 1e-6 ? tailLen : 1);
+		const QPointF tail = marks.tail;
+		const QPointF tailDir = marks.tailDir;   // into the line
 
 		painter->setBrush(Qt::NoBrush);
 		switch (m_style)
@@ -982,10 +1163,8 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	// goes, so the tail reads as a mirror of the head rather than a bar across it
 	if (isMonic())
 	{
-		const QPointF start = path.pointAtPercent(0.0);
-		QPointF tailWay = path.pointAtPercent(0.04) - start;
-		const qreal len = qSqrt(tailWay.x() * tailWay.x() + tailWay.y() * tailWay.y());
-		tailWay /= (len > 1e-6 ? len : 1);
+		const QPointF start = marks.tail;
+		const QPointF tailWay = marks.tailDir;
 		const QPointF tailNormal(-tailWay.y(), tailWay.x());
 
 		if (isInclusion())

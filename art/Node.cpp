@@ -74,6 +74,7 @@ Node::Node(const QString& id, QGraphicsItem *parent)
 	, m_key(QStringLiteral("n%1").arg(++s_nextKey))
 {
 	setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);   // itemChange sees moves
+	m_cornerRadius = AppSettings::instance().nodeCornerRadius();
 	setId(id);
 }
 

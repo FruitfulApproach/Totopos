@@ -76,7 +76,18 @@ Node* ArrowTutor::onPlace(TutorSession& session, const QPointF& scenePos)
 	Category* home = m_from->surroundingCategory();
 	if (home == nullptr)
 		return nullptr;
-	if (!home->mapRectToScene(home->boxRect()).contains(scenePos))
+	// INSIDE IT - unless it IS the canvas, which has no outside.
+	//
+	// A drawn category is a box, and an object of it put down beyond its
+	// frame would be sitting outside the thing it is an object of. The
+	// ambient category is not a box: it is the paper, its frame is only the
+	// union of whatever happens to be on it, and every point of the canvas is
+	// already in it. Testing it the same way meant that double-clicking a
+	// hand's breadth from the one object on the canvas was "outside the
+	// category" and refused - so the gesture that draws an arrow to somewhere
+	// new did nothing at all on an almost empty diagram, which is exactly
+	// when it is wanted.
+	if (!home->isAmbient() && !home->mapRectToScene(home->boxRect()).contains(scenePos))
 	{
 		session.say(QString("An arrow joins two objects of one category. Put it down inside %1, "
 		                    "where %2 is.").arg(home->id(), m_from->id()), home);

@@ -10,6 +10,7 @@
 #include <QPainterPath>
 #include <QPixmap>
 #include <QScreen>
+#include <QShowEvent>
 
 namespace
 {
@@ -23,6 +24,11 @@ namespace
 	// where the subtext sits: low enough to be clear of the version, high
 	// enough not to touch the frame
 	const int kSayingBaseline = kHeight - kMargin - 6;
+
+	// How long the splash stays up at the least. Long enough to read the name
+	// and the version and to notice the line underneath; short enough that
+	// nobody opening the program to get on with something feels held.
+	const qint64 kLeastVisibleMs = 900;
 
 	const QColor kInk      = QColor(0x1E, 0x20, 0x2C);   // the near-black everything is written in
 	const QColor kQuiet    = QColor(0x6B, 0x70, 0x84);   // for what is only there to be glanced at
@@ -110,6 +116,24 @@ QPixmap SplashScreen::plate()
 
 	painter.end();
 	return pixmap;
+}
+
+void SplashScreen::showEvent(QShowEvent* event)
+{
+	QSplashScreen::showEvent(event);
+	if (!m_up.isValid())
+		m_up.start();
+}
+
+void SplashScreen::finishWhenRead(QWidget* window)
+{
+	// Whatever is left of the minimum, spent with the event loop turning:
+	// the splash goes on painting, and the window behind it goes on getting
+	// ready to be shown.
+	const qint64 so_far = m_up.isValid() ? m_up.elapsed() : kLeastVisibleMs;
+	for (qint64 left = kLeastVisibleMs - so_far; left > 0; left = kLeastVisibleMs - m_up.elapsed())
+		QApplication::processEvents(QEventLoop::AllEvents, int(left));
+	finish(window);
 }
 
 void SplashScreen::say(const QString& what)

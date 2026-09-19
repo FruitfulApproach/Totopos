@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QColor>
 #include <QVariant>
 
 // The application settings: one store (QSettings) behind Tools > Settings.
@@ -42,8 +43,24 @@ public:
 	static const char* LabelPointSize;   // double, 11.0 (0 or less: follow the application font)
 	static const char* ComposeWithRing;  // bool, true: g o f rather than gf
 	static const char* EnglishSelectionOnly; // bool, false: the English panel reads the whole diagram
+	static const char* NodeCornerRadius; // double, 13.0: how round a fresh node's corners are
+
+	// WHAT THE NEXT ONE PLACED IS DRAWN IN.
+	//
+	// Set from the Properties page, by the "Set default" beside the colour
+	// chips: colour one node the way you want them, press it, and everything
+	// placed from then on starts that way. An INVALID colour means nothing
+	// has been chosen and the built-in look stands - which is not the same as
+	// a chosen "none", so both can be said.
+	static const char* NodeFill;         // colour, none chosen
+	static const char* NodeBorder;       // colour, none chosen
+	static const char* ArrowFill;        // colour, none chosen
+	static const char* ArrowBorder;      // colour, none chosen
 
 	QVariant value(const char* key) const;
+	// "category/R-Mod/fill" and its like: one key per built-in, made here so
+	// the spelling lives in one place
+	static QString categoryKey(const QString& builtIn, const char* what);
 	void setValue(const char* key, const QVariant& value);
 	static QVariant defaultValue(const char* key);
 
@@ -78,6 +95,42 @@ public:
 	bool composeWithRing() const { return value(ComposeWithRing).toBool(); }
 	// the English panel reads only what is selected
 	bool englishSelectionOnly() const { return value(EnglishSelectionOnly).toBool(); }
+	// how round the corners of a freshly placed node are
+	double nodeCornerRadius() const { return value(NodeCornerRadius).toDouble(); }
+
+	// The colours a freshly placed node or arrow starts in. An invalid colour
+	// is "nothing chosen": the caller keeps its own built-in look.
+	QColor defaultFill(bool arrow) const
+	{ return value(arrow ? ArrowFill : NodeFill).value<QColor>(); }
+	QColor defaultBorder(bool arrow) const
+	{ return value(arrow ? ArrowBorder : NodeBorder).value<QColor>(); }
+	// A BUILT-IN CATEGORY'S COLOUR IS THE BUILT-IN'S, NOT ONE NODE'S.
+	//
+	// Every R-Mod drawn anywhere is the same category, so they are all drawn
+	// the same: the colour belongs to the NAME, and is kept here under it
+	// rather than on any one node. Change it on one and every R-Mod in every
+	// open diagram follows, which is why the colour chips on a built-in are
+	// not a per-node choice at all.
+	//
+	// Invalid means the built-in's own look stands.
+	QColor categoryFill(const QString& builtIn) const
+	{ return store(builtIn, "fill"); }
+	QColor categoryBorder(const QString& builtIn) const
+	{ return store(builtIn, "border"); }
+	void setCategoryLook(const QString& builtIn, const QColor& fill, const QColor& border);
+
+	// Remember these as what the next one placed should look like. An invalid
+	// colour is stored as such and means "none": a node with no fill at all.
+	void setDefaultLook(bool arrow, const QColor& fill, const QColor& border)
+	{
+		setValue(arrow ? ArrowFill : NodeFill, fill);
+		setValue(arrow ? ArrowBorder : NodeBorder, border);
+	}
+
+private:
+	QColor store(const QString& builtIn, const char* what) const;
+
+public:
 
 	// push every stored value into the objects that act on them, then announce
 	void apply();

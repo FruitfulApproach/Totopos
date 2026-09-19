@@ -28,6 +28,20 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	// its label unless the setting says otherwise (see paint).
 	setDefaultLook(QBrush(QColor(50, 205, 50, 110)), QPen(QColor(30, 144, 255), 1.6));
 
+	// AND WHAT WAS ASKED FOR, which wins over the look above.
+	//
+	// "Set default" on the Properties page stores the colours the next one
+	// placed should start in. Written through setFill/setBorder, so it DOES
+	// count as chosen: somebody picked these, and a node picked out that way
+	// shows its frame whether or not it holds anything, exactly as one
+	// coloured by hand does.
+	const QColor wantedFill = AppSettings::instance().defaultFill(false);
+	const QColor wantedBorder = AppSettings::instance().defaultBorder(false);
+	if (wantedFill.isValid())
+		setFill(QBrush(wantedFill));
+	if (wantedBorder.isValid())
+		setBorder(QPen(wantedBorder, border().widthF() > 0 ? border().widthF() : 1.6));
+
 	// the label is the handle you move it by, and says so
 	if (NodeLabel* text = labelItem())
 		text->setCursor(Qt::SizeAllCursor);

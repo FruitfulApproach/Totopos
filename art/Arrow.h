@@ -210,8 +210,34 @@ public:
 	// depth is taken off it
 	virtual qreal doubleLineGap() const { return 1.8; }
 
+	// WHERE THE MARKS GO, worked out once.
+	//
+	// The head, the second head of an epi, the vee or hook at the tail: all
+	// of them are placed off the same handful of numbers, read off the curve
+	// and scaled for how deep the arrow is drawn. Painting them and testing a
+	// click against them must agree exactly, so both ask for them here rather
+	// than each working them out again.
+	struct Marks
+	{
+		qreal scale = 1.0;
+		QPointF tip, dir, normal;       // the codomain end, and the frame there
+		QPointF tail, tailDir;          // the domain end, pointing into the line
+		qreal headLength = 0, headWidth = 0;
+		qreal secondHeadBack = 0;       // how far back an epi's second head sits
+	};
+	Marks markGeometry(const QPainterPath& path) const;
+
 	QRectF boundingRect() const override;
 	QPainterPath shape() const override;
+
+	// EVERYTHING THIS ARROW DRAWS, as one path: the line (both halves of a
+	// doubled one), the head, and whatever mark its style or its properties
+	// put at either end. Not the label, which is a child node of its own.
+	//
+	// What it is FOR is hit-testing. An arrow is its line and its marks, and
+	// a click on the head or on the hook of an inclusion is a click on the
+	// arrow - so shape() strokes this, not just the curve.
+	QPainterPath figure() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 signals:
