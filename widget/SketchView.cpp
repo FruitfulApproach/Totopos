@@ -113,11 +113,10 @@ void SketchView::setCategoryLocked(bool locked)
 	for (int i = 0; i < m_category->count(); ++i)
 		m_category->setItemIcon(i, i == m_category->currentIndex() ? lock : QIcon());
 	m_category->setToolTip(locked
-		? QStringLiteral("The category is settled once anything is drawn: everything here is an "
-		                 "object or an arrow OF it, and they would all mean something else in "
-		                 "another one. Start a new diagram to choose a different category.")
-		: QStringLiteral("The category everything here is drawn in. It can be changed while the "
-		                 "diagram is still empty."));
+		? QStringLiteral("Settled once the diagram has something in it. Start a new "
+		                 "diagram to work in another category.")
+		: QStringLiteral("The category everything here is drawn in. Changeable while the diagram "
+		                 "is empty."));
 }
 
 void SketchView::buildOverlay()

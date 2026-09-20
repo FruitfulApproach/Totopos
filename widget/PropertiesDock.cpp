@@ -1,4 +1,5 @@
 ﻿#include "widget/PropertiesDock.h"
+#include "core/Palette.h"
 
 #include <QVBoxLayout>
 #include <QFormLayout>
@@ -13,6 +14,8 @@
 #include <QHBoxLayout>
 #include <QCheckBox>
 #include <QSignalBlocker>
+#include <QPointer>
+#include <QPair>
 
 #include <QListWidget>
 #include <QEvent>
@@ -130,6 +133,26 @@ void PropertiesDock::build()
 	m_borderColour->setToolTip("The colour of the frame round it.");
 	connect(m_borderColour, &QAbstractButton::clicked, this, [this] { applyColour(false); });
 	colourRow->addWidget(m_borderColour);
+
+	// The NAME, which is not the box it sits in: a pale wash of a fill wants
+	// dark letters whatever colour the wash is, so the two are asked
+	// separately rather than one being worked out from the other.
+	m_textColour = new QPushButton("Text", colours);
+	m_textColour->setToolTip("The colour the name is written in.");
+	connect(m_textColour, &QAbstractButton::clicked, this, &PropertiesDock::applyTextColour);
+	colourRow->addWidget(m_textColour);
+
+	// WHAT THE NEXT ONE PLACED SHOULD LOOK LIKE.
+	//
+	// Colouring a node is about that node; this says "and from now on, like
+	// this". It takes the two colours beside it exactly as they stand - a
+	// "none" included, since no fill at all is as much a choice as a colour -
+	// and files them as the default for the KIND selected: arrows under
+	// arrows, everything else under nodes, because a line and a box do not
+	// want the same colours and one setting for both would be no setting.
+	m_setDefaultLook = new QPushButton("Set default", colours);
+	connect(m_setDefaultLook, &QAbstractButton::clicked, this, &PropertiesDock::applyDefaultLook);
+	colourRow->addWidget(m_setDefaultLook);
 	nodeForm->addRow("Appearance", colours);
 	layout->addWidget(m_nodeBox);
 
@@ -583,6 +606,36 @@ void PropertiesDock::refresh()
 		m_borderColour->setText(border.isValid() ? QStringLiteral("Border") : QStringLiteral("Border: none"));
 		m_fillColour->setStyleSheet(colourSwatch(fill));
 		m_borderColour->setStyleSheet(colourSwatch(border));
+		const QColor text = first->labelColour();
+		m_textColour->setText(text.isValid() ? QStringLiteral("Text")
+		                                     : QStringLiteral("Text: default"));
+		m_textColour->setStyleSheet(colourSwatch(text));
+
+		// A BUILT-IN CATEGORY HAS NO COLOUR OF ITS OWN TO SET.
+		//
+		// Every R-Mod drawn anywhere is the same category and is drawn the
+		// same; the colour is the built-in's, kept under its name. So the
+		// chips here change all of them at once - and "Set default" has
+		// nothing left to do, because on a built-in the colour IS the
+		// default. Shown greyed rather than taken away, with the reason on it.
+		const QString built = builtInOfSelection();
+		const bool sharedColour = !built.isEmpty();
+		m_setDefaultLook->setEnabled(!sharedColour);
+		m_setDefaultLook->setToolTip(sharedColour
+			? QString("%1's colour is %1's, wherever it is drawn: it is already the default, and "
+			          "changing it above changes every %1 in every open diagram.").arg(built)
+			: QString("Start the next %1 placed in these colours - fill, border and the "
+			          "colour its name is written in. What is already drawn is left alone.").arg(soleArrow() != nullptr ? QStringLiteral("arrow")
+			                                                    : QStringLiteral("node")));
+		const QString whose = sharedColour
+			? QString("Every %1 is drawn in this colour, here and in every other diagram: it "
+			          "belongs to %1 rather than to this one node.").arg(built)
+			: QString();
+		m_fillColour->setToolTip(sharedColour ? whose
+			: QStringLiteral("The colour inside. A colour chosen by hand is always drawn, even on a "
+			                 "node that holds nothing and would otherwise be just its label."));
+		m_borderColour->setToolTip(sharedColour ? whose
+			: QStringLiteral("The colour of the frame round it."));
 	}
 
 	m_objectBox->setVisible(!objects.isEmpty());
@@ -911,9 +964,19 @@ void PropertiesDock::applyBackgroundColour()
 	QColorDialog dialog(current.isValid() ? current : QColor(Qt::white), this);
 	dialog.setOption(QColorDialog::ShowAlphaChannel, false);
 	dialog.setWindowTitle(QStringLiteral("Background"));
-	if (dialog.exec() != QDialog::Accepted)
-		return;
-	m_scene->setBackground(dialog.currentColor());
+
+	// SHOWN WHILE IT IS BEING CHOSEN. A colour is picked by looking at it, not
+	// by reading its numbers: the paper changes under the dialog as the
+	// cursor moves over the wheel, and Cancel puts back the colour it had.
+	QPointer<DiagramScene> scene = m_scene;
+	connect(&dialog, &QColorDialog::currentColorChanged, this, [scene](const QColor& colour) {
+		if (!scene.isNull())
+			scene->setBackground(colour);
+	});
+	const bool accepted = dialog.exec() == QDialog::Accepted;
+	if (m_scene == nullptr)
+		return;   // the diagram was closed under the dialog
+	m_scene->setBackground(accepted ? dialog.currentColor() : current);
 	refresh();
 }
 
@@ -937,16 +1000,168 @@ void PropertiesDock::applyColour(bool fill)
 	QColorDialog dialog(current.isValid() ? current : QColor(Qt::white), this);
 	dialog.setOption(QColorDialog::ShowAlphaChannel, fill);
 	dialog.setWindowTitle(fill ? QStringLiteral("Fill") : QStringLiteral("Border"));
-	if (dialog.exec() != QDialog::Accepted)
+
+	// SHOWN ON THE THINGS THEMSELVES WHILE IT IS BEING CHOSEN.
+	//
+	// A colour is judged against what it is next to, so the selection wears
+	// each shade as the cursor passes over it. Two things follow from that:
+	//
+	//   * what the dialog paints is a PREVIEW and never goes in the history -
+	//     setFill/setBorder, not the Recorded pair, or the undo stack would
+	//     fill with every shade the cursor crossed;
+	//   * the state the dialog opened on is kept here, so Cancel puts it back
+	//     exactly, and OK puts it back FIRST and then applies the chosen
+	//     colour properly - which leaves one entry in the history, from the
+	//     colour that was really there to the colour that was really chosen.
+	const QString built = builtInOfSelection();
+	AppSettings& settings = AppSettings::instance();
+	const QColor keptFill = built.isEmpty() ? QColor() : settings.categoryFill(built);
+	const QColor keptBorder = built.isEmpty() ? QColor() : settings.categoryBorder(built);
+
+	QList<QPair<QPointer<Node>, QPair<QBrush, QPen>>> before;
+	if (built.isEmpty())
+		for (Node* node : nodes)
+			before.append({ QPointer<Node>(node), { node->fill(), node->border() } });
+
+	const auto wear = [&](const QColor& colour) {
+		if (!built.isEmpty())
+		{
+			settings.setCategoryLook(built, fill ? colour : keptFill, fill ? keptBorder : colour);
+			return;
+		}
+		for (const auto& was : before)
+		{
+			if (was.first.isNull())
+				continue;
+			if (fill)
+				was.first->setFill(colour.isValid() ? QBrush(colour) : QBrush(Qt::NoBrush));
+			else
+				was.first->setBorder(colour.isValid() ? QPen(colour, was.second.second.widthF() > 0
+					? was.second.second.widthF() : 1.5) : QPen(Qt::NoPen));
+		}
+	};
+	const auto putBack = [&] {
+		if (!built.isEmpty())
+		{
+			settings.setCategoryLook(built, keptFill, keptBorder);
+			return;
+		}
+		for (const auto& was : before)
+			if (!was.first.isNull())
+			{
+				was.first->setFill(was.second.first);
+				was.first->setBorder(was.second.second);
+			}
+	};
+
+	connect(&dialog, &QColorDialog::currentColorChanged, this,
+	        [&wear](const QColor& colour) { wear(colour); });
+	const bool accepted = dialog.exec() == QDialog::Accepted;
+	putBack();   // whichever way it went, the history starts from where it began
+	if (!accepted)
+	{
+		refresh();
+		return;
+	}
+
+	// A BUILT-IN'S COLOUR IS THE BUILT-IN'S. Written under its name rather
+	// than onto this node, and every R-Mod anywhere is redrawn in it - which
+	// is the whole point: they are all the same category.
+	if (!built.isEmpty())
+	{
+		settings.setCategoryLook(built,
+			fill ? dialog.currentColor() : keptFill,
+			fill ? keptBorder : dialog.currentColor());
+		refresh();
+		return;
+	}
+
+	for (const auto& was : before)
+	{
+		if (was.first.isNull())
+			continue;   // deleted while the dialog was up
+		if (fill)
+			was.first->setFillRecorded(dialog.currentColor());
+		else
+			was.first->setBorderRecorded(dialog.currentColor());
+	}
+	refresh();
+}
+
+void PropertiesDock::applyTextColour()
+{
+	if (m_updating)
+		return;
+	const QList<Node*> nodes = selection();
+	if (nodes.isEmpty())
 		return;
 
+	// the colour the dialog opens on: whatever the first one selected writes
+	// its name in, or the ink it would be written in if nobody has said
+	const QColor current = nodes.first()->labelColour();
+	QColorDialog dialog(current.isValid() ? current : Palette::ink(), this);
+	dialog.setOption(QColorDialog::ShowAlphaChannel, false);
+	dialog.setWindowTitle(QStringLiteral("Text"));
+
+	// Worn while it is being chosen, exactly as the fill and the border are
+	// (see applyColour): the preview is not recorded, the colours the dialog
+	// opened on are put back whichever way it ends, and only then is the
+	// chosen one applied properly - one entry in the history, from what was
+	// really there to what was really chosen.
+	QList<QPair<QPointer<Node>, QColor>> before;
 	for (Node* node : nodes)
+		before.append({ QPointer<Node>(node), node->labelColour() });
+
+	connect(&dialog, &QColorDialog::currentColorChanged, this, [&before](const QColor& colour) {
+		for (const auto& was : before)
+			if (!was.first.isNull())
+				was.first->setLabelColour(colour);
+	});
+	const bool accepted = dialog.exec() == QDialog::Accepted;
+	for (const auto& was : before)
+		if (!was.first.isNull())
+			was.first->setLabelColour(was.second);
+	if (!accepted)
 	{
-		if (fill)
-			node->setFillRecorded(dialog.currentColor());
-		else
-			node->setBorderRecorded(dialog.currentColor());
+		refresh();
+		return;
 	}
+
+	for (const auto& was : before)
+		if (!was.first.isNull())
+			was.first->setLabelColourRecorded(dialog.currentColor());
+	refresh();
+}
+
+QString PropertiesDock::builtInOfSelection() const
+{
+	const QList<Node*> nodes = selection();
+	if (nodes.size() != 1)
+		return QString();   // two at once is not one built-in's colour
+	auto* category = dynamic_cast<Category*>(nodes.first());
+	return category != nullptr ? category->builtInName() : QString();
+}
+
+void PropertiesDock::applyDefaultLook()
+{
+	if (m_updating)
+		return;
+	const QList<Node*> nodes = selection();
+	if (nodes.isEmpty())
+		return;
+
+	// The colours as they stand on the first one selected - the two the chips
+	// beside this button are wearing. An invalid colour is a chosen "none",
+	// and is stored as one.
+	Node* first = nodes.first();
+	const QColor fill = first->fill().style() == Qt::NoBrush ? QColor() : first->fill().color();
+	const QColor border = first->border().style() == Qt::NoPen ? QColor() : first->border().color();
+	const bool arrow = dynamic_cast<Arrow*>(first) != nullptr;
+	AppSettings::instance().setDefaultLook(arrow, fill, border);
+	// and the colour its name is written in, taken the same way: what the
+	// chip beside this button is wearing, an invalid one meaning "nothing
+	// chosen - the ink names are written in"
+	AppSettings::instance().setDefaultText(arrow, first->labelColour());
 	refresh();
 }
 

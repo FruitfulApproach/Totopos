@@ -58,7 +58,16 @@ private:
 	// open a colour dialog and give what comes back to every node selected;
 	// `fill` picks which of the two colours is being changed
 	void applyColour(bool fill);
+	// the colour the NAME is written in, which is nobody else's business
+	void applyTextColour();
 	void applyBackgroundColour();
+	// store the selected node's colours as what the next one placed starts in
+	void applyDefaultLook();
+	// The built-in category the selection IS, by name, or empty. Its colour
+	// belongs to the built-in rather than to the node (see
+	// AppSettings::categoryFill), which is what makes the chips change every
+	// instance at once and the "Set default" beside them beside the point.
+	QString builtInOfSelection() const;
 	// the stylesheet that makes a chip wear its own colour; empty for none
 	static QString colourSwatch(const QColor& colour);
 	void applyExistsSuch(bool on);
@@ -95,6 +104,9 @@ private:
 	// what the Appearance submenu of the right-click menu used to offer
 	QPushButton* m_fillColour = nullptr;
 	QPushButton* m_borderColour = nullptr;
+	// "what the next one placed looks like", beside the two chips
+	QPushButton* m_textColour = nullptr;
+	QPushButton* m_setDefaultLook = nullptr;
 
 	// Everything a CATEGORY is asked about: which one it is, whether the
 	// diagram drawn in it commutes, what that diagram is put forward as, and

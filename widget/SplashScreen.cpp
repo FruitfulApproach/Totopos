@@ -18,9 +18,21 @@ namespace
 	// these and scaled once, at the end, to whatever the screen is: a splash
 	// screen laid out in device pixels is a different picture on every
 	// machine, and this one is the same picture everywhere.
-	const int kWidth  = 520;
-	const int kHeight = 320;
+	const int kWidth  = 560;
+	const int kHeight = 430;
 	const int kMargin = 34;
+
+	// THE LOGO GETS THE TOP OF THE CARD, and nearly all of it.
+	//
+	// It is the thing worth looking at, so the card is sized round it rather
+	// than the other way about: the artwork is 414x256, and this room is deep
+	// enough to show it at very nearly that, where it used to be squeezed to
+	// well under half. The rows below are placed off the bottom of this room,
+	// so giving the logo more or less room moves them with it.
+	const int kLogoTop = kMargin - 6;
+	const int kLogoHeight = 250;
+	const int kNameTop = kLogoTop + kLogoHeight + 8;
+	const int kVersionTop = kNameTop + 48;
 	// where the subtext sits: low enough to be clear of the version, high
 	// enough not to touch the frame
 	const int kSayingBaseline = kHeight - kMargin - 6;
@@ -82,7 +94,7 @@ QPixmap SplashScreen::plate()
 	const QPixmap logo(QStringLiteral(":/img/TotoposLogo.png"));
 	if (!logo.isNull())
 	{
-		const QRect room(kMargin, kMargin - 6, kWidth - 2 * kMargin, 150);
+		const QRect room(kMargin, kLogoTop, kWidth - 2 * kMargin, kLogoHeight);
 		const QSize fitted = logo.size().scaled(room.size(), Qt::KeepAspectRatio);
 		const QRect at(room.x() + (room.width() - fitted.width()) / 2,
 		               room.y() + (room.height() - fitted.height()) / 2,
@@ -97,7 +109,7 @@ QPixmap SplashScreen::plate()
 	title.setWeight(QFont::Light);
 	painter.setFont(title);
 	painter.setPen(kInk);
-	painter.drawText(QRect(0, kMargin + 148, kWidth, 46), Qt::AlignHCenter | Qt::AlignVCenter,
+	painter.drawText(QRect(0, kNameTop, kWidth, 46), Qt::AlignHCenter | Qt::AlignVCenter,
 	                 Version::name());
 
 	// the version, small and quiet, directly under the name
@@ -106,7 +118,7 @@ QPixmap SplashScreen::plate()
 	version.setWeight(QFont::Normal);
 	painter.setFont(version);
 	painter.setPen(kQuiet);
-	painter.drawText(QRect(0, kMargin + 192, kWidth, 20), Qt::AlignHCenter | Qt::AlignVCenter,
+	painter.drawText(QRect(0, kVersionTop, kWidth, 20), Qt::AlignHCenter | Qt::AlignVCenter,
 	                 QStringLiteral("version %1").arg(Version::number()));
 
 	// a hairline above the subtext, so the line that keeps changing is visibly

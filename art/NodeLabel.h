@@ -35,6 +35,13 @@ public:
 	void showLockedHint();
 
 	QRectF boundingRect() const override;
+	// What the letters actually cover, with the line's ascent and descent
+	// trimmed off. boundingRect() is a LINE of text - as tall as the font can
+	// ever need - and a node that is nothing but its name was getting that
+	// whole line as its box, which is a wide empty border above and below a
+	// single D. Falls back to boundingRect() for anything laid out in more
+	// than a plain single line.
+	QRectF inkRect() const;
 	void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 	void beginEdit();

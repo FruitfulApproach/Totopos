@@ -25,10 +25,13 @@ const char* AppSettings::LabelPointSize = "label/pointSize";
 const char* AppSettings::ComposeWithRing = "notation/composeWithRing";
 const char* AppSettings::EnglishSelectionOnly = "english/selectionOnly";
 const char* AppSettings::NodeCornerRadius = "node/cornerRadius";
+const char* AppSettings::BendLingerMs = "arrow/bendLingerMs";
 const char* AppSettings::NodeFill = "node/fill";
 const char* AppSettings::NodeBorder = "node/border";
 const char* AppSettings::ArrowFill = "arrow/fill";
 const char* AppSettings::ArrowBorder = "arrow/border";
+const char* AppSettings::NodeText = "node/text";
+const char* AppSettings::ArrowText = "arrow/text";
 
 namespace
 {
@@ -105,11 +108,36 @@ QVariant AppSettings::defaultValue(const char* key)
 	if (k == ComposeWithRing) return true;
 	if (k == EnglishSelectionOnly) return false;
 	if (k == NodeCornerRadius) return 13.0;
+	if (k == BendLingerMs) return 2000;
 	// A default QColor is INVALID, and that is the answer wanted: nothing has
 	// been chosen, so whatever placed the node keeps its own look.
-	if (k == NodeFill || k == NodeBorder || k == ArrowFill || k == ArrowBorder)
+	if (k == NodeFill || k == NodeBorder || k == ArrowFill || k == ArrowBorder
+	 || k == NodeText || k == ArrowText)
 		return QColor();
 	return QVariant();
+}
+
+QString AppSettings::categoryKey(const QString& builtIn, const char* what)
+{
+	return QStringLiteral("category/%1/%2").arg(builtIn, QString::fromLatin1(what));
+}
+
+QColor AppSettings::categoryColour(const QString& builtIn, const char* what) const
+{
+	if (builtIn.isEmpty())
+		return QColor();   // not a built-in: its colour is its own node's
+	return ::store().value(categoryKey(builtIn, what)).value<QColor>();
+}
+
+void AppSettings::setCategoryLook(const QString& builtIn, const QColor& fill, const QColor& border)
+{
+	if (builtIn.isEmpty())
+		return;
+	::store().setValue(categoryKey(builtIn, "fill"), fill);
+	::store().setValue(categoryKey(builtIn, "border"), border);
+	// Everything drawn follows at once: apply() re-reads the appearances,
+	// which is how every other R-Mod in every open diagram hears about this.
+	apply();
 }
 
 QVariant AppSettings::value(const char* key) const

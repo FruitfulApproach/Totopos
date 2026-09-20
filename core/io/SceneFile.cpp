@@ -17,7 +17,7 @@
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
-	const quint16 kVersion = 21;   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+	const quint16 kVersion = 22;   // 22: the colour each name is written in   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
 
 	// THE TWO MEANINGS OF VERSION 15.
 	//
@@ -98,6 +98,9 @@ namespace
 		out << node->markedForDeletion() << node->labelOffset();
 		// version 17: WHICH node this is, as against what it is called
 		out << node->key();
+		// version 22: the colour the NAME is written in. Invalid means nobody
+		// said, and it is written in the ink names are written in.
+		out << node->labelColour();
 
 		if (auto* category = dynamic_cast<Category*>(node))
 		{
@@ -215,6 +218,7 @@ namespace
 		QList<QPointF> bends;
 		quint8 style = 0;   // Arrow::Style::Plain
 		QString key;
+		QColor labelColour;   // invalid: written in the ink names are written in
 		QString pattern;
 		QList<QPair<QList<int>, QString>> patternSources;
 	};
@@ -261,6 +265,9 @@ namespace
 		QString nodeKey;
 		if (version >= 17)
 			in >> nodeKey;
+		QColor labelColour;
+		if (version >= 22)
+			in >> labelColour;
 
 		Node* node = nullptr;
 		if (kind == "Arrow" || kind == "Functor")
@@ -275,6 +282,7 @@ namespace
 			arrow.border = border;
 			arrow.width = width;
 			arrow.key = nodeKey;
+			arrow.labelColour = labelColour;
 			arrow.existsSuch = existsSuch;
 			arrow.hypothesis = hypothesis;
 			arrow.deleteMark = deleteMark;
@@ -384,6 +392,7 @@ namespace
 		node->setDeleteMark(deleteMark);
 		node->setHypothesis(hypothesis);
 		node->setLabelOffset(labelOffset);
+		node->setLabelColour(labelColour);
 		node->setCommutesInComponent(componentCommutes);
 		node->setRowsExactInComponent(componentRows);
 		node->setColumnsExactInComponent(componentColumns);
@@ -808,6 +817,7 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		arrow->setStyle(static_cast<Arrow::Style>(p.style));
 		arrow->setKey(p.key);
 		arrow->setLabelOffset(p.labelOffset);
+		arrow->setLabelColour(p.labelColour);
 		if (!p.pattern.isEmpty())
 			derived.append(PendingDerived{ arrow, p.pattern, p.patternSources });
 		if (!p.imageFunctor.isEmpty())

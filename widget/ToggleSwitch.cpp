@@ -1,4 +1,5 @@
 ﻿#include "widget/ToggleSwitch.h"
+#include "core/Palette.h"
 
 #include <QPainter>
 #include <QPropertyAnimation>
@@ -116,7 +117,7 @@ void ToggleSwitch::paintEvent(QPaintEvent*)
 	if (hasFocus())
 	{
 		painter.setBrush(Qt::NoBrush);
-		painter.setPen(QPen(QColor(99, 102, 241), 1.5));
+		painter.setPen(QPen(Palette::picked(), 1.5));
 		painter.drawRoundedRect(r.adjusted(0.75, 0.75, -0.75, -0.75), radius, radius);
 	}
 }

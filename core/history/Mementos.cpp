@@ -26,12 +26,28 @@ void ItemsMoved::redo()
 			m.node->setPos(m.after);
 }
 
+StyleChanged* StyleChanged::ofLabelColour(const QString& description, Node* node,
+                                          const QColor& before, const QColor& after)
+{
+	auto* change = new StyleChanged(description, node, QBrush(), QPen(), QBrush(), QPen());
+	change->m_touchesPaint = false;
+	change->m_touchesLabel = true;
+	change->m_labelBefore = before;
+	change->m_labelAfter = after;
+	return change;
+}
+
 void StyleChanged::undo()
 {
 	if (m_node.isNull())
 		return;
-	m_node->setFill(m_fillBefore);
-	m_node->setBorder(m_borderBefore);
+	if (m_touchesPaint)
+	{
+		m_node->setFill(m_fillBefore);
+		m_node->setBorder(m_borderBefore);
+	}
+	if (m_touchesLabel)
+		m_node->setLabelColour(m_labelBefore);
 	if (m_radiusBefore >= 0)
 		m_node->setCornerRadius(m_radiusBefore);
 }
@@ -40,8 +56,13 @@ void StyleChanged::redo()
 {
 	if (m_node.isNull())
 		return;
-	m_node->setFill(m_fillAfter);
-	m_node->setBorder(m_borderAfter);
+	if (m_touchesPaint)
+	{
+		m_node->setFill(m_fillAfter);
+		m_node->setBorder(m_borderAfter);
+	}
+	if (m_touchesLabel)
+		m_node->setLabelColour(m_labelAfter);
 	if (m_radiusAfter >= 0)
 		m_node->setCornerRadius(m_radiusAfter);
 }

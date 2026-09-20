@@ -55,6 +55,11 @@ public:
 	static QString applied(const QString& functor, const QString& element);
 	static QChar hole() { return QLatin1Char('.'); }
 
+	// Where an image can be put down without landing on something already
+	// drawn: the spot asked for, or the first one clear of everything below
+	// it. See the note on the implementation.
+	static QPointF freeSpotIn(Object* cod, const QPointF& wanted);
+
 	// Would this name be read as ONE thing? G is; G∘F is not, and has to be
 	// bracketed before it takes an argument, or (G∘F)(X) comes out as
 	// G∘F(X), which reads as G applied to F(X).
@@ -191,6 +196,52 @@ private:
 	// the node in the domain that this key belongs to, or nullptr
 	Node* sourceWithKey(const QString& key) const;
 	Node* imageOf(Object* codomain, const QString& functor, const Node* source) const;
+	// THE SAME SHAPE, NOT THE SAME POINTS.
+	//
+	// A bend is a point in its OWN arrow's coordinates, so handing one
+	// arrow's points to another says "bend at this spot on the page", not
+	// "bend like this". The image arrow starts somewhere else and is a
+	// different length, so the copy came out with the bow in the wrong place
+	// and the wrong size - and along a chain of functors, C -> D -> E, the
+	// error was copied onto the copy and grew at every step.
+	//
+	// So a bend is carried across in the line's OWN frame: how far along the
+	// run it sits, and how far off to the side, both as a fraction of the
+	// run. Read back against the other arrow's run that gives the same shape
+	// wherever it is drawn and however long it is - and a chain of them
+	// stays uniform, because each step reads the shape rather than adding to
+	// the last step's error.
+	static QList<QPointF> carriedBends(const Arrow* from, const Arrow* to, bool reversed);
+
+	// the one place an image belongs: its source's place, read in the
+	// codomain's own coordinates, moved along by this mapping's column
+	QPointF imagePlace(const Node* source) const;
+	// WHICH COLUMN OF THE CODOMAIN IS THIS MAPPING'S.
+	//
+	// Two functors out of the same C into the same D each draw the whole of
+	// C's diagram, and each draws it at C's own arrangement - so F(X) landed
+	// exactly on G(X), and the pair of them read as one object with two
+	// names written over each other.
+	//
+	// They are told apart by giving each mapping a column of the grid. The
+	// order is the order the functors are drawn in, top to bottom, because
+	// that is the order they are read in: the arrow drawn highest takes
+	// column 0, the next one column 1, and so on.
+	int column() const;
+	// how far apart those columns stand, in scene units
+	static qreal columnStep();
+	// IS THE DOMAIN'S DIAGRAM A ROW OR A COLUMN?
+	//
+	// f : X -> Y drawn downwards leaves the width of the codomain free, so
+	// the copies stand side by side. Drawn along a row it does not: a second
+	// copy beside the first would be in line with the first one's own
+	// objects, and the two would read as one long row. The whole
+	// arrangement turns a quarter turn with the diagram - the copies stack
+	// DOWNWARDS instead, and the functors are read left to right rather than
+	// top to bottom.
+	bool domainIsRow() const;
+	// where this mapping's copy stands, measured from the first one's
+	QPointF columnOffset() const;
 	void stamp(Node* image, const QString& functor, const Node* source) const;
 	// is that node one of ours?
 	bool isOurImage(const Node* node) const;

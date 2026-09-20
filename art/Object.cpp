@@ -1,4 +1,5 @@
 ﻿#include "art/Object.h"
+#include "core/Palette.h"
 #include "art/Category.h"
 #include "art/AtomicElement.h"
 #include "core/Emoji.h"
@@ -26,7 +27,7 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	// the members rather than through setFill/setBorder, so this does NOT count
 	// as a style chosen by hand - an object with nothing in it is still just
 	// its label unless the setting says otherwise (see paint).
-	setDefaultLook(QBrush(QColor(50, 205, 50, 110)), QPen(QColor(30, 144, 255), 1.6));
+	setDefaultLook(QBrush(Palette::faded(Palette::thing(), 105)), QPen(Palette::cobalt(), 1.6));
 
 	// AND WHAT WAS ASKED FOR, which wins over the look above.
 	//
@@ -41,6 +42,10 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 		setFill(QBrush(wantedFill));
 	if (wantedBorder.isValid())
 		setBorder(QPen(wantedBorder, border().widthF() > 0 ? border().widthF() : 1.6));
+
+	// and the colour its name is written in, if one was asked for
+	if (const QColor wantedText = AppSettings::instance().defaultText(false); wantedText.isValid())
+		setLabelColour(wantedText);
 
 	// the label is the handle you move it by, and says so
 	if (NodeLabel* text = labelItem())
@@ -58,24 +63,13 @@ QRectF Object::boxRect() const
 	// air between the frame and its contents. A node that holds nothing is
 	// its label and nothing else - a module called M is the letter M - so it
 	// gets barely any: the border, where one is drawn at all, sits close in.
-	const qreal air = containedCount() == 0 ? 0.5 : 2.5;
+	// (contentFrame gives the letters themselves for a node that holds
+	// nothing, so this is air round the GLYPH, not round its text line.)
+	const qreal air = containedCount() == 0 ? 2.5 : 1.5;
 	const QRectF box = contentFrame().adjusted(-air, -air, air, air);
 
-	// A SINGLE LETTER IS DRAWN IN A SQUARE. A glyph's rect is taller than it
-	// is wide, so O, X, M and the rest each came out as a narrow upright
-	// box - a row of them read as a row of different shapes rather than as a
-	// row of objects. Taking the longer side for both makes one square, and
-	// keeping the centre where it was means the letter does not shift: the
-	// box only grows outwards around it.
-	//
-	// Only for a leaf. A node that holds something is a frame round what it
-	// holds, and squaring that would push its contents off centre.
-	if (containedCount() != 0 || id().size() != 1)
-		return box;
-
-	const qreal side = qMax(box.width(), box.height());
-	const QPointF middle = box.center();
-	return QRectF(middle.x() - side / 2.0, middle.y() - side / 2.0, side, side);
+	// one letter is drawn in a square, and the square is centred on it
+	return squareIfSingleGlyph(box);
 }
 
 void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -103,22 +97,22 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	{
 		// dots around the border: this object is asserted to exist
 		if (pen.style() == Qt::NoPen)
-			pen = QPen(QColor(60, 60, 70), 1.6 * scale);
+			pen = QPen(Palette::ink(), 1.6 * scale);
 		pen.setStyle(Qt::DotLine);
 	}
 	if (hasError())
 	{
 		// part of something the diagram cannot mean: shown, not hidden
 		const Qt::PenStyle style = pen.style() == Qt::DotLine ? Qt::DotLine : Qt::SolidLine;
-		pen = QPen(QColor(255, 0, 0), 2.5 * scale);
+		pen = QPen(Palette::wrong(), 2.5 * scale);
 		pen.setStyle(style);
 	}
 	if (isHighlighted())
 	{
 		// last word: whatever this object is painted with, right now it is
 		// being pointed at
-		pen = QPen(QColor(22, 163, 74), 3.0 * scale);
-		brush = QBrush(QColor(34, 197, 94, 70));
+		pen = QPen(Palette::pointedAt(), 3.0 * scale);
+		brush = QBrush(Palette::faded(Palette::pointedAt(), 70));
 	}
 
 	// PICKED OUT. The fill comes forward either way, so the object reads as
@@ -144,13 +138,13 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	painter->setPen(pen);
 	// the BOX, not boundingRect(): that one also covers the label, which may
 	// have been dragged clear of the frame (see Node::boxRect)
-	painter->drawRoundedRect(boxRect(), cornerRadius(), cornerRadius());
+	painter->drawRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
 
 	if (selected && !existsSuch())
 	{
 		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(QColor(99, 102, 241), 1.0 * scale, Qt::DashLine));
-		painter->drawRoundedRect(boxRect(), cornerRadius(), cornerRadius());
+		painter->setPen(QPen(Palette::picked(), 1.0 * scale, Qt::DashLine));
+		painter->drawRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
 	}
 
 	// Struck off: this one goes when the rule is applied. Drawn last, over
@@ -162,7 +156,7 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 		const qreal reach = qMin(qreal(11.0) * scale, qMin(frame.width(), frame.height()) / 2);
 		const QPointF at = frame.center();
 		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(QColor(220, 38, 38), 2.5 * scale, Qt::SolidLine, Qt::RoundCap));
+		painter->setPen(QPen(Palette::wrong(), 2.5 * scale, Qt::SolidLine, Qt::RoundCap));
 		painter->drawLine(at + QPointF(-reach, -reach), at + QPointF(reach, reach));
 		painter->drawLine(at + QPointF(-reach, reach), at + QPointF(reach, -reach));
 	}
@@ -239,7 +233,10 @@ void Object::addElementAction(QMenu& menu, const QPointF& atScene)
 	                        "element of one is something that can be drawn and carried across an "
 	                        "arrow.").arg(id(), home->id()));
 	Object* self = this;
-	QObject::connect(add, &QAction::triggered, diagram, [diagram, self, atScene] {
+	// the nearest clear grid point to where the menu was opened: an element
+	// asked for while the cursor is on one already must not land on it
+	const QPointF clear = mapToScene(freeGridSpotIn(this, mapFromScene(atScene)));
+	QObject::connect(add, &QAction::triggered, diagram, [diagram, self, atScene = clear] {
 		// queued: the menu is still closing, and this puts a node in the scene
 		QMetaObject::invokeMethod(diagram, [diagram, self, atScene] {
 			if (AtomicElement* made = self->createElement(atScene))
@@ -278,7 +275,7 @@ void Object::populateActions(QMenu& menu)
 QPainterPath Object::shape() const
 {
 	QPainterPath path;
-	path.addRoundedRect(boxRect(), cornerRadius(), cornerRadius());
+	path.addRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
 	return path;
 }
 

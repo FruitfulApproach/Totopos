@@ -1,8 +1,10 @@
 ﻿#include "art/NodeLabel.h"
+#include "core/Palette.h"
 #include "art/Node.h"
 
 #include <QKeyEvent>
 #include <QTextDocument>
+#include <QTextOption>
 #include <QTextCursor>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsScene>
@@ -11,6 +13,7 @@
 #include "core/Emoji.h"
 #include <QVariantAnimation>
 #include <QPainter>
+#include <QFontMetricsF>
 #include <QDebug>
 
 NodeLabel::NodeLabel(const QString& text, Node* node)
@@ -104,15 +107,64 @@ void NodeLabel::setSource(const QString& text)
 		renderSource();   // mid-edit the document belongs to the person typing
 }
 
+namespace
+{
+	// THE ONLY THING THAT BREAKS A NAME IS SOMEBODY WRITING THE BREAK.
+	//
+	// A name is written with a backslash and an n where a new line is wanted,
+	// the way it is written everywhere else, and that is the whole of it:
+	// nothing else in the program decides that a name has got long enough to
+	// fold. See the note in renderSource.
+	const QString kBreak = QStringLiteral("\\n");
+
+	// A REAL line break in the text is not one somebody asked for.
+	//
+	// Nobody types a newline into a name - the editor commits on Return - so
+	// one that is in there arrived by some other road: pasted in, read from a
+	// file written elsewhere, or built by something that joined two pieces.
+	// Left alone it folds the name in a place nobody chose, which is what
+	// turned (G o F)(X) into two lines. It reads as a space, which is what it
+	// would have been had it been typed.
+	QString oneLine(const QString& text)
+	{
+		QString out = text;
+		out.replace(QLatin1Char('\r'), QLatin1Char(' '));
+		out.replace(QLatin1Char('\n'), QLatin1Char(' '));
+		return out;
+	}
+
+	QString withBreaks(const QString& text, bool html)
+	{
+		QString out = oneLine(text);
+		out.replace(kBreak, html ? QStringLiteral("<br>") : QStringLiteral("\n"));
+		return out;
+	}
+}
+
 void NodeLabel::renderSource()
 {
+	// A NAME IS ONE LINE, however long it gets.
+	//
+	// (G o F)(X) came out folded into "(G o F" and ")(X)", one above the
+	// other, which is not a name any more - it reads as two. A name is one
+	// thing said in one breath, and a diagram has room to the sides: better a
+	// wide label than a name broken in a place nobody chose.
+	//
+	// So wrapping is off, here and for the editor, and the only thing that
+	// starts a new line is a backslash and an n written in the name itself,
+	// which is a break somebody chose and is kept.
+	QTextOption option = document()->defaultTextOption();
+	option.setWrapMode(QTextOption::NoWrap);
+	document()->setDefaultTextOption(option);
+	document()->setTextWidth(-1);   // -1: as wide as it needs to be
+
 	// Plain text unless there is something to raise or lower. setHtml on an
 	// ordinary name would put it through the rich-text parser for nothing,
 	// and & or < in a name would have to be escaped on the way in.
-	if (Notation::hasScripts(m_source))
-		setHtml(Notation::toHtml(m_source));
+	if (Notation::hasScripts(m_source) || m_source.contains(kBreak))
+		setHtml(withBreaks(Notation::toHtml(m_source), true));
 	else
-		setPlainText(m_source);
+		setPlainText(oneLine(m_source));
 }
 
 QRectF NodeLabel::boundingRect() const
@@ -121,6 +173,30 @@ QRectF NodeLabel::boundingRect() const
 	// room for the padlock, and only while it is out: a permanent margin here
 	// would widen every node's frame for nothing
 	return m_hinting ? base.adjusted(-2, -15, 15, 2) : base;
+}
+
+QRectF NodeLabel::inkRect() const
+{
+	const QRectF base = QGraphicsTextItem::boundingRect();
+	const QString text = toPlainText();
+	// the padlock needs its room; scripts and breaks are laid out by the
+	// document and are not one plain line of glyphs
+	if (m_hinting || text.isEmpty() || text.contains(QLatin1Char('\n'))
+	    || Notation::hasScripts(m_source))
+		return boundingRect();
+
+	const QFontMetricsF fm(font());
+	const QRectF ink = fm.tightBoundingRect(text);
+	if (ink.isEmpty())
+		return base;
+
+	// tightBoundingRect is measured from the pen position on the baseline, so
+	// it is put back where the document draws that baseline: margin down from
+	// the top of the line, plus the ascent.
+	const qreal margin = document()->documentMargin();
+	return QRectF(base.left() + margin + ink.left(),
+	              base.top() + margin + fm.ascent() + ink.top(),
+	              ink.width(), ink.height());
 }
 
 void NodeLabel::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -133,10 +209,10 @@ void NodeLabel::paint(QPainter* painter, const QStyleOptionGraphicsItem* option,
 	const int alpha = int(230 * m_hintLevel);
 	const QRectF text = QGraphicsTextItem::boundingRect();
 	painter->setBrush(Qt::NoBrush);
-	painter->setPen(QPen(QColor(180, 83, 9, alpha), 1.6));
+	painter->setPen(QPen(Palette::faded(Palette::held(), alpha), 1.6));
 	painter->drawRoundedRect(text.adjusted(-1.5, -1.5, 1.5, 1.5), 4, 4);
 
-	painter->setPen(QColor(180, 83, 9, alpha));
+	painter->setPen(Palette::faded(Palette::held(), alpha));
 	painter->setFont(Emoji::font(11));
 	painter->drawText(QRectF(text.right() - 3, text.top() - 15, 17, 17),
 	                  Qt::AlignCenter, QStringLiteral("\U0001F512"));

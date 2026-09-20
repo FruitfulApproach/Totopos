@@ -1,4 +1,4 @@
-#include "art/DiagramScene.h"
+﻿#include "art/DiagramScene.h"
 #include "core/categories/BuiltInCategories.h"
 #include "tutor/TutorSession.h"
 #include "core/AppSettings.h"
@@ -47,6 +47,10 @@ DiagramScene::DiagramScene(QObject* parent)
 	// re-centres the scene whenever it changes; the first node placed would
 	// jump away from the cursor
 	setSceneRect(-4000, -4000, 8000, 8000);
+
+	// the paper this is drawn on, until a file or the Properties page says
+	// otherwise (m_background carries the same colour)
+	setBackgroundBrush(QBrush(m_background));
 
 	// NO BSP INDEX.
 	//
@@ -323,6 +327,15 @@ void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 	QGraphicsScene::contextMenuEvent(event);   // an item under the cursor takes it
 	if (event->isAccepted())
 		return;
+
+	// NOTHING UNDER IT: the right button on bare canvas means "never mind",
+	// and what it lets go of is whatever was picked out. Picking things adds
+	// them and no left click takes them away again (see pickingAdds), so this
+	// is the one gesture that empties the selection - which is why it is the
+	// one that cannot be done by accident.
+	clearSelection();
+	hideHandles();
+
 	if (m_ambientCategory != nullptr)
 	{
 		// where on the canvas it was, so "place something here" means here
@@ -1316,9 +1329,34 @@ Arrow* DiagramScene::finishArrow(Node* to)
 	return arrow;
 }
 
+namespace
+{
+	// PICKING THINGS OUT ADDS TO WHAT IS PICKED OUT.
+	//
+	// A diagram is worked on a piece at a time - this object, that arrow, and
+	// the one beside it - and a plain click that threw away everything chosen
+	// so far made gathering a handful of things a matter of holding a key
+	// down and never letting go. Worse, a click that MISSED, which is the
+	// easiest thing in the world to do on a canvas that is mostly empty,
+	// emptied the selection with it.
+	//
+	// Qt already knows how to do this: it is what Ctrl means to a graphics
+	// scene. So the left button is handed to it as though Ctrl were held -
+	// clicking something adds it, clicking it again takes it back out, a
+	// rubber band gathers rather than replaces, and a click on nothing leaves
+	// everything where it was. Clearing is the RIGHT button's job now (see
+	// contextMenuEvent), which is the gesture that means "never mind".
+	void pickingAdds(QGraphicsSceneMouseEvent* event)
+	{
+		if (event->button() == Qt::LeftButton || (event->buttons() & Qt::LeftButton))
+			event->setModifiers(event->modifiers() | Qt::ControlModifier);
+	}
+}
+
 void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	m_lastScenePos = event->scenePos();
+	pickingAdds(event);
 
 	// The border button is up, so the cursor is on it: this press is the one
 	// gesture it offers. Taken here, before any of the press machinery below,
@@ -1379,6 +1417,9 @@ void DiagramScene::notePushed(Node* node, const QPointF& before)
 void DiagramScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
 	m_lastScenePos = event->scenePos();
+	// the release decides what a click picked out, so it has to agree with
+	// the press about what a click means (see pickingAdds)
+	pickingAdds(event);
 	// the press turned into carrying a copy away: the drag has already had it
 	if (m_dragCarriedOff)
 	{

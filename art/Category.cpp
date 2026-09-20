@@ -1,4 +1,5 @@
 ﻿#include "art/Category.h"
+#include "core/Palette.h"
 #include "art/Arrow.h"
 #include "core/props/MapsElements.h"
 #include "art/DiagramScene.h"
@@ -6,14 +7,15 @@
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
 #include "core/props/CategoryProps.h"
+#include "core/AppSettings.h"
 #include <QMenu>
 
 Category::Category(const QString& name, QGraphicsItem* parent)
 	: Object(name, parent)
 {
 	// a category is a translucent yellow region with a dodger-blue frame
-	setFill(QBrush(QColor(255, 235, 0, 55)));
-	setBorder(QPen(QColor(30, 144, 255, 170), 2));
+	setFill(QBrush(Palette::faded(Palette::field(), 70)));
+	setBorder(QPen(Palette::faded(Palette::cobalt(), 170), 2));
 }
 
 Category::~Category()
@@ -55,9 +57,8 @@ bool Category::labelIsLocked() const
 QString Category::labelLockTip() const
 {
 	if (isAmbient() && holdsAnything() && !Object::labelIsLocked())
-		return QStringLiteral("The category is settled once anything is drawn: everything here is an "
-		                      "object or an arrow OF it, and they would all mean something else in "
-		                      "another one. Start a new diagram to choose a different category.");
+		return QStringLiteral("Settled once the diagram has something in it. Start a new "
+		                      "diagram to work in another category.");
 	return Object::labelLockTip();
 }
 
@@ -520,21 +521,24 @@ QRectF Category::emptyFrame()
 
 QRectF Category::boxRect() const
 {
-	const QRectF held = contentFrame().adjusted(-9, -9, 9, 9);
-	if (containedCount() != 0)
+	const QRectF held = squareIfSingleGlyph(contentFrame().adjusted(-5.4, -5.4, 5.4, 5.4));
+	if (containedCount() != 0 || !isAmbient())
 		return held;
 
-	// Empty: the room, taken down a step for each category this one sits
-	// inside - a subcategory drawn in a category should not be bigger than
-	// somewhere to put two or three things, and at full size it would push
-	// the category holding it out to fit. The name is unioned in as well, in
-	// case it has been dragged clear of the room.
-	const qreal scale = depthScale();
-	QRectF room = emptyFrame();
-	room.setWidth(room.width() * scale);
-	room.setHeight(room.height() * scale);
-	room.moveCenter(emptyFrame().center());
-	return room | held;
+	// EMPTY, AND THE CANVAS: the room to draw the first thing in.
+	//
+	// Only the canvas. A category DRAWN in something is a box standing in it,
+	// and an empty one is as small as its name - which is right: it is a
+	// thing, and things are the size of what they hold. Giving every empty
+	// category the room below made each freshly placed one a sheet the size
+	// of the window, and since an arrow leaves its domain at the FRAME, an
+	// arrow drawn out of a fresh category came flying in from the far corner
+	// of that sheet.
+	//
+	// The canvas is not a thing standing anywhere, so it has no such size to
+	// be: it is the paper, and an empty sheet of paper is the whole sheet.
+	// The name is unioned in as well, in case it sits outside the room.
+	return emptyFrame() | held;
 }
 
 void Category::becameAmbient()
@@ -564,21 +568,48 @@ void Category::applyDepthAppearance(int depth)
 		setBorder(QPen(Qt::NoPen));
 		return;
 	}
+	// EVERY R-Mod IS THE SAME R-Mod, SO THEY ARE ALL DRAWN THE SAME.
+	//
+	// A built-in's colour belongs to the built-in, not to any one node that
+	// happens to be it: it is kept under the NAME (AppSettings::categoryFill)
+	// and read back here, so setting it on one changes every R-Mod in every
+	// open diagram at once. A category the user defined has no such name to
+	// be filed under and keeps the look below.
+	//
+	// Unset - which is how everything starts - means the look below stands.
+	const QString built = builtInName();
+	const QColor wantedFill = AppSettings::instance().categoryFill(built);
+	const QColor wantedBorder = AppSettings::instance().categoryBorder(built);
+
 	if (m_subcategory)
 	{
 		// A subcategory is a PART of the category it is drawn in, not a thing
 		// standing in it, and is drawn as such: barely there, and outlined in
 		// dots, so it reads differently from an object of that category.
-		setFill(QBrush(QColor(255, 242, 74, qMax(10, 32 - 6 * depth))));
-		QPen dotted(QColor(30, 144, 255, qMax(90, 190 - 18 * depth)), qMax(0.8, 1.8 - 0.2 * depth));
+		//
+		// It is still an R-Mod, so it is still R-Mod's colour - only fainter,
+		// which is what tells a part from a thing.
+		QColor fill = wantedFill.isValid() ? wantedFill : Palette::field();
+		fill.setAlpha(qMax(10, 32 - 6 * depth));
+		setFill(QBrush(fill));
+		QColor edge = wantedBorder.isValid() ? wantedBorder : Palette::cobalt();
+		edge.setAlpha(qMax(90, 190 - 18 * depth));
+		QPen dotted(edge, qMax(0.8, 1.8 - 0.2 * depth));
 		dotted.setStyle(Qt::DotLine);
 		setBorder(dotted);
 		return;
 	}
+
 	// A bright yellow canvas, in dodger blue. Each level of nesting fades a
-	// little so the yellow does not pile up into orange.
-	setFill(QBrush(QColor(255, 242, 74, qMax(28, 105 - 18 * depth))));
-	setBorder(QPen(QColor(30, 144, 255, qMax(110, 220 - 20 * depth)), qMax(0.8, 2.2 - 0.3 * depth)));
+	// little so the yellow does not pile up into orange - and a colour chosen
+	// for the built-in fades by the same steps, so nesting reads the same
+	// whatever it is coloured.
+	QColor fill = wantedFill.isValid() ? wantedFill : Palette::field();
+	fill.setAlpha(qMax(28, 105 - 18 * depth));
+	setFill(QBrush(fill));
+	QColor edge = wantedBorder.isValid() ? wantedBorder : Palette::cobalt();
+	edge.setAlpha(qMax(110, 220 - 20 * depth));
+	setBorder(QPen(edge, qMax(0.8, 2.2 - 0.3 * depth)));
 }
 
 void Category::adopt(Node* node, const QPointF& scenePos)

@@ -90,6 +90,18 @@ public:
 	void setFillRecorded(const QColor& colour);
 	void setBorderRecorded(const QColor& colour);
 
+	// THE COLOUR THE NAME IS WRITTEN IN.
+	//
+	// A node's own colour, kept apart from the fill and the frame: a label
+	// is not the box it sits in, and a pale wash of a fill wants dark
+	// letters whatever colour the wash is. An INVALID colour means nobody
+	// has said - the label is then written in the ink the program draws
+	// names in (Palette::ink, or whatever the setting says a new node
+	// starts with).
+	QColor labelColour() const { return m_labelColour; }
+	void setLabelColour(const QColor& colour);
+	void setLabelColourRecorded(const QColor& colour);
+
 	// Was the fill or the border chosen by hand (the colour chips)? A frame
 	// that was asked for is always drawn; one that is merely the default is
 	// only drawn when there is something inside to frame.
@@ -145,6 +157,20 @@ public:
 	// How round the corners of the frame are drawn, in scene units. 0 is a
 	// plain rectangle.
 	qreal cornerRadius() const { return m_cornerRadius; }
+
+	// THE RADIUS AS DRAWN, which is not the radius it is SET to.
+	//
+	// The number above is the one on the Properties page and in the file: the
+	// radius this node would have on the canvas. Everything else about a
+	// nested node is drawn a step smaller for each node it sits inside - the
+	// line widths, the head of an arrow, the size of the label - and the
+	// corners have to come off the same step or they do not. Left alone, a
+	// 13px round on a box two levels down, which is a third of the size, ate
+	// the whole of its short side and drew an ellipse.
+	//
+	// Nothing reads this back: it is for painting and for hit-testing, so
+	// what is clicked is the shape that is drawn.
+	qreal drawnCornerRadius() const { return m_cornerRadius * depthScale(); }
 	void setCornerRadius(qreal radius);
 
 	// set Exists such AND put it in the scene's history (it changes what the
@@ -221,7 +247,7 @@ public:
 	//
 	// Never paint with boundingRect(): the box would jump to swallow a label
 	// the moment one was dragged clear of it.
-	virtual QRectF boxRect() const { return contentFrame(); }
+	virtual QRectF boxRect() const { return squareIfSingleGlyph(contentFrame()); }
 
 	// Our frame is the union of what we hold, so it changes whenever a child
 	// arrives, leaves, moves or resizes. Call this once the change is COMPLETE
@@ -293,6 +319,23 @@ public:
 	// The hidden snap grid: node positions land on multiples of the unit,
 	// measured in SCENE coordinates, so nesting makes no difference — an
 	// object inside a category snaps to the same grid as the category itself.
+	// THE NEAREST EMPTY GRID POINT TO A WANTED SPOT, PREFERRING THE ONE BELOW.
+	//
+	// Everything put into a node by hand - Add object, Add element, the image
+	// a functor draws - wants to land where it was asked for, and must not
+	// land on top of what is already there. Right-clicking a node and asking
+	// for another one asks for it AT THE CURSOR, which is on that node: taken
+	// at its word, the new one is drawn exactly over the old, and the only
+	// sign of it is that the label changed.
+	//
+	// So the spot asked for is put on the grid and, if something is sitting
+	// there, the grid is searched outwards a ring at a time. Below comes
+	// first at every distance, because a list of things grows downwards and
+	// that is where the eye looks for the new one.
+	//
+	// `wanted` and the answer are both in `parent`'s own coordinates.
+	static QPointF freeGridSpotIn(const Node* parent, const QPointF& wanted);
+
 	static qreal snapUnit() { return s_snapUnit; }
 	static void setSnapUnit(qreal unit) { s_snapUnit = unit; }
 	static bool snapEnabled() { return s_snapEnabled; }
@@ -401,6 +444,9 @@ protected:
 
 	// note a colour change in the scene's history (purely graphical)
 	void recordStyleChange(const QBrush& fillBefore, const QPen& borderBefore);
+	void recordLabelColourChange(const QColor& before);
+	// put the colour on the label item itself
+	void applyLabelColour();
 
 	// Where this node's label goes. An object centres it; an arrow puts it
 	// beside the middle of its line, wherever it has been dragged to. It is
@@ -428,6 +474,18 @@ protected:
 	// node's own label - so a name dragged clear of the box does not drag the
 	// box after it. A node holding nothing is its label, and gets that instead.
 	QRectF contentFrame() const;
+
+	// A SINGLE LETTER IS DRAWN IN A SQUARE. A glyph's rect is taller than it
+	// is wide, so O, X, M and the rest each came out as a narrow upright
+	// box - a row of them read as a row of different shapes rather than as a
+	// row of objects. Taking the longer side for both makes one square, and
+	// keeping the centre where it was means the letter does not shift: the
+	// box only grows outwards around it.
+	//
+	// Only for a node holding nothing. A node that holds something is a frame
+	// round what it holds, and squaring that would push its contents off
+	// centre - so the rect comes back untouched.
+	QRectF squareIfSingleGlyph(const QRectF& box) const;
 
 	// what this node looks like at that nesting depth; subclasses extend it
 	virtual void applyDepthAppearance(int depth);
@@ -494,6 +552,8 @@ private:
 	QString m_labelPattern;
 	QList<QPointer<Node>> m_labelSources;
 	bool m_settingDerivedLabel = false;
+	// invalid: the name is written in the ink names are written in
+	QColor m_labelColour;
 	QBrush m_fill = Qt::NoBrush;
 	QPen m_border = Qt::NoPen;
 	bool m_existsSuch = false;

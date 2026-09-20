@@ -1,4 +1,5 @@
 ﻿#include "art/NodeHandles.h"
+#include "core/Palette.h"
 #include "art/Arrow.h"
 #include "core/AppSettings.h"
 #include "core/Emoji.h"
@@ -180,7 +181,7 @@ void NodeHandles::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWid
 		{
 			// the runner: chase the elements of the domain across
 			painter->setPen(QPen(QColor(255, 255, 255, 220), 1.2));
-			painter->setBrush(hot ? QColor(21, 128, 61) : QColor(34, 197, 94, 235));
+			painter->setBrush(hot ? QColor(21, 128, 61) : Palette::faded(Palette::pointedAt(), 235));
 			painter->drawEllipse(c, kRadius, kRadius);
 			painter->setPen(Qt::black);
 			painter->setFont(Emoji::font(int(kRadius * 1.4)));

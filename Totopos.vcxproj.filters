@@ -89,6 +89,9 @@
     <ClCompile Include="core\Emoji.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="core\Branding.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
     <ClCompile Include="core\NodeKind.cpp">
       <Filter>core</Filter>
     </ClCompile>
@@ -236,8 +239,14 @@
     <ClCompile Include="widget\ToggleSwitch.cpp">
       <Filter>widget</Filter>
     </ClCompile>
-    <ClCompile Include="Totopos.cpp">
+    <ClCompile Include="dialog\Totopos.cpp">
       <Filter>dialog</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\SplashScreen.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="art\RModule.cpp">
+      <Filter>art</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -388,8 +397,14 @@
     <QtMoc Include="widget\ToggleSwitch.h">
       <Filter>widget</Filter>
     </QtMoc>
-    <QtMoc Include="Totopos.h">
+    <QtMoc Include="dialog\Totopos.h">
       <Filter>dialog</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\SplashScreen.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="art\RModule.h">
+      <Filter>art</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
@@ -400,6 +415,12 @@
       <Filter>art</Filter>
     </ClInclude>
     <ClInclude Include="core\Emoji.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Palette.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Branding.h">
       <Filter>core</Filter>
     </ClInclude>
     <ClInclude Include="core\NodeKind.h">
@@ -441,27 +462,30 @@
     <ClInclude Include="art\GraphicsHelpers.h">
       <Filter>core</Filter>
     </ClInclude>
+    <ClInclude Include="core\Version.h">
+      <Filter>core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="dialog\CategoryDialog.ui">
       <Filter>dialog</Filter>
     </QtUic>
-    <QtUic Include="Totopos.ui">
+    <QtUic Include="dialog\Totopos.ui">
       <Filter>dialog</Filter>
     </QtUic>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="Totopos.qrc">
+    <QtRcc Include="resources\resources.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Totopos.rc">
+    <ResourceCompile Include="resources\Totopos.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Totopos.ico">
+    <None Include="resources\icons\Totopos.ico">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

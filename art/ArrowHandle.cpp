@@ -1,4 +1,5 @@
-#include "art/ArrowHandle.h"
+﻿#include "art/ArrowHandle.h"
+#include "core/Palette.h"
 #include "art/Node.h"
 
 #include <QPainter>
@@ -132,7 +133,7 @@ void ArrowHandle::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWid
 		// a control that has appeared over the work, and it should not be
 		// mistaken for part of it even for a moment.
 		painter->setPen(QPen(QColor(255, 255, 255, 235), 1.6));
-		painter->setBrush(QColor(245, 158, 11, 245));
+		painter->setBrush(Palette::faded(Palette::offered(), 245));
 		painter->drawEllipse(c, kRadius, kRadius);
 
 		switch (m_buttons.at(i))

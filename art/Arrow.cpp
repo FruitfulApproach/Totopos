@@ -1,4 +1,5 @@
 ﻿#include "art/Arrow.h"
+#include "core/Palette.h"
 
 #include <QMenu>
 #include <QActionGroup>
@@ -15,6 +16,7 @@
 #include <QPainterPathStroker>
 #include <QStyleOptionGraphicsItem>
 #include <QtMath>
+#include <algorithm>
 #include "art/GraphicsHelpers.h"
 #include <QDebug>
 
@@ -37,7 +39,9 @@ Arrow::Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *par
 	: Node(id, parent)
 {
 	setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemSendsGeometryChanges);   // never dragged: the ends place it
-	setDefaultLook(QBrush(Qt::NoBrush), QPen(QColor(30, 144, 255), 1.5));
+	setDefaultLook(QBrush(Qt::NoBrush), QPen(Palette::cobalt(), 1.5));
+	if (const QColor wantedText = AppSettings::instance().defaultText(true); wantedText.isValid())
+		setLabelColour(wantedText);
 
 	// AND WHAT WAS ASKED FOR, which wins over the look above.
 	//
@@ -324,6 +328,114 @@ void Arrow::clearLooseEnd()
 	refreshGeometry();
 }
 
+int Arrow::parallelIndex(int* count) const
+{
+	if (count != nullptr)
+		*count = 1;
+	if (m_domain == nullptr || m_codomain == nullptr || parentItem() == nullptr)
+		return 0;
+
+	// Between the same two things, whichever way round each one runs: g going
+	// back the other way is still a second line along the same run, and has
+	// to be moved aside from f just the same.
+	QList<const Arrow*> together;
+	for (QGraphicsItem* child : parentItem()->childItems())
+	{
+		auto* line = dynamic_cast<const Arrow*>(child);
+		if (line == nullptr || !line->isVisible())
+			continue;
+		const bool same = (line->m_domain == m_domain && line->m_codomain == m_codomain)
+		               || (line->m_domain == m_codomain && line->m_codomain == m_domain);
+		if (same && line->m_codomain != nullptr)
+			together << line;
+	}
+	if (together.size() < 2)
+		return 0;
+
+	// In the order they were made. The key counts up as nodes are made and is
+	// written to the file with them, so the arrangement is the same every
+	// time the diagram is opened - which sorting by name or by pointer would
+	// not be.
+	std::sort(together.begin(), together.end(), [](const Arrow* a, const Arrow* b) {
+		return QStringView(a->key()).mid(1).toULongLong()
+		     < QStringView(b->key()).mid(1).toULongLong();
+	});
+	if (count != nullptr)
+		*count = int(together.size());
+	return int(together.indexOf(this));
+}
+
+bool Arrow::spreadParallel(const QRectF& rd, const QRectF& rc,
+                           QPointF& start, QPointF& end, QPointF& bow) const
+{
+	int count = 1;
+	const int mine = parallelIndex(&count);
+	if (count < 2)
+		return false;
+
+	QPointF along = end - start;
+	const qreal length = norm(along);
+	if (length < 1e-6)
+		return false;
+	along /= length;
+
+	// WHICH WAY THEY SPREAD, and so along which edge of each frame. Arrows
+	// running ACROSS the page - C on the left, D on the right - are spread
+	// UP AND DOWN the facing edges, which is the case in front of anyone
+	// most of the time. Arrows running down the page spread side to side.
+	const bool spreadVertically = qAbs(along.x()) >= qAbs(along.y());
+
+	// THE ROOM THERE IS, AND THE MIDDLE OF IT.
+	//
+	// The arrows are spread about the middle of the stretch of edge the two
+	// frames SHARE, not about wherever the nearest two points of the frames
+	// happened to fall. Those are the ends of the shared stretch as often as
+	// the middle of it - two boxes of different heights meet at the top or
+	// the bottom of the shorter one - and a fan hung off that point came out
+	// bunched against one end of the edge instead of evenly across it.
+	const qreal low = spreadVertically ? qMax(rd.top(), rc.top()) : qMax(rd.left(), rc.left());
+	const qreal high = spreadVertically ? qMin(rd.bottom(), rc.bottom()) : qMin(rd.right(), rc.right());
+	if (high <= low)
+		return false;   // the frames do not face one another: nothing to spread along
+	const qreal middle = (low + high) / 2.0;
+	const qreal room = high - low;
+
+	// Evenly, about that middle: with two, one each side of it; with three,
+	// the middle one keeps it. The gap is the one asked for unless the edge
+	// is too short to hold them all at that spacing, in which case they close
+	// up to share out what room there is.
+	const qreal gap = qMin(ParallelGap, room / count);
+	const qreal at = middle + (mine - (count - 1) / 2.0) * gap;
+
+	// Set the across coordinate on both ends at once: the same on each, so
+	// the line stays parallel to its neighbours instead of sloping between
+	// two different offsets.
+	if (spreadVertically)
+	{
+		start.setY(qBound(rd.top(), at, rd.bottom()));
+		end.setY(qBound(rc.top(), at, rc.bottom()));
+	}
+	else
+	{
+		start.setX(qBound(rd.left(), at, rd.right()));
+		end.setX(qBound(rc.left(), at, rc.right()));
+	}
+
+	// Room enough at that spacing: the line stays straight, which is the
+	// whole point of trying the ends first.
+	if (gap >= ParallelGap - 0.5)
+		return false;
+
+	// Not enough. What the edge could not give, the middle of the line does -
+	// bowed out by what is missing, and further than that because a bow is
+	// widest in the middle and has to be clear of its neighbour for its whole
+	// length.
+	const QPointF aside(-along.y(), along.x());
+	const qreal missing = (ParallelGap - gap) * (mine - (count - 1) / 2.0);
+	bow = (start + end) / 2.0 + aside * missing * 2.0;
+	return qAbs(missing) > 0.5;
+}
+
 QList<QPointF> Arrow::throughPoints() const
 {
 	QList<QPointF> pts;
@@ -358,6 +470,9 @@ QList<QPointF> Arrow::throughPoints() const
 			drawnBends << bend;
 
 	QPointF start, end;
+	// set by spreadParallel when the ends alone cannot hold the arrows apart
+	QPointF bow;
+	bool bowed = false;
 	if (drawnBends.isEmpty())
 	{
 		// Nothing pulling it about: join the two frames at their nearest
@@ -409,6 +524,12 @@ QList<QPointF> Arrow::throughPoints() const
 				end -= along * 3;
 			}
 		}
+
+		// AND ASIDE FROM WHATEVER ELSE RUNS BETWEEN THE SAME TWO THINGS.
+		// Only for an arrow nobody has bent: once it has been pulled into a
+		// shape by hand, that shape is the answer to where it runs, and
+		// moving it would be undoing somebody's work.
+		bowed = spreadParallel(rd, rc, start, end, bow);
 	}
 	else
 	{
@@ -447,6 +568,8 @@ QList<QPointF> Arrow::throughPoints() const
 	}
 
 	pts << start;
+	if (bowed)
+		pts << bow;   // drawn, not stored: see Arrow::ParallelGap
 	pts << drawnBends;
 	pts << end;
 	return pts;
@@ -463,16 +586,51 @@ QPainterPath Arrow::curve() const
 		path.lineTo(pts.last());
 		return path;
 	}
-	// Catmull-Rom, written as the cubic Beziers QPainterPath draws: the curve
-	// runs THROUGH every point, with the ends held by doubling them up
-	for (int i = 0; i + 1 < pts.size(); ++i)
+	// A ROUNDED-CORNER POLYLINE: straight from point to point, with the
+	// corner at each bend taken off by an arc.
+	//
+	// The line between two bends is STRAIGHT, which is what an arrow in a
+	// diagram is, and the only curve is at the corner itself. A spline
+	// through the same points put a bulge into every stretch of line and
+	// wandered off the points it was pulled through as soon as two of them
+	// came close together; this cannot, because between the corners there is
+	// nothing to wander.
+	//
+	// The corner is rounded by CornerRadius, cut back at either end of the
+	// corner to no more than half of the shorter of the two legs, so a bend
+	// dragged hard up against its neighbour rounds off small rather than
+	// eating the leg between them. A corner that is already straight is left
+	// alone.
+	for (int i = 1; i + 1 < pts.size(); ++i)
 	{
-		const QPointF p0 = pts.at(qMax(0, i - 1));
-		const QPointF p1 = pts.at(i);
-		const QPointF p2 = pts.at(i + 1);
-		const QPointF p3 = pts.at(qMin(int(pts.size()) - 1, i + 2));
-		path.cubicTo(p1 + (p2 - p0) / 6.0, p2 - (p3 - p1) / 6.0, p2);
+		const QPointF prev = pts.at(i - 1);
+		const QPointF here = pts.at(i);
+		const QPointF next = pts.at(i + 1);
+
+		const QPointF toPrev = prev - here;
+		const QPointF toNext = next - here;
+		const qreal backLength = norm(toPrev);
+		const qreal onLength = norm(toNext);
+		if (backLength < 1e-6 || onLength < 1e-6)
+			continue;   // two points in the same place: no corner to round
+
+		const QPointF back = toPrev / backLength;
+		const QPointF on = toNext / onLength;
+		// straight through (or doubled back on itself): nothing to round off
+		if (qAbs(back.x() * on.y() - back.y() * on.x()) < 1e-6)
+		{
+			path.lineTo(here);
+			continue;
+		}
+
+		const qreal cut = qMin(CornerRadius, qMin(backLength, onLength) / 2.0);
+		path.lineTo(here + back * cut);
+		// the corner itself as a quadratic, pulled towards the bend point: the
+		// line arrives along one leg and leaves along the other, so there is
+		// no kink where the arc meets the straight
+		path.quadTo(here, here + on * cut);
 	}
+	path.lineTo(pts.last());
 	return path;
 }
 
@@ -736,8 +894,39 @@ void Arrow::labelDragFinished(const QPointF& fromPos)
 			this, fromPos - labelAnchor(), m_labelOffset));
 }
 
+void Arrow::dropRedundantBends()
+{
+	// Not while a hand is on it: a point being dragged is passing over the
+	// straight line on its way somewhere, and taking it away mid-drag would
+	// pull the line out from under the cursor. The release has its own check.
+	if (m_dropping || m_pressed || m_bends.isEmpty())
+		return;
+	m_dropping = true;
+	QList<QPointF> kept = m_bends;
+	for (int at = kept.size() - 1; at >= 0; --at)
+	{
+		QList<QPointF> without = kept;
+		without.removeAt(at);
+		if (isRedundantBend(kept.at(at), without))
+			kept = without;
+	}
+	// still held while setBends runs: that calls refreshGeometry, which calls
+	// straight back in here
+	if (kept != m_bends)
+		setBends(kept);
+	m_dropping = false;
+}
+
 void Arrow::refreshGeometry()
 {
+	// The shape has just settled - an end moved, a frame grew, a point was
+	// set - so a point that was holding the line in a bend may be sitting on
+	// the straight line now. THAT is when a leftover control point appears:
+	// the arrow is drawn straight and still carries the point that used to
+	// bend it, and nothing but dragging that very point would have taken it
+	// away.
+	dropRedundantBends();
+
 	prepareGeometryChange();
 	ancestorsPrepareGeometryChange();
 	if (label() != nullptr)
@@ -944,9 +1133,76 @@ QPainterPath Arrow::shape() const
 	stroker.setCapStyle(Qt::RoundCap);
 	stroker.setJoinStyle(Qt::RoundJoin);
 	QPainterPath hit = stroker.createStroke(drawn).simplified();
+
+	// BUT IT STOPS AT THE THINGS IT JOINS.
+	//
+	// The head arrives AT the codomain, and fattened by the hit width it lies
+	// across it - so a click meant for the object at the end of an arrow was
+	// answered by the arrow instead, arrows being drawn above objects. That
+	// made an arrow nearly impossible to finish: the click naming the far end
+	// kept landing on the arrow already there.
+	//
+	// An arrow is the run BETWEEN two things, so the inside of either end is
+	// not part of it. Taking the two ends out says exactly that, and leaves
+	// the head clickable everywhere it is not lying on top of the object it
+	// points at.
+	const auto without = [this, &hit](Node* end) {
+		// An end that is itself an ARROW is left alone: its own shape is this
+		// same fattened figure, taking it out would eat a swathe of this one,
+		// and asking it for that shape from inside this one is a circle to
+		// begin with.
+		if (end == nullptr || end == this || end->scene() != scene()
+		 || dynamic_cast<Arrow*>(end) != nullptr)
+			return;
+		hit = hit.subtracted(mapFromItem(end, end->shape()));
+	};
+	without(m_domain);
+	without(m_codomain);
+
+	// AND ITS BENDS ARE GRABBABLE - united in, never merely added.
+	//
+	// A QPainterPath fills odd-even, and addEllipse appends a subpath rather
+	// than joining it to what is there. A bend dot sits ON the line, so its
+	// disc overlapped the stroked line - and under odd-even an overlap counts
+	// as OUTSIDE. Each handle was punching a HOLE through the arrow exactly
+	// where the handle is drawn: the press went through it to whatever was
+	// behind (the category the arrow is drawn in), so a bend point could be
+	// seen, could be hovered, and could not be picked up.
+	//
+	// united() is the actual union of the two regions, and leaves the disc
+	// solid wherever it lies.
 	for (const QPointF& bend : m_bends)
-		hit.addEllipse(bend, 9, 9);   // and its bends are grabbable
+	{
+		QPainterPath dot;
+		dot.addEllipse(bend, BendGrabRadius, BendGrabRadius);
+		hit = hit.united(dot);
+	}
 	return hit;
+}
+
+QRectF Arrow::labelGap() const
+{
+	NodeLabel* text = labelItem();
+	if (text == nullptr || !text->isVisible() || text->toPlainText().isEmpty())
+		return QRectF();
+
+	// THE LETTERS, not the line of text they sit on. boundingRect() is as
+	// tall as the font can ever need and carries the document's own margin,
+	// so the hole punched for a capital F came out a good deal wider and
+	// taller than the F - which reads as a gap in the line rather than as a
+	// name sitting in it. inkRect() is what is actually drawn.
+	//
+	// A hair of air round that, so the line stops clear of the letters
+	// rather than just touching them.
+	const qreal air = 1.5;
+	const QRectF box = text->mapRectToParent(text->inkRect()).adjusted(-air, -air, air, air);
+
+	// Only when the line actually runs through it. A name sitting beside the
+	// line - which is where it sits nearly always - leaves the line whole.
+	const QPainterPath line = curve();
+	if (line.isEmpty() || !line.intersects(box))
+		return QRectF();
+	return box;
 }
 
 void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -980,13 +1236,13 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	if (hasError())
 	{
 		const Qt::PenStyle style = pen.style();
-		pen = QPen(QColor(255, 0, 0), 2.5 * scale);
+		pen = QPen(Palette::wrong(), 2.5 * scale);
 		pen.setStyle(style);
 	}
 	if (isHighlighted())
 	{
 		const Qt::PenStyle style = pen.style();
-		pen = QPen(QColor(22, 163, 74), qMax(3.0 * scale, pen.widthF() + 1.0 * scale));
+		pen = QPen(Palette::pointedAt(), qMax(3.0 * scale, pen.widthF() + 1.0 * scale));
 		pen.setStyle(style);
 	}
 	const bool selected = (option->state & QStyle::State_Selected) != 0;
@@ -996,6 +1252,22 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	painter->setBrush(Qt::NoBrush);
 	const qreal headLengthAhead = marks.headLength;
 	const qreal headWidthAhead = marks.headWidth;
+
+	// THE NAME IS NOT PAINTED OVER. Where the label lies across the line, the
+	// line is not drawn: the clip is in force for the STROKE only, so the
+	// head and whatever the style puts on the tail are drawn whole - a head
+	// with a bite out of it would read as a different arrow.
+	const QRectF nameGap = labelGap();
+	const bool broken = !nameGap.isNull();
+	if (broken)
+	{
+		QPainterPath everywhere;
+		everywhere.addRect(boundingRect().adjusted(-8, -8, 8, 8));
+		QPainterPath hole;
+		hole.addRoundedRect(nameGap, 3, 3);
+		painter->save();
+		painter->setClipPath(everywhere.subtracted(hole), Qt::IntersectClip);
+	}
 
 	if (drawsDoubleLine())
 	{
@@ -1032,6 +1304,8 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	{
 		painter->drawPath(path);
 	}
+	if (broken)
+		painter->restore();
 
 	// the head: a filled triangle at the codomain end, along the curve as it
 	// arrives rather than along the straight line between the ends
@@ -1198,16 +1472,26 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		const QPointF at = path.pointAtPercent(0.5);
 		const qreal reach = 8.0;
 		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(QColor(220, 38, 38), 2.5, Qt::SolidLine, Qt::RoundCap));
+		painter->setPen(QPen(Palette::wrong(), 2.5, Qt::SolidLine, Qt::RoundCap));
 		painter->drawLine(at + QPointF(-reach, -reach), at + QPointF(reach, reach));
 		painter->drawLine(at + QPointF(-reach, reach), at + QPointF(reach, -reach));
 	}
 
-	// the points it is pulled through, while it is being worked on
+	// THE POINTS IT IS PULLED THROUGH, while it is being worked on.
+	//
+	// Drawn in the arrow's OWN colour, not a colour of their own: they are
+	// part of this arrow and of nothing else, and where several arrows run
+	// close together the colour is what says which line a point belongs to.
+	// An indigo that was the same on every arrow said nothing at all.
+	//
+	// The white ring stays: it is what keeps a point legible on top of the
+	// line it sits on, whatever colour the two of them are.
 	if (!m_bends.isEmpty() && ((option->state & QStyle::State_Selected) || m_hovered))
 	{
+		QColor dot = pen.color();
+		dot.setAlpha(qMax(200, dot.alpha()));   // a faded line still gets solid handles
 		painter->setPen(QPen(Qt::white, 1.2));
-		painter->setBrush(QColor(99, 102, 241, 235));
+		painter->setBrush(dot);
 		for (const QPointF& bend : m_bends)
 			painter->drawEllipse(bend, 4.5, 4.5);
 	}
@@ -1470,8 +1754,12 @@ void Arrow::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 	if (m_dragBend >= 0 && m_dragBend < m_bends.size())
 	{
 		QList<QPointF> bends = m_bends;
-		// on the same hidden grid as everything else
-		bends[m_dragBend] = mapFromParent(snapped(mapToParent(event->pos())));
+		// NOT ON THE GRID. A control point is not a thing standing in the
+		// diagram, it is the shape of a line: what it is set to is a curve
+		// that looks right, and the nearest grid point is a coarse answer to
+		// that. Objects snap because two of them level with one another is
+		// worth having; a bend has nothing to line up WITH.
+		bends[m_dragBend] = event->pos();
 		// through setBends, which ANNOUNCES the new shape: an arrow that ends
 		// on this one, and the handle bar sitting beside it, both follow
 		setBends(bends);
@@ -1506,14 +1794,40 @@ void Arrow::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 void Arrow::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 {
 	m_hovered = true;
+	if (m_bendsLinger != nullptr)
+		m_bendsLinger->stop();   // pointed at again: the clock starts over
 	update();
 	Node::hoverEnterEvent(event);
 }
 
 void Arrow::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
 {
-	m_hovered = false;
-	update();
+	// THEY STAY UP A MOMENT LONGER. See the note on m_bendsLinger: a bend is
+	// dragged by a point that is only there while the line is hovered, so the
+	// mouse has to get from the line to the point without the point going
+	// away. The wait is counted from the moment the mouse left, so moving
+	// back onto the line and off again gives the full wait each time.
+	const int linger = AppSettings::instance().bendLingerMs();
+	if (linger <= 0 || m_bends.isEmpty())
+	{
+		m_hovered = false;
+		update();
+		Node::hoverLeaveEvent(event);
+		return;
+	}
+
+	if (m_bendsLinger == nullptr)
+	{
+		// A child of this arrow, so it goes when the arrow does and cannot
+		// fire into something that is no longer there.
+		m_bendsLinger = new QTimer(this);
+		m_bendsLinger->setSingleShot(true);
+		connect(m_bendsLinger, &QTimer::timeout, this, [this] {
+			m_hovered = false;
+			update();
+		});
+	}
+	m_bendsLinger->start(linger);
 	Node::hoverLeaveEvent(event);
 }
 

@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QPointF>
 #include <QPainterPath>
+#include <QTimer>
 #include "art/Node.h"
 
 class ArrowProp;
@@ -20,9 +21,11 @@ public:
 	Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *parent=nullptr);
 
 	// The points the line is pulled through. Drag the line and one appears
-	// where it was grabbed; the curve through them is a Catmull-Rom spline, so
-	// it passes through every point rather than merely being pulled towards
-	// it. Purely graphical: where an arrow is drawn says nothing about it.
+	// where it was grabbed. The line runs STRAIGHT from one to the next and
+	// turns the corner at each of them with a rounded bend, so it passes
+	// through every point (bar the rounding at the corner itself) rather than
+	// bulging between them. Purely graphical: where an arrow is drawn says
+	// nothing about it.
 	const QList<QPointF>& bends() const { return m_bends; }
 	void setBends(const QList<QPointF>& bends);
 	void addBend(const QPointF& at);
@@ -32,8 +35,29 @@ public:
 	// the Properties button both want, neither of them being able to reach
 	// recordBends from outside
 	void straightenRecorded();
+	// How near a press has to be to a bend point to be a grab of it. The
+	// same figure is what the handle contributes to the arrow's hit area
+	// (see Arrow::shape), so what can be grabbed and what the press lands on
+	// are one and the same.
+	static constexpr qreal BendGrabRadius = 9.0;
+	// TWO ARROWS BETWEEN THE SAME TWO OBJECTS MUST NOT BE ONE LINE.
+	//
+	// f and g : X -> Y are two different arrows and the diagram says so by
+	// drawing two; joining the nearest points of the two frames draws them
+	// both along the very same run, one exactly under the other, and their
+	// labels land on top of each other too.
+	//
+	// They are spread apart instead, and the first thing tried is simply
+	// JOINING AT DIFFERENT POINTS: an arrow leaves and arrives a little to
+	// one side, which costs the line nothing - it stays straight - and is
+	// what anyone drawing this by hand would do. Only when the edges are too
+	// short to hold the spread is the line bowed out, and even then the bow
+	// is the arrow's DRAWING and not a control point: nothing is added to
+	// bends(), so as far as the file and the user are concerned the arrow is
+	// still a straight one nobody has bent.
+	static constexpr qreal ParallelGap = 14.0;
 	// the bend under a point in this arrow's coordinates, or -1
-	int bendAt(const QPointF& pos, qreal radius = 9.0) const;
+	int bendAt(const QPointF& pos, qreal radius = BendGrabRadius) const;
 
 	// the curve as drawn, in this arrow's coordinates
 	QPainterPath curve() const;
@@ -301,6 +325,38 @@ private:
 	// being pulled out sideways from its middle - and an existing bend point
 	// can still be grabbed wherever it happens to sit.
 	static constexpr qreal BendFreeEnds = 1.0 / 3.0;
+	// How much of each corner is taken off where the line turns at a bend.
+	// Never more than half the shorter of the two legs meeting there, so
+	// bends close together still round rather than swallowing the line
+	// between them (see Arrow::curve).
+	static constexpr qreal CornerRadius = 16.0;
+	// This arrow's place among those running between the same two things,
+	// and how many there are: 0 of 1 when it is alone. The order is the
+	// order they were made in, so a diagram does not reshuffle its arrows
+	// when it is read back.
+	int parallelIndex(int* count) const;
+	// Move the two ends aside so parallel arrows do not coincide. Returns
+	// true (with `bow` set) when the edges could not hold the whole spread
+	// and the line has to be bowed out as well.
+	bool spreadParallel(const QRectF& rd, const QRectF& rc,
+	                    QPointF& start, QPointF& end, QPointF& bow) const;
+	// Let go of any point the line no longer needs. A bend holds the curve
+	// in a shape; one that sits on the line the arrow would take anyway is
+	// holding nothing, and the arrow only LOOKS straight while quietly
+	// carrying it. Run whenever the shape settles, not only when a point is
+	// let go of, because what makes a point redundant is usually the OTHER
+	// end moving.
+	void dropRedundantBends();
+	// THE HOLE THE NAME SITS IN.
+	//
+	// An arrow's name sits beside its line, but a line drawn from anywhere to
+	// anywhere cannot always leave room beside it - and a label dragged onto
+	// the line, or pushed there by the line moving, is read straight through
+	// by the stroke behind it. A printed diagram answers this by BREAKING the
+	// line where the name is, and that is what this is: the label's box, in
+	// this arrow's coordinates, to be left unpainted. Null when the name is
+	// nowhere near the line, which is the usual case and costs nothing.
+	QRectF labelGap() const;
 	// is that point near enough to the line the arrow would take without it?
 	bool isRedundantBend(const QPointF& point, const QList<QPointF>& without) const;
 
@@ -321,6 +377,17 @@ private:
 	QList<QPointF> m_bendsAtPress;
 	QPointF m_pressPos;
 	int m_dragBend = -1;
+	bool m_dropping = false;      // inside dropRedundantBends: setBends must not call back in
 	bool m_pressed = false;
+
+	// POINTED AT, OR POINTED AT RECENTLY.
+	//
+	// The bend points come out on hover and are what a bend is DRAGGED by, so
+	// the mouse has to travel from the line to a point that only exists while
+	// the mouse is on the line - and slipping off on the way took them away
+	// again. They stay up for a while after the mouse leaves
+	// (AppSettings::BendLingerMs), counted from when it was last on the line,
+	// which is long enough to reach one.
 	bool m_hovered = false;
+	QTimer* m_bendsLinger = nullptr;   // made when first needed; takes them down
 };

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <QGraphicsScene>
+#include "core/Palette.h"
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QPointer>
@@ -396,7 +397,10 @@ private:
 	// line that follows the cursor while an arrow is being drawn
 	void showHandles(Node* node, const QPointF& itemPos);
 
-	QColor m_background;   // invalid: the view's own palette
+	// The paper a fresh diagram is drawn on. Set rather than left invalid -
+	// invalid means the view's own palette, which is the window's grey and
+	// not a sheet to draw on. A diagram read from a file brings its own.
+	QColor m_background = Palette::paper();
 	Category* m_ambientCategory = nullptr;
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;

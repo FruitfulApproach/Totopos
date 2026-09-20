@@ -1,8 +1,0 @@
-// Icon with lowest ID value is used for File Explorer
-// ID 1 = Window/File Explorer icon, ID 2 = Taskbar icon
-//
-// Forward slashes on purpose: a backslash starts an escape inside an RC
-// string, so "resources\icons\TotoposWindowIcon.ico" hands the compiler a tab
-// where the T should be. RC takes / just as happily.
-1    ICON    DISCARDABLE    "resources/icons/TotoposWindowIcon.ico"
-2    ICON    DISCARDABLE    "resources/icons/TotoposTaskbarIcon.ico"

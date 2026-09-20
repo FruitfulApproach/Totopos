@@ -118,6 +118,10 @@ void SettingsDialog::buildPages()
 			"How thick the two strokes of the head are drawn.");
 		addDouble(p, "Click width", AppSettings::ArrowHitWidth, 4.0, 60.0, 2.0, " px",
 			"How near the line the mouse has to be to hit it. Wider is easier to grab and to bend.");
+		addDouble(p, "Bend points linger", AppSettings::BendLingerMs, 0.0, 10000.0, 250.0, " ms",
+			"How long the points a curve is pulled through stay up after the mouse has left the line. "
+			"They come out on hover and are what a bend is dragged by, so taking them away the instant "
+			"the mouse slips off the line leaves nothing to aim at. 0 does take them away at once.");
 	}
 	{
 		Page& p = addPage("Diagram", "Commuting", "A diagram that is asserted to commute is read by comparing "

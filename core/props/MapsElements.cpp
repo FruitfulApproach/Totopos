@@ -7,6 +7,10 @@
 #include <QList>
 #include <QUuid>
 #include <utility>
+#include <algorithm>
+#include <QGraphicsScene>
+#include <QLineF>
+#include <QPainterPath>
 #include "art/Arrow.h"
 #include "art/Category.h"
 #include "art/Object.h"
@@ -154,6 +158,50 @@ void MapsElements::removeImages()
 }
 
 
+QPointF MapsElements::freeSpotIn(Object* cod, const QPointF& wanted)
+{
+	// TWO MAPPINGS INTO ONE PLACE PUT THEIR IMAGES IN THE SAME SPOT.
+	//
+	// Each mapping draws its image at the same offset the source has in ITS
+	// home, which is right and is what makes the image read as a copy of the
+	// diagram it came from. But X drawn in C has ONE offset, and if both G.F
+	// and G carry something to E then both land on it - G(F(X)) and
+	// (G.F)(X) written one on top of the other, unreadable and hard even to
+	// drag apart, because clicking there picks whichever is on top.
+	//
+	// So the spot is taken if something is already sitting on it, and the new
+	// one steps down until it is clear. Only at the moment it is FIRST drawn:
+	// from then on its position is its own and nothing moves it but a hand or
+	// the mirror.
+	// EVERYTHING HERE IS IN THE CODOMAIN'S OWN COORDINATES: the spot asked
+	// for, the spots already taken, and the answer. That is the frame the
+	// image is about to be given a position in, so nothing is mapped in or
+	// out and there is no scene transform to get the wrong way round.
+	if (cod == nullptr)
+		return wanted;
+	const qreal step = 34.0;
+	QPointF at = wanted;
+	for (int tries = 0; tries < 24; ++tries)
+	{
+		bool taken = false;
+		for (QGraphicsItem* child : cod->childItems())
+		{
+			auto* node = dynamic_cast<Node*>(child);
+			if (node == nullptr || !node->isVisible() || dynamic_cast<Arrow*>(node) != nullptr)
+				continue;
+			if (node->mapRectToParent(node->boxRect()).contains(at))
+			{
+				taken = true;
+				break;
+			}
+		}
+		if (!taken)
+			return at;
+		at.setY(at.y() + step);
+	}
+	return at;
+}
+
 QString MapsElements::formula(const QString& functor)
 {
 	// An arrow with no name of its own is an inclusion: it carries x to x. Its
@@ -256,6 +304,211 @@ Node* MapsElements::sourceWithKey(const QString& key) const
 		if (auto* node = dynamic_cast<Node*>(child); node != nullptr && node->key() == key)
 			return node;
 	return nullptr;
+}
+
+qreal MapsElements::columnStep()
+{
+	// Wide enough for an image and the label of an arrow beside it, and a
+	// whole number of grid steps, so a column still lands on the grid.
+	const qreal unit = Node::snapUnit() > 0 ? Node::snapUnit() : 25.0;
+	return 3.0 * unit;
+}
+
+bool MapsElements::domainIsRow() const
+{
+	Node* dom = domain();
+	if (dom == nullptr)
+		return false;
+
+	// The spread of what is drawn in there, taken from the objects' own
+	// places: wider than it is tall is a row. Arrows are left out - an arrow
+	// is drawn BETWEEN two objects and has no place of its own to add.
+	QRectF spread;
+	for (QGraphicsItem* child : dom->childItems())
+	{
+		auto* node = dynamic_cast<Node*>(child);
+		if (node == nullptr || !node->isVisible() || dynamic_cast<Arrow*>(node) != nullptr)
+			continue;
+		spread |= node->mapRectToParent(node->boxRect());
+	}
+	// Nothing drawn, or a single object: there is no direction to it, and a
+	// column is the arrangement to fall back on.
+	return spread.width() > spread.height();
+}
+
+QPointF MapsElements::columnOffset() const
+{
+	const qreal along = column() * columnStep();
+	// a quarter turn when the diagram is a row: the copies stack downwards
+	return domainIsRow() ? QPointF(0, along) : QPointF(along, 0);
+}
+
+int MapsElements::column() const
+{
+	Arrow* F = arrow();
+	Object* cod = codomain();
+	if (F == nullptr || cod == nullptr || F->scene() == nullptr)
+		return 0;
+
+	// WHERE EACH FUNCTOR ARRIVES, not where its arrow happens to lie.
+	//
+	// The mappings that draw into the same place are read in the order their
+	// arrows COME IN at it, and that is a point on the codomain's edge: the
+	// end of the line. An arrow's middle is not the same thing - two
+	// functors drawn from opposite corners meet the same edge a long way
+	// from where their middles are - and it was the middle that put H in the
+	// second column when its arrow arrives to the LEFT of I's.
+	QList<QPair<QPointF, const MapsElements*>> peers;
+	for (QGraphicsItem* item : F->scene()->items())
+	{
+		auto* line = dynamic_cast<Arrow*>(item);
+		if (line == nullptr)
+			continue;
+		auto* maps = dynamic_cast<MapsElements*>(line->prop(Key()));
+		if (maps == nullptr || maps->codomain() != cod)
+			continue;
+		const QPainterPath drawn = line->curve();
+		const QPointF arrives = drawn.isEmpty()
+			? line->sceneBoundingRect().center()
+			: line->mapToScene(drawn.pointAtPercent(1.0));
+		peers.append({ arrives, maps });
+	}
+	if (peers.size() < 2)
+		return 0;
+
+	// ALONG WHICHEVER AXIS THEY ACTUALLY SPREAD.
+	//
+	// Functors coming in along one edge of the codomain are ordered ALONG
+	// that edge: arriving on the left edge they are read top to bottom,
+	// arriving on the top edge, left to right. Nothing has to know which
+	// edge that is - the arrival points say so themselves, by being spread
+	// out on one axis and level on the other.
+	QRectF spread;
+	for (const auto& peer : peers)
+		spread |= QRectF(peer.first, QSizeF(0.01, 0.01));
+	const bool acrossThePage = spread.width() > spread.height();
+
+	// Ties broken by the mapping's own identity, so two functors arriving at
+	// the very same point still get a column each - and always the same one,
+	// rather than swapping places every time the scene is walked.
+	std::sort(peers.begin(), peers.end(),
+	          [acrossThePage](const QPair<QPointF, const MapsElements*>& a,
+	                          const QPair<QPointF, const MapsElements*>& b) {
+		const qreal at = acrossThePage ? a.first.x() : a.first.y();
+		const qreal bt = acrossThePage ? b.first.x() : b.first.y();
+		if (!qFuzzyCompare(at + 1.0, bt + 1.0))
+			return at < bt;
+		return a.second->mappingId() < b.second->mappingId();
+	});
+
+	for (int at = 0; at < peers.size(); ++at)
+		if (peers.at(at).second == this)
+			return at;
+	return 0;
+}
+
+namespace
+{
+	// THE RUN AN ARROW MAKES, in its own coordinates: the middle of what it
+	// leaves to the middle of what it arrives at.
+	//
+	// NOT the drawn curve. The curve already has the bends in it - they are
+	// what moves its ends along the two frames - so reading the frame off it
+	// and then writing bends back against that frame is a loop: each sync
+	// would read a shape the last sync's bend had already altered, and the
+	// bow would grow every time. The two ends do not move when the line
+	// bends, so they are a frame that stays put.
+	bool runOf(const Arrow* line, QPointF& from, QPointF& to)
+	{
+		if (line == nullptr)
+			return false;
+		Node* leaves = line->domain();
+		Node* arrives = line->codomain();
+		if (leaves != nullptr && arrives != nullptr)
+		{
+			from = line->mapFromItem(leaves, leaves->boxRect().center());
+			to = line->mapFromItem(arrives, arrives->boxRect().center());
+			if (QLineF(from, to).length() > 1e-6)
+				return true;
+		}
+		// half-drawn, or the two ends on top of one another: the line as
+		// drawn is all there is to go on
+		const QPainterPath drawn = line->curve();
+		if (drawn.isEmpty())
+			return false;
+		from = drawn.pointAtPercent(0.0);
+		to = drawn.pointAtPercent(1.0);
+		return QLineF(from, to).length() > 1e-6;
+	}
+}
+
+QList<QPointF> MapsElements::carriedBends(const Arrow* from, const Arrow* to, bool reversed)
+{
+	if (from == nullptr || to == nullptr)
+		return QList<QPointF>();
+	const QList<QPointF> shape = from->bends();
+	if (shape.isEmpty())
+		return shape;
+
+	QPointF theirStart, theirEnd, ourStart, ourEnd;
+	if (!runOf(from, theirStart, theirEnd) || !runOf(to, ourStart, ourEnd))
+		return shape;   // no run to read it against: the points themselves are the best guess
+
+	const QLineF theirs(theirStart, theirEnd);
+	const QLineF ours(ourStart, ourEnd);
+	const qreal theirLength = theirs.length();
+	const qreal ourLength = ours.length();
+	const QPointF theirAlong = (theirEnd - theirStart) / theirLength;
+	const QPointF theirAside(-theirAlong.y(), theirAlong.x());
+	const QPointF ourAlong = (ourEnd - ourStart) / ourLength;
+	const QPointF ourAside(-ourAlong.y(), ourAlong.x());
+
+	QList<QPointF> carried;
+	carried.reserve(shape.size());
+	for (const QPointF& bend : shape)
+	{
+		const QPointF offset = bend - theirStart;
+		qreal along = QPointF::dotProduct(offset, theirAlong) / theirLength;
+		qreal aside = QPointF::dotProduct(offset, theirAside) / theirLength;
+		// A CONTRAVARIANT IMAGE RUNS THE OTHER WAY, and its run is read from
+		// the other end: the same curve is then the same distance from the
+		// far end, and bowed to the other side, or the copy comes out
+		// mirrored.
+		if (reversed)
+		{
+			along = 1.0 - along;
+			aside = -aside;
+		}
+		carried << ourStart + ourAlong * (along * ourLength) + ourAside * (aside * ourLength);
+	}
+	// The order goes with the direction: a line reversed meets its points
+	// back to front.
+	if (reversed)
+		std::reverse(carried.begin(), carried.end());
+	return carried;
+}
+
+QPointF MapsElements::imagePlace(const Node* source) const
+{
+	// ABSOLUTE, AND NOTHING ELSE - bar the column this mapping draws in.
+	//
+	// The image of X is AT X's place - the same point, read in the codomain's
+	// own coordinates instead of the domain's - moved along by however many
+	// mappings draw into the same place before this one (sideways for a
+	// domain drawn as a column, downwards for one drawn as a row). Both are
+	// children, so the two local frames are read as one frame, and the
+	// codomain ends up a copy of the arrangement in the domain, one copy per
+	// functor, side by side in the order the functors are drawn.
+	//
+	// Nothing is remembered between the two and nothing is added up. Carrying
+	// MOVES across as deltas is what let them drift: a move the image made on
+	// its own account - a collision push, a grid snap, a frame settling - was
+	// not a move of the source, so the gap it opened was kept for ever. An
+	// offset remembered per image had the same fault in slower motion, since
+	// a gap once opened was simply adopted as the arrangement.
+	if (source == nullptr)
+		return QPointF();
+	return source->pos() + columnOffset();
 }
 
 Node* MapsElements::imageOf(Object* cod, const QString& functor, const Node* source) const
@@ -372,7 +625,7 @@ void MapsElements::onSourceBends(Arrow* source)
 	if (image == nullptr)
 		return;
 	m_syncing = true;
-	image->setBends(source->bends());   // the same points, the same shape
+	image->setBends(carriedBends(source, image, isContravariant()));   // the same SHAPE
 	m_syncing = false;
 }
 
@@ -390,7 +643,7 @@ void MapsElements::onImageBends(Arrow* image)
 		if (source == nullptr || key.isEmpty() || source->key() != key)
 			continue;
 		m_syncing = true;
-		source->setBends(image->bends());
+		source->setBends(carriedBends(image, source, isContravariant()));
 		m_syncing = false;
 		return;
 	}
@@ -412,10 +665,10 @@ void MapsElements::onSourceMoved(Node* source, const QPointF& delta)
 	if (image == nullptr)
 		return;
 
-	// BY THE SAME AMOUNT, not to the same place: the image keeps whatever
-	// position it was given, and simply travels with what it is the image of.
+	// TO THE SOURCE'S PLACE, not by the amount the source travelled: see
+	// imagePlace. The delta this was handed says only THAT it moved.
 	m_syncing = true;
-	image->setPos(image->pos() + delta);
+	image->setPos(imagePlace(source));
 	m_syncing = false;
 }
 
@@ -432,8 +685,11 @@ void MapsElements::onImageMoved(Node* image, const QPointF& delta)
 		auto* node = dynamic_cast<Node*>(child);
 		if (node == nullptr || key.isEmpty() || node->key() != key)
 			continue;
+		// Dragged by hand: the source goes to the matching place - the one
+		// this mapping's column came from, so dragging an image in the second
+		// column does not haul its source a column sideways.
 		m_syncing = true;
-		node->setPos(node->pos() + delta);
+		node->setPos(image->pos() - columnOffset());
 		m_syncing = false;
 		return;
 	}
@@ -641,16 +897,23 @@ void MapsElements::sync()
 		Node* img = imageOf(cod, name, source);
 		if (img == nullptr)
 		{
-			// where it first appears: at the same offset as its source. From
-			// then on its position is ITS OWN - it moves when the source
-			// moves, by the same amount, but it can be put wherever you like.
-			img = cod->createNamedChild(applied(name, source->id()), cod->mapToScene(source->pos()));
+			// AT ITS SOURCE'S PLACE, read in the codomain's own frame
+			img = cod->createNamedChild(applied(name, source->id()),
+			                            cod->mapToScene(imagePlace(source)));
 			stamp(img, name, source);
 			img->setVisible(m_live);
 		}
-		else if (img->id() != applied(name, source->id()))
+		else
 		{
-			img->setId(applied(name, source->id()));   // the source was relabelled
+			if (img->id() != applied(name, source->id()))
+				img->setId(applied(name, source->id()));   // the source was relabelled
+			// AND PUT BACK WHERE IT BELONGS. Every sync is the whole answer,
+			// not a correction to the last one: an image that has been left
+			// somewhere else - by a diagram read from a file, by a shove from
+			// a neighbour, by anything at all - is brought to its source's
+			// place here, so the two sides cannot stay apart.
+			if (m_mirror && img->pos() != imagePlace(source))
+				img->setPos(imagePlace(source));
 		}
 		image.insert(source, img);
 		connect(source, &Node::moved, this, &MapsElements::onSourceMoved, Qt::UniqueConnection);
@@ -754,8 +1017,9 @@ void MapsElements::sync()
 			connect(imageArrow, &Arrow::bendsChanged, this, &MapsElements::onImageBends, Qt::UniqueConnection);
 			connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
 			connect(imageArrow, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
-			if (imageArrow->bends() != source->bends())
-				imageArrow->setBends(source->bends());
+			const QList<QPointF> shape = carriedBends(source, imageArrow, isContravariant());
+			if (imageArrow->bends() != shape)
+				imageArrow->setBends(shape);
 		}
 	}
 
@@ -843,7 +1107,8 @@ int MapsElements::mapDiagram()
 		Node* already = imageOf(cod, name, object);
 		if (already == nullptr)
 		{
-			already = cod->createNamedChild(applied(name, object->id()), cod->mapToScene(object->pos()));
+			const QPointF spot = freeSpotIn(cod, object->pos());
+			already = cod->createNamedChild(applied(name, object->id()), cod->mapToScene(spot));
 			stamp(already, name, object);
 			already->setVisible(true);   // asked for by hand: shown
 			made << already;

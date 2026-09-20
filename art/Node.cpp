@@ -1,4 +1,5 @@
-#include "art/Node.h"
+﻿#include "art/Node.h"
+#include "core/Palette.h"
 #include "art/Category.h"
 #include "art/Arrow.h"
 
@@ -52,6 +53,54 @@ namespace
 		}
 		return distance < 0 ? 0 : distance;
 	}
+}
+
+QPointF Node::freeGridSpotIn(const Node* parent, const QPointF& wanted)
+{
+	if (parent == nullptr)
+		return wanted;
+
+	// What counts as taken: a node already drawn in there, with the spot
+	// inside the box it is drawn as. Arrows are not in the running - a line
+	// running past is nothing to stand clear of - and neither is anything
+	// hidden.
+	const auto taken = [parent](const QPointF& at) {
+		for (QGraphicsItem* child : parent->childItems())
+		{
+			auto* node = dynamic_cast<const Node*>(child);
+			if (node == nullptr || !node->isVisible() || dynamic_cast<const Arrow*>(node) != nullptr)
+				continue;
+			if (node->mapRectToParent(node->boxRect()).contains(at))
+				return true;
+		}
+		return false;
+	};
+
+	// The grid the answer has to sit on. With snapping off there is no grid
+	// to step along, so a step is taken from the unit anyway - the spot still
+	// has to be clear of what is there.
+	const qreal step = s_snapUnit > 0 ? s_snapUnit : 25.0;
+	QPointF start = wanted;
+	if (s_snapEnabled && s_snapUnit > 0)
+		start = QPointF(qRound(wanted.x() / step) * step, qRound(wanted.y() / step) * step);
+	if (!taken(start))
+		return start;
+
+	// Outwards a ring at a time, and within a ring straight down first: down,
+	// then the two sides, then up, then the corners - each of those in the
+	// same below-before-above order.
+	for (int ring = 1; ring <= 12; ++ring)
+	{
+		const qreal d = ring * step;
+		const QPointF around[] = {
+			QPointF(0,  d), QPointF(-d,  0), QPointF( d,  0), QPointF(0, -d),
+			QPointF(-d,  d), QPointF( d,  d), QPointF(-d, -d), QPointF( d, -d),
+		};
+		for (const QPointF& offset : around)
+			if (!taken(start + offset))
+				return start + offset;
+	}
+	return start;   // nowhere clear within reach: where it was asked for
 }
 
 QPointF Node::snapped(const QPointF& parentPos) const
@@ -147,6 +196,7 @@ void Node::setId(const QString& id) {
 		prepareGeometryChange();
 		ancestorsPrepareGeometryChange();
 		m_idText = new NodeLabel(id, this);
+		applyLabelColour();   // born in whatever colour this node writes in
 		placeLabel();
 		ancestorsUpdate();
 		emit idChanged(this, id);
@@ -192,6 +242,44 @@ void Node::setBorderRecorded(const QColor& colour)
 		setBorder(pen);
 	}
 	recordStyleChange(fillBefore, borderBefore);
+}
+
+void Node::setLabelColour(const QColor& colour)
+{
+	if (m_labelColour == colour)
+		return;
+	m_labelColour = colour;
+	applyLabelColour();
+	update();
+	emit styleChanged(this);
+}
+
+void Node::applyLabelColour()
+{
+	if (m_idText == nullptr)
+		return;
+	// invalid: nobody has said, so the name is written in the ink names are
+	// written in
+	m_idText->setDefaultTextColor(m_labelColour.isValid() ? m_labelColour : Palette::ink());
+}
+
+void Node::setLabelColourRecorded(const QColor& colour)
+{
+	const QColor before = m_labelColour;
+	setLabelColour(colour);
+	recordLabelColourChange(before);
+}
+
+void Node::recordLabelColourChange(const QColor& before)
+{
+	if (m_labelColour == before)
+		return;
+	auto* diagram = dynamic_cast<DiagramScene*>(scene());
+	if (diagram == nullptr)
+		return;
+	diagram->history()->record(StyleChanged::ofLabelColour(
+		QString("Recoloured the name of %1").arg(id().isEmpty() ? QStringLiteral("a node") : id()),
+		this, before, m_labelColour));
 }
 
 bool Node::holdsAnything() const
@@ -517,8 +605,8 @@ bool Node::labelIsLocked() const
 
 QString Node::labelLockTip() const
 {
-	return QStringLiteral("This name is made from the functor's name and the name of what it is the "
-	                      "image of. Change it by renaming either of those.");
+	return QStringLiteral("Made from the functor and what it is the image of. Rename either "
+	                      "of those to change it.");
 }
 
 void Node::refreshLabelMovability()
@@ -548,8 +636,34 @@ QRectF Node::contentFrame() const
 			continue;
 		frame |= child->mapRectToParent(child->boundingRect());
 	}
-	// nothing held: this node IS its label, so that is the whole of it
-	return frame.isNull() ? childFrame() : frame;
+	if (!frame.isNull())
+		return frame;
+
+	// NOTHING HELD: this node IS its label, so that is the whole of it - and
+	// what the letters cover, not the line they sit on. A text line carries
+	// the font's full ascent and descent, so a lone D was boxed with a band of
+	// empty air above and below it, and squaring that box (squareIfSingleGlyph)
+	// spread the same air out sideways.
+	if (const NodeLabel* text = labelItem())
+		return text->mapRectToParent(text->inkRect());
+	return childFrame();
+}
+
+QRectF Node::squareIfSingleGlyph(const QRectF& box) const
+{
+	if (containedCount() != 0 || box.isNull())
+		return box;
+	// What is DRAWN is what has to be square, so the letter is taken from the
+	// label - a node whose id is machinery behind a one-letter name still
+	// reads as that one letter.
+	const NodeLabel* text = labelItem();
+	const QString name = text != nullptr ? text->source() : id();
+	if (name.size() != 1)
+		return box;
+
+	const qreal side = qMax(box.width(), box.height());
+	const QPointF middle = box.center();
+	return QRectF(middle.x() - side / 2.0, middle.y() - side / 2.0, side, side);
 }
 
 QVariant Node::itemChange(GraphicsItemChange change, const QVariant& value)
@@ -919,9 +1033,13 @@ void Node::addObjectAction(QMenu& menu, Category* home)
 	auto* diagram = diagramOf(this);
 	if (diagram == nullptr)
 		return;
-	// where the menu was opened, in the scene - so the object lands under the
-	// cursor rather than in the middle of whatever it is going into
-	const QPointF at = mapToScene(contextPos());
+	// Where the menu was opened, so the object lands under the cursor rather
+	// than in the middle of whatever it is going into - but on the nearest
+	// grid point that is CLEAR. Right-clicking a node to ask for another one
+	// asks for it at the cursor, which is on that node, and taken literally
+	// the new object was drawn exactly on top of the old one.
+	const QPointF at = home->mapToScene(
+		freeGridSpotIn(home, home->mapFromScene(mapToScene(contextPos()))));
 	QAction* add = menu.addAction(QString("%1  Add object").arg(Emoji::add()));
 	add->setToolTip(QString("Place a new object in %1, here.").arg(home->id()));
 	QObject::connect(add, &QAction::triggered, diagram, [diagram, home, at] {

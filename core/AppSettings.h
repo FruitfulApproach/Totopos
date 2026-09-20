@@ -44,6 +44,7 @@ public:
 	static const char* ComposeWithRing;  // bool, true: g o f rather than gf
 	static const char* EnglishSelectionOnly; // bool, false: the English panel reads the whole diagram
 	static const char* NodeCornerRadius; // double, 13.0: how round a fresh node's corners are
+	static const char* BendLingerMs;     // int, 2000: how long the bend points stay up after a hover
 
 	// WHAT THE NEXT ONE PLACED IS DRAWN IN.
 	//
@@ -56,6 +57,8 @@ public:
 	static const char* NodeBorder;       // colour, none chosen
 	static const char* ArrowFill;        // colour, none chosen
 	static const char* ArrowBorder;      // colour, none chosen
+	static const char* NodeText;         // colour the NAME is written in, none chosen
+	static const char* ArrowText;        // the same for an arrow's name
 
 	QVariant value(const char* key) const;
 	// "category/R-Mod/fill" and its like: one key per built-in, made here so
@@ -97,6 +100,9 @@ public:
 	bool englishSelectionOnly() const { return value(EnglishSelectionOnly).toBool(); }
 	// how round the corners of a freshly placed node are
 	double nodeCornerRadius() const { return value(NodeCornerRadius).toDouble(); }
+	// how long the points a curve is pulled through stay up once the mouse
+	// has brought them out; 0 takes them away the moment it leaves
+	int bendLingerMs() const { return value(BendLingerMs).toInt(); }
 
 	// The colours a freshly placed node or arrow starts in. An invalid colour
 	// is "nothing chosen": the caller keeps its own built-in look.
@@ -104,6 +110,10 @@ public:
 	{ return value(arrow ? ArrowFill : NodeFill).value<QColor>(); }
 	QColor defaultBorder(bool arrow) const
 	{ return value(arrow ? ArrowBorder : NodeBorder).value<QColor>(); }
+	// The colour a freshly placed one writes its NAME in. Invalid: nothing
+	// chosen, so the label is written in the ink names are written in.
+	QColor defaultText(bool arrow) const
+	{ return value(arrow ? ArrowText : NodeText).value<QColor>(); }
 	// A BUILT-IN CATEGORY'S COLOUR IS THE BUILT-IN'S, NOT ONE NODE'S.
 	//
 	// Every R-Mod drawn anywhere is the same category, so they are all drawn
@@ -114,9 +124,9 @@ public:
 	//
 	// Invalid means the built-in's own look stands.
 	QColor categoryFill(const QString& builtIn) const
-	{ return store(builtIn, "fill"); }
+	{ return categoryColour(builtIn, "fill"); }
 	QColor categoryBorder(const QString& builtIn) const
-	{ return store(builtIn, "border"); }
+	{ return categoryColour(builtIn, "border"); }
 	void setCategoryLook(const QString& builtIn, const QColor& fill, const QColor& border);
 
 	// Remember these as what the next one placed should look like. An invalid
@@ -126,9 +136,13 @@ public:
 		setValue(arrow ? ArrowFill : NodeFill, fill);
 		setValue(arrow ? ArrowBorder : NodeBorder, border);
 	}
+	void setDefaultText(bool arrow, const QColor& text)
+	{
+		setValue(arrow ? ArrowText : NodeText, text);
+	}
 
 private:
-	QColor store(const QString& builtIn, const char* what) const;
+	QColor categoryColour(const QString& builtIn, const char* what) const;
 
 public:
 

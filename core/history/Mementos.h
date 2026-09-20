@@ -52,6 +52,17 @@ public:
 		, m_fillAfter(fillAfter), m_borderAfter(borderAfter)
 		, m_radiusBefore(radiusBefore), m_radiusAfter(radiusAfter) {}
 
+	// THE COLOUR OF THE NAME, on its own.
+	//
+	// The same change in kind - what this node is painted with - but it
+	// touches neither the fill nor the frame, and an undo must put those
+	// back exactly as they are rather than as they were read off a node at
+	// some other moment. So it is made through here, with the two brushes
+	// left empty and a flag saying the colour of the name is the whole of
+	// what changed.
+	static StyleChanged* ofLabelColour(const QString& description, Node* node,
+	                                   const QColor& before, const QColor& after);
+
 	void undo() override;
 	void redo() override;
 	quint16 typeTag() const override { return MementoTag::StyleChanged; }
@@ -62,6 +73,9 @@ private:
 	QPen m_borderBefore, m_borderAfter;
 	qreal m_radiusBefore = -1;   // below zero: this change did not touch the corners
 	qreal m_radiusAfter = -1;
+	bool m_touchesPaint = true;  // false: only the name's colour changed
+	bool m_touchesLabel = false;
+	QColor m_labelBefore, m_labelAfter;
 };
 
 // The points an arrow is pulled through. Where a line is drawn says nothing

@@ -1,5 +1,6 @@
-﻿#include "Totopos.h"
+﻿#include "dialog/Totopos.h"
 #include "core/Emoji.h"
+#include "core/Branding.h"
 #include "core/AppSettings.h"
 #include "core/Version.h"
 #include "widget/SplashScreen.h"
@@ -26,7 +27,10 @@ int main(int argc, char *argv[])
     AppSettings::migrateFromOldName();
 
     splash.say(QStringLiteral("Setting out the pens"));
-    app.setWindowIcon(Emoji::appIcon());   // the taskbar and the window switcher
+    // Ours if we are carrying it, the detective drawn from the emoji font if
+    // the resources did not make it into the binary.
+    const QIcon taskbar = Branding::taskbarIcon();
+    app.setWindowIcon(taskbar.isNull() ? Emoji::appIcon() : taskbar);   // the taskbar and the window switcher
 
     splash.say(QStringLiteral("Laying out the workbench"));
     Totopos window;
