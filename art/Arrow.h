@@ -56,6 +56,11 @@ public:
 	// bends(), so as far as the file and the user are concerned the arrow is
 	// still a straight one nobody has bent.
 	static constexpr qreal ParallelGap = 14.0;
+	// How far a control point may sit from the line the arrow would take
+	// without it and still count as ON it - and so be let go of. The bend
+	// handle itself is a disc of BendGrabRadius, so anything inside this is
+	// a deviation hidden underneath the very point that makes it.
+	static constexpr qreal StraightEnough = BendGrabRadius;
 	// the bend under a point in this arrow's coordinates, or -1
 	int bendAt(const QPointF& pos, qreal radius = BendGrabRadius) const;
 
@@ -176,6 +181,22 @@ public:
 		Equals,
 	};
 
+	// DOUBLED, ON ITS OWN ACCOUNT.
+	//
+	// An equals is drawn as two lines because that is what an equals IS, and
+	// that stays tied to the style. But a doubled shaft is also a mark in its
+	// own right - a natural transformation is written with one, and so is an
+	// implication - and it has nothing to do with the hooks and barbs the
+	// Style menu offers. Asking for it there would have meant a style for
+	// every combination of a doubled line with each of the others.
+	//
+	// So it is a switch beside them: any arrow may be doubled, whatever else
+	// it is drawn as, and an equals is doubled whether or not the switch is
+	// on.
+	bool doubledLine() const { return m_doubleLine; }
+	void setDoubledLine(bool doubled);
+	void setDoubledLineRecorded(bool doubled);
+
 	Style style() const { return m_style; }
 	void setStyle(Style style);
 	// the same, and put it in the scene's history: what an arrow is claimed to
@@ -228,7 +249,7 @@ public:
 	// plain arrow is a single line with a head. Asking the two apart is what
 	// lets the third combination exist: an implication (art/Implies.h) is a
 	// double line WITH a head, which is how "implies" is written.
-	virtual bool drawsDoubleLine() const { return m_style == Style::Equals; }
+	virtual bool drawsDoubleLine() const { return m_doubleLine || m_style == Style::Equals; }
 	virtual bool drawsHead() const { return m_style != Style::Equals; }
 	// half the space between the two lines, in scene units before the arrow's
 	// depth is taken off it
@@ -366,6 +387,7 @@ private:
 	bool m_hasLooseEnd = false;
 	QList<ArrowProp*> m_props;
 	Style m_style = Style::Plain;
+	bool m_doubleLine = false;   // asked for on its own, beside the style
 
 	// where the label was put, in the arrow's own frame: along the line and
 	// off to the side, as fractions of its length (see rememberLabelPlacement)

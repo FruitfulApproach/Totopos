@@ -48,8 +48,20 @@ DiagramScene::DiagramScene(QObject* parent)
 	// jump away from the cursor
 	setSceneRect(-4000, -4000, 8000, 8000);
 
-	// the paper this is drawn on, until a file or the Properties page says
-	// otherwise (m_background carries the same colour)
+	// WHAT THIS DIAGRAM STARTS FROM: the settings, read now and kept here.
+	//
+	// Read once, into the diagram, rather than asked of the settings every
+	// time something is placed. A diagram is then a thing in its own right -
+	// it is saved with these and opens the same way on another machine - and
+	// changing a setting does not go back and alter diagrams that are
+	// already open.
+	// The PAPER is taken now, because a diagram has one from the moment it
+	// exists and changing the setting must not repaint diagrams already open.
+	// The six colours below it are NOT: a diagram says nothing about them
+	// until somebody presses "Set diagram default", and until then the
+	// settings are read whenever something is placed - so "Set default"
+	// changes what the open diagram goes on to draw.
+	m_background = AppSettings::instance().defaultBackground();
 	setBackgroundBrush(QBrush(m_background));
 
 	// NO BSP INDEX.
@@ -89,6 +101,65 @@ DiagramScene::DiagramScene(QObject* parent)
 		}
 		update();
 	});
+}
+
+namespace
+{
+	// the diagram an item is being built into, if it is in one yet
+	const DiagramScene* diagramOf(const QGraphicsItem* item)
+	{
+		return item != nullptr ? dynamic_cast<const DiagramScene*>(item->scene()) : nullptr;
+	}
+}
+
+QColor StartsAs::fill(const QGraphicsItem* item, bool arrow)
+{
+	if (const DiagramScene* diagram = diagramOf(item))
+		return diagram->defaultFill(arrow);
+	return AppSettings::instance().defaultFill(arrow);
+}
+
+QColor StartsAs::border(const QGraphicsItem* item, bool arrow)
+{
+	if (const DiagramScene* diagram = diagramOf(item))
+		return diagram->defaultBorder(arrow);
+	return AppSettings::instance().defaultBorder(arrow);
+}
+
+QColor StartsAs::text(const QGraphicsItem* item, bool arrow)
+{
+	if (const DiagramScene* diagram = diagramOf(item))
+		return diagram->defaultText(arrow);
+	return AppSettings::instance().defaultText(arrow);
+}
+
+QColor DiagramScene::defaultFill(bool arrow) const
+{
+	const std::optional<QColor> mine = ownFill(arrow);
+	return mine ? *mine : AppSettings::instance().defaultFill(arrow);
+}
+
+QColor DiagramScene::defaultBorder(bool arrow) const
+{
+	const std::optional<QColor> mine = ownBorder(arrow);
+	return mine ? *mine : AppSettings::instance().defaultBorder(arrow);
+}
+
+QColor DiagramScene::defaultText(bool arrow) const
+{
+	const std::optional<QColor> mine = ownText(arrow);
+	return mine ? *mine : AppSettings::instance().defaultText(arrow);
+}
+
+void DiagramScene::setDefaultLook(bool arrow, const QColor& fill, const QColor& border)
+{
+	(arrow ? m_arrowFill : m_nodeFill) = fill;
+	(arrow ? m_arrowBorder : m_nodeBorder) = border;
+}
+
+void DiagramScene::setDefaultText(bool arrow, const QColor& text)
+{
+	(arrow ? m_arrowText : m_nodeText) = text;
 }
 
 void DiagramScene::setBackground(const QColor& colour)
@@ -425,24 +496,53 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	// frame simply grows to reach the object just put down.
 	Node* from = pending;
 
-	Category* category = finishing ? from->surroundingCategory()
-							  : categoryAt(hitItem(event->scenePos()));
-	if (category == nullptr)
+	// WHERE THE OTHER END GOES, AND WHAT IT IS.
+	//
+	// Whatever is drawn is drawn IN something, and that something decides
+	// what may be put beside it: an object of a category, an element of a
+	// module. So the parent is asked rather than guessed - the nearest thing
+	// above the domain that can hold children, which for an object is its
+	// category and for an element is the object holding it.
+	//
+	// The click may land well outside that parent's frame, and that is the
+	// ordinary case rather than a mistake: the arrow was dragged clear of the
+	// box to leave room to put the other end down. The new node goes into the
+	// parent all the same, AT THE SPOT THAT WAS DOUBLE-CLICKED, and the
+	// parent's frame grows to reach it.
+	Object* into = nullptr;
+	if (finishing)
+	{
+		for (QGraphicsItem* up = from->parentItem(); up != nullptr && into == nullptr; up = up->parentItem())
+			if (auto* holder = dynamic_cast<Object*>(up); holder != nullptr && holder->canHoldNamedChildren())
+				into = holder;
+		if (into == nullptr)
+			into = from->surroundingCategory();   // nothing above it holds children: its category does
+		if (into == nullptr)
+			into = m_ambientCategory;             // and failing that, the canvas
+	}
+	else
+	{
+		into = categoryAt(hitItem(event->scenePos()));
+	}
+	if (into == nullptr)
 	{
 		if (arrowPending())
 			cancelArrow();   // nowhere to put the other end
 		return;
 	}
 
-	// the category decides what it is made of: a category in BigCat, a set in Set, ...
-	Object* placed = category->createCanvasObject(event->scenePos());
+	// The parent names it and the parent decides its kind: an object in a
+	// category, an element in something whose objects are sets.
+	auto* category = dynamic_cast<Category*>(into);
+	const QString name = category != nullptr ? category->nextObjectName() : into->nextElementName();
+	Object* placed = into->createNamedChild(name, event->scenePos());
 	if (placed == nullptr)
 	{
 		if (arrowPending())
 			cancelArrow();
 		return;
 	}
-	recordCreation(QString("Placed %1 in %2").arg(placed->id(), category->id()), { placed });
+	recordCreation(QString("Placed %1 in %2").arg(placed->id(), into->id()), { placed });
 	if (finishing)
 		finishArrow(placed);   // and the arrow that was waiting now has an end
 	event->accept();
@@ -1357,6 +1457,36 @@ void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	m_lastScenePos = event->scenePos();
 	pickingAdds(event);
+
+	// SHIFT AND CLICK TAKES A THING IN OR OUT OF THE SELECTION, and does
+	// nothing else.
+	//
+	// A plain click already adds (see pickingAdds), but it cannot be relied
+	// on to take away again: a node is usually grabbed by its NAME, and the
+	// label hands the press to the scene as a move after picking its node
+	// out - so clicking something already chosen chose it again. An arrow
+	// does the same for its own press. Shift says "only change whether this
+	// one is in", so it is answered here, before anything below can start a
+	// move or insist on selecting.
+	//
+	// It is deliberately not a drag: the press is taken and finished with.
+	if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ShiftModifier))
+	{
+		Node* node = nodeForPress(event->scenePos());
+		if (node != nullptr && node != m_ambientCategory)
+		{
+			const bool wasIn = node->isSelected();
+			node->setSelected(!wasIn);
+			// the handle bar belongs to something chosen: it goes with the
+			// node when the node goes out
+			if (wasIn)
+				hideHandles();
+			else
+				showHandles(node, node->mapFromScene(event->scenePos()));
+			event->accept();
+			return;
+		}
+	}
 
 	// The border button is up, so the cursor is on it: this press is the one
 	// gesture it offers. Taken here, before any of the press machinery below,

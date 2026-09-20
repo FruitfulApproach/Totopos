@@ -67,6 +67,18 @@ void StyleChanged::redo()
 		m_node->setCornerRadius(m_radiusAfter);
 }
 
+void ArrowDoubled::undo()
+{
+	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))
+		arrow->setDoubledLine(m_before);
+}
+
+void ArrowDoubled::redo()
+{
+	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))
+		arrow->setDoubledLine(m_after);
+}
+
 void ArrowBent::undo()
 {
 	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))

@@ -36,15 +36,18 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	// count as chosen: somebody picked these, and a node picked out that way
 	// shows its frame whether or not it holds anything, exactly as one
 	// coloured by hand does.
-	const QColor wantedFill = AppSettings::instance().defaultFill(false);
-	const QColor wantedBorder = AppSettings::instance().defaultBorder(false);
+	// This diagram's defaults, or the settings' when it is not in one yet
+	// (see StartsAs): a diagram sent to somebody else looks the way it was
+	// drawn, whatever their own settings say.
+	const QColor wantedFill = StartsAs::fill(this, false);
+	const QColor wantedBorder = StartsAs::border(this, false);
 	if (wantedFill.isValid())
 		setFill(QBrush(wantedFill));
 	if (wantedBorder.isValid())
 		setBorder(QPen(wantedBorder, border().widthF() > 0 ? border().widthF() : 1.6));
 
 	// and the colour its name is written in, if one was asked for
-	if (const QColor wantedText = AppSettings::instance().defaultText(false); wantedText.isValid())
+	if (const QColor wantedText = StartsAs::text(this, false); wantedText.isValid())
 		setLabelColour(wantedText);
 
 	// the label is the handle you move it by, and says so

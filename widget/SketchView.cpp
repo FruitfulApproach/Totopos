@@ -59,6 +59,19 @@ SketchView::SketchView(QWidget* parent)
 {
 	setRenderHint(QPainter::Antialiasing, true);
 	setDragMode(QGraphicsView::RubberBandDrag);
+	// WHAT A BAND DRAWN ROUND THINGS TAKES: the ones it got ALL the way
+	// round.
+	//
+	// Qt's default is to take anything the band so much as touches, which on
+	// a diagram is nearly everything: a category is a box round its objects,
+	// so a band drawn inside it to gather two of its objects clips the
+	// category's own frame and takes the category too - and with it, in
+	// effect, the whole diagram. Dragging the result moved everything.
+	//
+	// Containment is the gesture people mean by drawing a ring round things,
+	// and it also gives a way to pick a nested thing WITHOUT its parent,
+	// which touching cannot.
+	setRubberBandSelectionMode(Qt::ContainsItemShape);
 	// zoom about the point under the cursor, not the view's centre
 	setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
 	setResizeAnchor(QGraphicsView::AnchorViewCenter);

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QtWidgets/QMainWindow>
 #include "ui_Totopos.h"
@@ -19,6 +19,7 @@ class LibraryDock;
 class ApplicableRulesDock;
 class EnglishDock;
 class QAction;
+class QCloseEvent;
 
 // One diagram open in the window: its own canvas, its own scene, its own file
 // and its own history. A piece of one can be carried into another - hold a
@@ -50,6 +51,12 @@ class Totopos : public QMainWindow
 public:
     Totopos(QWidget *parent = nullptr);
     ~Totopos();
+
+protected:
+    // WHERE IT WAS AND HOW IT WAS ARRANGED, kept for the next run. Written on
+    // the way out rather than as the window is dragged about: what is worth
+    // remembering is where it was LEFT.
+    void closeEvent(QCloseEvent* event) override;
 
 private slots:
     void openSettings();

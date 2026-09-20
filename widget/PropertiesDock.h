@@ -60,6 +60,8 @@ private:
 	void applyColour(bool fill);
 	// the colour the NAME is written in, which is nobody else's business
 	void applyTextColour();
+	// file the paper this diagram is on as the paper a NEW diagram starts on
+	void applyDefaultPaper();
 	void applyBackgroundColour();
 	// store the selected node's colours as what the next one placed starts in
 	void applyDefaultLook();
@@ -106,6 +108,8 @@ private:
 	QPushButton* m_borderColour = nullptr;
 	// "what the next one placed looks like", beside the two chips
 	QPushButton* m_textColour = nullptr;
+	QPushButton* m_setDefaultPaper = nullptr;
+	ToggleSwitch* m_doubleLine = nullptr;
 	QPushButton* m_setDefaultLook = nullptr;
 
 	// Everything a CATEGORY is asked about: which one it is, whether the

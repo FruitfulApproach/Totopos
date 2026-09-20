@@ -1,4 +1,5 @@
 ﻿#include "core/AppSettings.h"
+#include "core/Palette.h"
 #include "art/Node.h"
 #include "tutor/Tutor.h"
 
@@ -32,6 +33,10 @@ const char* AppSettings::ArrowFill = "arrow/fill";
 const char* AppSettings::ArrowBorder = "arrow/border";
 const char* AppSettings::NodeText = "node/text";
 const char* AppSettings::ArrowText = "arrow/text";
+const char* AppSettings::Background = "diagram/background";
+const char* AppSettings::WindowGeometry = "window/geometry";
+const char* AppSettings::WindowState = "window/state";
+const char* AppSettings::LastFolder = "window/lastFolder";
 
 namespace
 {
@@ -114,6 +119,11 @@ QVariant AppSettings::defaultValue(const char* key)
 	if (k == NodeFill || k == NodeBorder || k == ArrowFill || k == ArrowBorder
 	 || k == NodeText || k == ArrowText)
 		return QColor();
+	if (k == Background) return Palette::paper();
+	// Empty: nothing to restore, so the window opens where the system puts it
+	// and the file dialog starts wherever it would have started anyway.
+	if (k == WindowGeometry || k == WindowState) return QByteArray();
+	if (k == LastFolder) return QString();
 	return QVariant();
 }
 

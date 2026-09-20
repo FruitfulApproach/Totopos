@@ -1,4 +1,4 @@
-#include "widget/SplashScreen.h"
+﻿#include "widget/SplashScreen.h"
 
 #include "core/Version.h"
 
@@ -14,39 +14,61 @@
 
 namespace
 {
-	// The plate, in its own coordinates. Everything below is written against
-	// these and scaled once, at the end, to whatever the screen is: a splash
-	// screen laid out in device pixels is a different picture on every
-	// machine, and this one is the same picture everywhere.
-	const int kWidth  = 560;
-	const int kHeight = 430;
-	const int kMargin = 34;
-
-	// THE LOGO GETS THE TOP OF THE CARD, and nearly all of it.
+	// THE PLATE IS THE LOGO. Everything below is written against these and
+	// scaled once, at the end, to whatever the screen is: a splash screen
+	// laid out in device pixels is a different picture on every machine, and
+	// this one is the same picture everywhere.
 	//
-	// It is the thing worth looking at, so the card is sized round it rather
-	// than the other way about: the artwork is 414x256, and this room is deep
-	// enough to show it at very nearly that, where it used to be squeezed to
-	// well under half. The rows below are placed off the bottom of this room,
-	// so giving the logo more or less room moves them with it.
-	const int kLogoTop = kMargin - 6;
-	const int kLogoHeight = 250;
-	const int kNameTop = kLogoTop + kLogoHeight + 8;
-	const int kVersionTop = kNameTop + 48;
-	// where the subtext sits: low enough to be clear of the version, high
-	// enough not to touch the frame
-	const int kSayingBaseline = kHeight - kMargin - 6;
+	// The height is the WIDTH TIMES THE LOGO'S OWN PROPORTIONS (414 x 256),
+	// so the artwork fills the card exactly and nothing is cropped. Sizing
+	// the card first and fitting the logo into it is what left the old splash
+	// with a band of white above and below - and cropping a logo to make a
+	// rectangle work is a logo nobody chose. Give the card the logo's shape
+	// instead and neither happens.
+	const int kWidth  = 560;
+	const int kHeight = 560 * 256 / 414;   // 346
+	const int kMargin = 34;
+	const int kRadius = 18;
+
+	// THE WRITING SITS ON THE ARTWORK, so it is given a wash to stand on:
+	// deepest at the TOP edge and fading out downwards. Without it the name
+	// is legible or not depending on what happens to be behind it, which is
+	// not something a splash screen can be left to luck.
+	//
+	// It runs the WHOLE height of the card. Covering only the part the
+	// writing is in put a hard edge across the picture where the band began:
+	// the wash was already at full strength on its first row, so the artwork
+	// above it was untouched and the join read as a line ruled across the
+	// logo. A wash has to start at nothing or start at the edge, and this one
+	// starts at the edge.
+	const qreal kScrimFadesBy = 0.75;   // gone by three quarters of the way down
+
+	// the rows, measured up from the bottom edge rather than down from the
+	// logo: the artwork now owns the whole card, so there is no bottom of it
+	// to hang them from
+	const int kSayingBaseline = kHeight - kMargin + 10;
+	const int kVersionTop = kSayingBaseline - 54;
+	const int kNameTop = kVersionTop - 46;
 
 	// How long the splash stays up at the least. Long enough to read the name
 	// and the version and to notice the line underneath; short enough that
 	// nobody opening the program to get on with something feels held.
+	//
+	// LONGER IN A DEBUG BUILD, and on purpose: the splash is the one part of
+	// the program nobody sees for long enough to judge, because starting up
+	// is fast and it is gone. Two and a half seconds is time to look at it
+	// while working on it. A release build keeps the short wait - that one is
+	// for people who opened the program to get on with something.
+#ifdef QT_DEBUG
+	const qint64 kLeastVisibleMs = 2500;
+#else
 	const qint64 kLeastVisibleMs = 900;
+#endif
 
-	const QColor kInk      = QColor(0x1E, 0x20, 0x2C);   // the near-black everything is written in
-	const QColor kQuiet    = QColor(0x6B, 0x70, 0x84);   // for what is only there to be glanced at
+	const QColor kInk      = QColor(0x1E, 0x20, 0x2C);   // the near-black the wash deepens to
+	const QColor kOnArt    = QColor(0xFF, 0xFF, 0xFF);   // the name, written over the artwork
+	const QColor kQuiet    = QColor(0xD7, 0xDA, 0xE6);   // for what is only there to be glanced at
 	const QColor kEdge     = QColor(0x63, 0x66, 0xF1);   // the blue of the diagrams
-	const QColor kPaper    = QColor(0xFF, 0xFF, 0xFF);
-	const QColor kPaperLow = QColor(0xF3, 0xF4, 0xFB);   // a shade, so the plate is not a flat sheet
 }
 
 SplashScreen::SplashScreen()
@@ -74,33 +96,48 @@ QPixmap SplashScreen::plate()
 	painter.setRenderHint(QPainter::TextAntialiasing, true);
 	painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-	// the card itself: white paper with a faint fall of grey, rounded, and
-	// bordered in the blue the diagrams are drawn in
-	const QRectF card(1.0, 1.0, kWidth - 2.0, kHeight - 2.0);
-	QLinearGradient paper(card.topLeft(), card.bottomLeft());
-	paper.setColorAt(0.0, kPaper);
-	paper.setColorAt(1.0, kPaperLow);
-	QPainterPath rounded;
-	rounded.addRoundedRect(card, 18, 18);
-	painter.fillPath(rounded, paper);
-	painter.setPen(QPen(kEdge, 2));
-	painter.drawPath(rounded);
-
-	// THE LOGO, given the top two thirds and fitted inside it.
+	// THE CARD IS THE ARTWORK, CLIPPED TO ITS ROUNDED CORNERS.
 	//
-	// Scaled to fit rather than to fill: a logo cropped to make a rectangle
-	// work is a logo nobody chose. Whatever is left over is white space,
-	// which is what the rest of the card is made of anyway.
+	// The clip is what makes the corners round: the logo is drawn over the
+	// whole plate and the corners simply are not painted, so there is no
+	// frame drawn ON the picture and no white showing through behind it.
+	const QRectF card(1.0, 1.0, kWidth - 2.0, kHeight - 2.0);
+	QPainterPath rounded;
+	rounded.addRoundedRect(card, kRadius, kRadius);
+	painter.setClipPath(rounded);
+
 	const QPixmap logo(QStringLiteral(":/img/TotoposLogo.png"));
 	if (!logo.isNull())
 	{
-		const QRect room(kMargin, kLogoTop, kWidth - 2 * kMargin, kLogoHeight);
-		const QSize fitted = logo.size().scaled(room.size(), Qt::KeepAspectRatio);
-		const QRect at(room.x() + (room.width() - fitted.width()) / 2,
-		               room.y() + (room.height() - fitted.height()) / 2,
-		               fitted.width(), fitted.height());
+		// Scaled to FILL. The card was given the logo's own proportions, so
+		// this is an exact fit and expanding takes nothing off - but it is
+		// written as a fill rather than a fit so that artwork of some other
+		// shape covers the card instead of floating in the middle of it.
+		const QSize covering = logo.size().scaled(QSize(kWidth, kHeight), Qt::KeepAspectRatioByExpanding);
+		const QRect at((kWidth - covering.width()) / 2, (kHeight - covering.height()) / 2,
+		               covering.width(), covering.height());
 		painter.drawPixmap(at, logo);
 	}
+	else
+	{
+		painter.fillPath(rounded, kInk);   // nothing to show: a plain card, not a hole
+	}
+
+	// The wash the writing stands on, DEEPEST AT THE TOP and fading out
+	// downwards - the other way up from a photograph's caption bar, and the
+	// way round that suits this artwork.
+	QLinearGradient scrim(QPointF(0, 0), QPointF(0, kHeight));
+	scrim.setColorAt(0.0, QColor(kInk.red(), kInk.green(), kInk.blue(), 225));
+	scrim.setColorAt(kScrimFadesBy / 2.0, QColor(kInk.red(), kInk.green(), kInk.blue(), 110));
+	scrim.setColorAt(kScrimFadesBy, QColor(kInk.red(), kInk.green(), kInk.blue(), 0));
+	scrim.setColorAt(1.0, QColor(kInk.red(), kInk.green(), kInk.blue(), 0));
+	painter.fillRect(QRectF(0, 0, kWidth, kHeight), scrim);
+
+	// and the edge, drawn last so it sits over both, in the blue the diagrams
+	// are drawn in
+	painter.setClipping(false);
+	painter.setPen(QPen(kEdge, 2));
+	painter.drawPath(rounded);
 
 	// the name, large and light: a wide tracking would be better still, but
 	// letter spacing is a font property and this one is whatever is installed
@@ -108,7 +145,7 @@ QPixmap SplashScreen::plate()
 	title.setPointSizeF(30);
 	title.setWeight(QFont::Light);
 	painter.setFont(title);
-	painter.setPen(kInk);
+	painter.setPen(kOnArt);
 	painter.drawText(QRect(0, kNameTop, kWidth, 46), Qt::AlignHCenter | Qt::AlignVCenter,
 	                 Version::name());
 
@@ -123,7 +160,7 @@ QPixmap SplashScreen::plate()
 
 	// a hairline above the subtext, so the line that keeps changing is visibly
 	// a different kind of thing from the two that do not
-	painter.setPen(QPen(QColor(0, 0, 0, 24), 1));
+	painter.setPen(QPen(QColor(255, 255, 255, 46), 1));
 	painter.drawLine(kMargin + 40, kSayingBaseline - 30, kWidth - kMargin - 40, kSayingBaseline - 30);
 
 	painter.end();

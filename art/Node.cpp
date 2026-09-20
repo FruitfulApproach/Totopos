@@ -690,7 +690,14 @@ QVariant Node::itemChange(GraphicsItemChange change, const QVariant& value)
 		// never told: it stayed where the old line was.
 		for (QGraphicsItem* up = parentItem(); up != nullptr; up = up->parentItem())
 			if (auto* node = dynamic_cast<Node*>(up))
+			{
 				node->announceShapeChange();
+				// A CHILD MOVING IS ITS PARENT GROWING. Dragging something to
+				// the bottom of a box makes the box taller without the box
+				// going anywhere, and what the box has grown over is exactly
+				// as much in the way as if it had been walked into.
+				node->pushSiblingsAside();
+			}
 		pushSiblings(delta);
 		break;
 	}
@@ -752,6 +759,16 @@ void Node::refreshFrame()
 	// anywhere. An arrow redraws itself; a mapping carrying positions across
 	// ignores it, because nothing moved to carry (MapsElements::onSourceMoved).
 	emit moved(this, QPointF());
+
+	// AND WHAT THE NEW SHAPE IS NOW LYING ACROSS. Growing over a neighbour is
+	// the same trespass as walking into one, and is answered the same way -
+	// under the same conditions, so nothing is shoved by a frame settling
+	// while the program is drawing a diagram of its own accord (see
+	// shoveNeighbours).
+	pushSiblingsAside();
+	for (QGraphicsItem* p = parentItem(); p != nullptr; p = p->parentItem())
+		if (auto* node = dynamic_cast<Node*>(p))
+			node->pushSiblingsAside();   // our growth grew everything we sit inside
 }
 
 namespace
@@ -1316,6 +1333,31 @@ void Node::refreshDerivedLabel()
 
 void Node::pushSiblings(const QPointF& delta)
 {
+	const qreal travelled = QLineF(QPointF(0, 0), delta).length();
+	if (travelled < 1e-6)
+		return;
+	shoveNeighbours(delta / travelled);   // the way this node is going
+}
+
+void Node::pushSiblingsAside()
+{
+	// A NODE THAT GREW IS IN THE WAY JUST AS MUCH AS ONE THAT MOVED.
+	//
+	// A frame is the union of what it holds, so drawing something near the
+	// edge of a box - or dragging something already in it outwards - makes
+	// the BOX bigger without moving it an inch. Its neighbours were left
+	// where they were and the box simply grew over them, because the shove
+	// was only ever worked out from a node's own travel and here there is
+	// none: the node did not go anywhere, it got larger.
+	//
+	// There is no direction to take from a growth, so each neighbour is moved
+	// the way it already lies from the middle of this node - which is the
+	// shortest way out from under it.
+	shoveNeighbours(QPointF());
+}
+
+void Node::shoveNeighbours(const QPointF& direction)
+{
 	QGraphicsItem* parent = parentItem();
 	if (!s_collisionEnabled || parent == nullptr)
 		return;
@@ -1324,10 +1366,10 @@ void Node::pushSiblings(const QPointF& delta)
 	if (!s_userDragging && s_pushDepth == 0)
 		return;
 
-	const qreal travelled = QLineF(QPointF(0, 0), delta).length();
-	if (travelled < 1e-6)
-		return;
-	const QPointF direction = delta / travelled;   // the way this node is going
+	// null: this node grew rather than travelled, and each neighbour is
+	// pushed along its own line from our middle (worked out per neighbour
+	// below)
+	const bool grew = QLineF(QPointF(0, 0), direction).length() < 1e-6;
 
 	// A shove can start another, and two nodes can shove each other: count the
 	// depth and remember who has already been moved this round.
@@ -1365,9 +1407,17 @@ void Node::pushSiblings(const QPointF& delta)
 		// from is not being pushed into. Level with us counts as in front
 		// (dot == 0), and so does sitting exactly on us - two nodes stacked
 		// centre on centre have nowhere else to be sorted out.
-		const QPointF away = other->mapRectToParent(other->boxRect()).center() - mine.center();
-		if (QPointF::dotProduct(away, direction) < 0)
+		QPointF away = other->mapRectToParent(other->boxRect()).center() - mine.center();
+		if (!grew && QPointF::dotProduct(away, direction) < 0)
 			continue;
+
+		// A GROWTH PUSHES EVERY WAY AT ONCE: each neighbour goes the way it
+		// already lies from us. One sitting exactly on our middle has no such
+		// way, so it is sent downwards, where the eye looks for what has been
+		// moved aside.
+		const qreal reach = QLineF(QPointF(0, 0), away).length();
+		const QPointF push = !grew ? direction
+		                           : (reach > 1e-6 ? away / reach : QPointF(0, 1));
 
 		// Where it started, so undo puts it back with the node that shoved it.
 		if (diagram != nullptr)
@@ -1381,14 +1431,14 @@ void Node::pushSiblings(const QPointF& delta)
 			const QRectF theirs = other->mapRectToParent(other->boxRect());
 			if (!mine.intersects(theirs))
 				break;
-			qreal step = separation(mine, theirs, direction) + s_pushEpsilon;
+			qreal step = separation(mine, theirs, push) + s_pushEpsilon;
 			// The landing is put on the grid, so a shove shorter than half a
 			// unit would be rounded straight back onto where it started. Ask
 			// for whole grid units when the grid is on.
 			if (s_snapEnabled && s_snapUnit > 0)
 				step = qCeil(step / s_snapUnit) * s_snapUnit;
 			const QPointF before = other->pos();
-			other->setPos(other->pos() + direction * step);
+			other->setPos(other->pos() + push * step);
 			if (other->pos() == before)
 				break;   // it will not move (nothing to gain by asking again)
 		}

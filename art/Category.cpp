@@ -13,9 +13,15 @@
 Category::Category(const QString& name, QGraphicsItem* parent)
 	: Object(name, parent)
 {
-	// a category is a translucent yellow region with a dodger-blue frame
-	setFill(QBrush(Palette::faded(Palette::field(), 70)));
-	setBorder(QPen(Palette::faded(Palette::cobalt(), 170), 2));
+	// A translucent wash with a cobalt frame - unless a default says
+	// otherwise, in which case that is what a new one starts in.
+	// applyDepthAppearance settles both a moment later and reads the same
+	// order (built-in, then by hand, then the default, then this); this is
+	// only what it looks like before that runs.
+	const QColor wantedFill = StartsAs::fill(this, false);
+	const QColor wantedBorder = StartsAs::border(this, false);
+	setFill(QBrush(wantedFill.isValid() ? wantedFill : Palette::faded(Palette::field(), 70)));
+	setBorder(QPen(wantedBorder.isValid() ? wantedBorder : Palette::faded(Palette::cobalt(), 170), 2));
 }
 
 Category::~Category()
@@ -578,8 +584,32 @@ void Category::applyDepthAppearance(int depth)
 	//
 	// Unset - which is how everything starts - means the look below stands.
 	const QString built = builtInName();
-	const QColor wantedFill = AppSettings::instance().categoryFill(built);
-	const QColor wantedBorder = AppSettings::instance().categoryBorder(built);
+	QColor wantedFill = AppSettings::instance().categoryFill(built);
+	QColor wantedBorder = AppSettings::instance().categoryBorder(built);
+
+	// AND WHAT THIS ONE WAS ASKED TO BE, which this used to paint straight
+	// over.
+	//
+	// Every category is given its colours here, at every depth refresh - and
+	// a fresh one is refreshed the moment it is made. So a colour chosen by
+	// hand, or a default asked for with "Set default", was applied in the
+	// constructor and then painted over a moment later by the yellow below:
+	// a new category came out in the original colours however the default had
+	// been set.
+	//
+	// The order is: the BUILT-IN's colour first (every R-Mod is the same
+	// R-Mod, wherever it is drawn), then this node's own if it was coloured
+	// by hand, then the default a new one starts in, and only then the
+	// built-in look. What changes with depth is the ALPHA, which is set
+	// absolutely below and so does not pile up when this runs again.
+	if (!wantedFill.isValid() && hasChosenStyle() && fill().style() != Qt::NoBrush)
+		wantedFill = fill().color();
+	if (!wantedBorder.isValid() && hasChosenStyle() && border().style() != Qt::NoPen)
+		wantedBorder = border().color();
+	if (!wantedFill.isValid())
+		wantedFill = StartsAs::fill(this, false);
+	if (!wantedBorder.isValid())
+		wantedBorder = StartsAs::border(this, false);
 
 	if (m_subcategory)
 	{

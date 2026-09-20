@@ -1,4 +1,5 @@
 ﻿#include "core/io/SceneFile.h"
+#include <optional>
 
 #include <QFile>
 #include <QDataStream>
@@ -17,7 +18,7 @@
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
-	const quint16 kVersion = 22;   // 22: the colour each name is written in   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+	const quint16 kVersion = 25;   // 25: a doubled line, asked for on its own   // 24: which of the diagram's own defaults it has actually set   // 23: the diagram's own default colours   // 22: the colour each name is written in   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
 
 	// THE TWO MEANINGS OF VERSION 15.
 	//
@@ -140,6 +141,9 @@ namespace
 			out << quint8(maps != nullptr && maps->isContravariant() ? 1 : 0);
 			out << arrow->bends();   // the points its line is pulled through
 			out << quint8(arrow->style());   // inclusion, monic, epic, invertible
+			// version 25: a doubled shaft, which is a mark of its own and not
+			// one of the styles above
+			out << quint8(arrow->doubledLine() ? 1 : 0);
 		}
 
 		QList<Node*> children;
@@ -217,6 +221,7 @@ namespace
 		QPointF labelOffset;
 		QList<QPointF> bends;
 		quint8 style = 0;   // Arrow::Style::Plain
+		quint8 doubled = 0;   // a doubled shaft, asked for beside the style
 		QString key;
 		QColor labelColour;   // invalid: written in the ink names are written in
 		QString pattern;
@@ -310,6 +315,8 @@ namespace
 				in >> arrow.bends;
 			if (version >= 16)
 				in >> arrow.style;
+			if (version >= 25)
+				in >> arrow.doubled;
 			pending << arrow;
 			// an arrow holds nothing but its own label
 			qint32 count = 0;
@@ -607,6 +614,24 @@ bool SceneFile::save(DiagramScene* scene, const QString& path, QString* error)
 		// version 21: the colour of the paper. Invalid means none was chosen,
 		// which is what an older file says by not being able to say anything.
 		out << scene->background();
+
+		// version 23: THIS DIAGRAM'S OWN DEFAULTS - what a thing placed in it
+		// starts out looking like. Saved with the diagram rather than left to
+		// the settings, so it opens on another machine looking the way it was
+		// drawn. An invalid colour is "nothing chosen".
+		// Each is written as "has this diagram said anything" and then the
+		// colour, because saying NOTHING and saying "none" are two different
+		// answers: nothing said means the settings are asked whenever
+		// something is placed, while "none" is a chosen no-fill.
+		const auto writeOwn = [&out](const std::optional<QColor>& own) {
+			out << quint8(own ? 1 : 0) << (own ? *own : QColor());
+		};
+		writeOwn(scene->ownFill(false));
+		writeOwn(scene->ownBorder(false));
+		writeOwn(scene->ownText(false));
+		writeOwn(scene->ownFill(true));
+		writeOwn(scene->ownBorder(true));
+		writeOwn(scene->ownText(true));
 	}
 
 	QSaveFile file(path);
@@ -815,6 +840,7 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		arrow->setCornerRadius(p.radius);
 		arrow->setBends(p.bends);
 		arrow->setStyle(static_cast<Arrow::Style>(p.style));
+		arrow->setDoubledLine(p.doubled != 0);
 		arrow->setKey(p.key);
 		arrow->setLabelOffset(p.labelOffset);
 		arrow->setLabelColour(p.labelColour);
@@ -921,6 +947,44 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		data >> paper;
 		if (data.status() == QDataStream::Ok)
 			scene->setBackground(paper);
+	}
+
+	if (version >= 24)
+	{
+		// six answers, each of them "said anything?" and the colour
+		std::optional<QColor> own[6];
+		for (int at = 0; at < 6; ++at)
+		{
+			quint8 said = 0;
+			QColor colour;
+			data >> said >> colour;
+			if (said != 0)
+				own[at] = colour;
+		}
+		if (data.status() == QDataStream::Ok)
+		{
+			if (own[0] || own[1]) scene->setDefaultLook(false, own[0].value_or(QColor()), own[1].value_or(QColor()));
+			if (own[2]) scene->setDefaultText(false, *own[2]);
+			if (own[3] || own[4]) scene->setDefaultLook(true, own[3].value_or(QColor()), own[4].value_or(QColor()));
+			if (own[5]) scene->setDefaultText(true, *own[5]);
+		}
+	}
+	else if (version == 23)
+	{
+		// WRITTEN BEFORE THE DIAGRAM COULD SAY "NOTHING". Version 23 wrote six
+		// plain colours, so a colour that is there is taken as this diagram's
+		// own and an invalid one as nothing said - which is what those files
+		// meant in practice: they were written the day the field was added.
+		QColor read[6];
+		for (QColor& colour : read)
+			data >> colour;
+		if (data.status() == QDataStream::Ok)
+		{
+			if (read[0].isValid() || read[1].isValid()) scene->setDefaultLook(false, read[0], read[1]);
+			if (read[2].isValid()) scene->setDefaultText(false, read[2]);
+			if (read[3].isValid() || read[4].isValid()) scene->setDefaultLook(true, read[3], read[4]);
+			if (read[5].isValid()) scene->setDefaultText(true, read[5]);
+		}
 	}
 
 	// The NAME says what this is. snake-lemma.theorem.totopos is a theorem

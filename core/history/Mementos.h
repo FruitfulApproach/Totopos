@@ -78,6 +78,24 @@ private:
 	QColor m_labelBefore, m_labelAfter;
 };
 
+// A DOUBLED SHAFT. Purely a look: what the arrow claims is untouched, so this
+// is not a step in the proof and is not written to the file as history (the
+// flag itself is saved with the arrow).
+class ArrowDoubled : public PureGraphical
+{
+public:
+	ArrowDoubled(const QString& description, Node* arrow, bool before, bool after)
+		: PureGraphical(description), m_arrow(arrow), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+
+private:
+	QPointer<Node> m_arrow;
+	bool m_before = false;
+	bool m_after = false;
+};
+
 // The points an arrow is pulled through. Where a line is drawn says nothing
 // about what it means.
 class ArrowBent : public PureGraphical

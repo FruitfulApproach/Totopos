@@ -59,6 +59,21 @@ public:
 	static const char* ArrowBorder;      // colour, none chosen
 	static const char* NodeText;         // colour the NAME is written in, none chosen
 	static const char* ArrowText;        // the same for an arrow's name
+	static const char* Background;       // the paper a NEW diagram starts on
+
+	// WHERE THE WINDOW WAS AND HOW IT WAS ARRANGED.
+	//
+	// Not a preference anybody sets in a dialog, but a setting all the same:
+	// it is how the program looked when it was last used, and opening it
+	// back in the middle of the screen with every dock reset is the program
+	// forgetting something the user arranged on purpose. Qt writes both of
+	// these itself (QWidget::saveGeometry, QMainWindow::saveState) and reads
+	// them back the same way; they are opaque here.
+	static const char* WindowGeometry;   // QByteArray
+	static const char* WindowState;      // QByteArray: the docks and toolbars
+	// the folder the last diagram was opened from or saved to, so the next
+	// file dialog starts where the work is
+	static const char* LastFolder;       // QString
 
 	QVariant value(const char* key) const;
 	// "category/R-Mod/fill" and its like: one key per built-in, made here so
@@ -114,6 +129,22 @@ public:
 	// chosen, so the label is written in the ink names are written in.
 	QColor defaultText(bool arrow) const
 	{ return value(arrow ? ArrowText : NodeText).value<QColor>(); }
+	// The paper a new diagram is drawn on. Unlike the six above this one has
+	// a real colour behind it rather than "nothing chosen": there is no such
+	// thing as a sheet with no colour, so a diagram always has one.
+	QColor defaultBackground() const { return value(Background).value<QColor>(); }
+
+	// the window as it was left, and where files were last kept
+	QByteArray windowGeometry() const { return value(WindowGeometry).toByteArray(); }
+	QByteArray windowState() const { return value(WindowState).toByteArray(); }
+	void rememberWindow(const QByteArray& geometry, const QByteArray& state)
+	{
+		setValue(WindowGeometry, geometry);
+		setValue(WindowState, state);
+	}
+	QString lastFolder() const { return value(LastFolder).toString(); }
+	void setLastFolder(const QString& folder) { setValue(LastFolder, folder); }
+	void setDefaultBackground(const QColor& paper) { setValue(Background, paper); }
 	// A BUILT-IN CATEGORY'S COLOUR IS THE BUILT-IN'S, NOT ONE NODE'S.
 	//
 	// Every R-Mod drawn anywhere is the same category, so they are all drawn

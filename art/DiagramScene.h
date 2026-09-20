@@ -8,6 +8,7 @@
 #include <QTimer>
 #include "tutor/TutorSession.h"   // QPointer needs the complete type
 #include <memory>
+#include <optional>
 #include "art/Object.h"
 #include "art/Category.h"
 #include "art/Arrow.h"   // noteArrowStyle names Arrow::Style, so the type must be complete
@@ -22,6 +23,20 @@ class QKeyEvent;
 // The diagram's scene. A QGraphicsScene is a QObject, not a widget: it has no
 // designer form; its window is whichever view shows it. Everything drawn lives
 // inside the AMBIENT category, an item sitting at the centre of the scene.
+// WHAT AN ITEM ABOUT TO BE DRAWN SHOULD START OUT LOOKING LIKE.
+//
+// Asked by a node or an arrow from inside its own constructor, which is
+// before there is anything to ask but the scene it is being built into. The
+// diagram's own default is the answer when it has one; otherwise the
+// settings'. An invalid colour is "nothing chosen" and the item keeps the
+// look its kind gives it.
+namespace StartsAs
+{
+	QColor fill(const QGraphicsItem* item, bool arrow);
+	QColor border(const QGraphicsItem* item, bool arrow);
+	QColor text(const QGraphicsItem* item, bool arrow);
+}
+
 class DiagramScene : public QGraphicsScene
 {
 	Q_OBJECT
@@ -84,6 +99,40 @@ public:
 	// An invalid colour means the default: whatever the view's palette says,
 	// which is what a scene paints when nobody has chosen.
 	QColor background() const { return m_background; }
+
+	// WHAT A THING PLACED IN THIS DIAGRAM STARTS OUT LOOKING LIKE.
+	//
+	// Three levels, and each is the answer when the one below it has nothing
+	// to say:
+	//
+	//   * the ITEM'S own colour, set by hand on the Properties page. Beats
+	//     everything.
+	//   * THIS DIAGRAM'S default, below. A diagram made now takes these from
+	//     the settings, and they are saved in the file with it - so a diagram
+	//     sent to somebody else still looks the way it was drawn, whatever
+	//     that person's own defaults are.
+	//   * the SETTINGS, which is where a diagram's start from and where "Set
+	//     default" writes when nothing but an ordinary node is selected.
+	//
+	// An INVALID colour at either default level means "nothing chosen": the
+	// item keeps the look its own kind gives it.
+	// NOTHING SAID HERE MEANS ASK THE SETTINGS - which is why these are
+	// optionals and not merely invalid colours. An invalid colour is a real
+	// answer ("none: no fill at all"), so a diagram that has never been given
+	// a default of its own needs a way to say so. Left unset, the settings
+	// are read AT THE MOMENT SOMETHING IS PLACED, so pressing "Set default"
+	// changes what the diagram already open goes on to draw. Caching them
+	// when the diagram was made is what left a new node coming out in the old
+	// colours.
+	std::optional<QColor> ownFill(bool arrow) const { return arrow ? m_arrowFill : m_nodeFill; }
+	std::optional<QColor> ownBorder(bool arrow) const { return arrow ? m_arrowBorder : m_nodeBorder; }
+	std::optional<QColor> ownText(bool arrow) const { return arrow ? m_arrowText : m_nodeText; }
+	// the answer this diagram gives, its own or the settings'
+	QColor defaultFill(bool arrow) const;
+	QColor defaultBorder(bool arrow) const;
+	QColor defaultText(bool arrow) const;
+	void setDefaultLook(bool arrow, const QColor& fill, const QColor& border);
+	void setDefaultText(bool arrow, const QColor& text);
 	void setBackground(const QColor& colour);
 	void setNotation(Notation notation);
 	void toggleNotation();
@@ -401,6 +450,10 @@ private:
 	// invalid means the view's own palette, which is the window's grey and
 	// not a sheet to draw on. A diagram read from a file brings its own.
 	QColor m_background = Palette::paper();
+	// this diagram's own defaults, taken from the settings when it is made
+	// and written to the file with it
+	std::optional<QColor> m_nodeFill, m_nodeBorder, m_nodeText;
+	std::optional<QColor> m_arrowFill, m_arrowBorder, m_arrowText;
 	Category* m_ambientCategory = nullptr;
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;

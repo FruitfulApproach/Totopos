@@ -40,7 +40,7 @@ Arrow::Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *par
 {
 	setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemSendsGeometryChanges);   // never dragged: the ends place it
 	setDefaultLook(QBrush(Qt::NoBrush), QPen(Palette::cobalt(), 1.5));
-	if (const QColor wantedText = AppSettings::instance().defaultText(true); wantedText.isValid())
+	if (const QColor wantedText = StartsAs::text(this, true); wantedText.isValid())
 		setLabelColour(wantedText);
 
 	// AND WHAT WAS ASKED FOR, which wins over the look above.
@@ -50,8 +50,8 @@ Arrow::Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *par
 	// count as chosen: somebody picked these, and a node picked out that way
 	// shows its frame whether or not it holds anything, exactly as one
 	// coloured by hand does.
-	const QColor wantedFill = AppSettings::instance().defaultFill(true);
-	const QColor wantedBorder = AppSettings::instance().defaultBorder(true);
+	const QColor wantedFill = StartsAs::fill(this, true);
+	const QColor wantedBorder = StartsAs::border(this, true);
 	if (wantedFill.isValid())
 		setFill(QBrush(wantedFill));
 	if (wantedBorder.isValid())
@@ -913,7 +913,22 @@ void Arrow::dropRedundantBends()
 	// still held while setBends runs: that calls refreshGeometry, which calls
 	// straight back in here
 	if (kept != m_bends)
+	{
+		// AND IT GOES IN THE HISTORY. A point let go of here was put there by
+		// hand - it is only being let go of because the line has since
+		// straightened through it - so an undo has to be able to bring it
+		// back. Without this the point simply ceased to exist: undoing the
+		// move that straightened the line put the node back and left the
+		// arrow with nothing to bend it.
+		//
+		// Safe to record from in here: the history refuses anything recorded
+		// while it is replaying (SceneHistory::record), so an undo that
+		// straightens a line does not write a new entry of its own.
+		const QList<QPointF> before = m_bends;
 		setBends(kept);
+		recordBends(QString("Straightened %1").arg(id().isEmpty() ? QStringLiteral("an arrow") : id()),
+		            before);
+	}
 	m_dropping = false;
 }
 
@@ -1657,6 +1672,33 @@ void Arrow::setStyle(Style style)
 	emit styleChanged(this);
 }
 
+void Arrow::setDoubledLine(bool doubled)
+{
+	if (m_doubleLine == doubled)
+		return;
+	// the second stroke is drawn beside the line, so the rect has to be
+	// allowed to grow before it is painted
+	prepareGeometryChange();
+	ancestorsPrepareGeometryChange();
+	m_doubleLine = doubled;
+	update();
+	ancestorsUpdate();
+	emit styleChanged(this);
+}
+
+void Arrow::setDoubledLineRecorded(bool doubled)
+{
+	if (m_doubleLine == doubled)
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setDoubledLine(doubled);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new ArrowDoubled(
+			doubled ? QString("Drew %1 with a doubled line").arg(name)
+			        : QString("Drew %1 with a single line").arg(name),
+			this, !doubled, doubled));
+}
+
 void Arrow::setStyleRecorded(Style style)
 {
 	if (m_style == style)
@@ -1850,17 +1892,33 @@ bool Arrow::isRedundantBend(const QPointF& point, const QList<QPointF>& without)
 	if (plain.isEmpty())
 		return false;
 
-	// how far the point sits from that shape, at its nearest
+	// HOW FAR THE POINT SITS FROM THAT SHAPE, AT ITS NEAREST.
+	//
+	// Sampled along the line, and the number of samples goes with its
+	// LENGTH. A fixed 64 of them left a step of nine or ten pixels on a long
+	// arrow, so a point sitting exactly on the line could still measure
+	// several pixels from the nearest sample - and a line that was plainly
+	// straight kept its point because of the sampling rather than because of
+	// the shape.
+	const qreal length = plain.length();
+	const int steps = qBound(64, int(length / 2.0), 600);
 	qreal nearest = -1;
-	for (int i = 0; i <= 64; ++i)
+	for (int i = 0; i <= steps; ++i)
 	{
-		const QPointF d = plain.pointAtPercent(i / 64.0) - point;
+		const QPointF d = plain.pointAtPercent(qreal(i) / steps) - point;
 		const qreal distance = QLineF(QPointF(0, 0), d).length();
 		if (nearest < 0 || distance < nearest)
 			nearest = distance;
 	}
-	// within a couple of pixels is on it, as far as the eye is concerned
-	return nearest >= 0 && nearest < 3.0;
+	// NEAR ENOUGH IS ON IT.
+	//
+	// Not a couple of pixels: a line drawn two or three units wide swallows
+	// that, so a point that measured "off the line" was one nobody could see
+	// was off it - and the arrow looked straight while quietly keeping a
+	// control point. The line's own width is the measure of what shows, and
+	// the point is drawn as a disc of its own on top, so a deviation smaller
+	// than the disc is not a bend anybody asked for.
+	return nearest >= 0 && nearest < StraightEnough;
 }
 
 // ---------------------------------------------------------------- what it is

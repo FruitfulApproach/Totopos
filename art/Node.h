@@ -492,6 +492,12 @@ protected:
 
 	// shove the neighbours this node has just moved into
 	void pushSiblings(const QPointF& delta);
+	// the same, for a node that GREW rather than moved: see the note on the
+	// implementation
+	void pushSiblingsAside();
+	// what both of the above are: a push in one direction, or every
+	// direction at once when that one is null
+	void shoveNeighbours(const QPointF& direction);
 
 	// The nodes this node contains: its child items other than its own label,
 	// and only the ones you can SEE - a hidden child is not part of the frame

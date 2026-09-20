@@ -206,7 +206,20 @@ void PropertiesDock::build()
 	m_background->setToolTip("The colour of the paper everything is drawn on. Cleared with \"None\" in "
 	                         "the dialog, which gives it back the colour the window is drawn in.");
 	connect(m_background, &QAbstractButton::clicked, this, &PropertiesDock::applyBackgroundColour);
-	categoryForm->addRow("Appearance", m_background);
+
+	// and what a NEW diagram should start on. The paper is this diagram's;
+	// this says "and every one from now on", which is a different question
+	// and so a different button.
+	auto* paperRow = new QWidget(m_categoryBox);
+	auto* paperLine = new QHBoxLayout(paperRow);
+	paperLine->setContentsMargins(0, 0, 0, 0);
+	paperLine->addWidget(m_background);
+	m_setDefaultPaper = new QPushButton("Set default", paperRow);
+	m_setDefaultPaper->setToolTip("Start every new diagram on this colour of paper. Diagrams that "
+	                              "already exist keep theirs.");
+	connect(m_setDefaultPaper, &QAbstractButton::clicked, this, &PropertiesDock::applyDefaultPaper);
+	paperLine->addWidget(m_setDefaultPaper);
+	categoryForm->addRow("Appearance", paperRow);
 
 	m_subcategoryHint = new QLabel(m_categoryBox);
 	m_subcategoryHint->setWordWrap(true);
@@ -335,6 +348,24 @@ void PropertiesDock::build()
 			arrow->setStyleRecorded(Arrow::Style(m_arrowStyle->itemData(index).toInt()));
 	});
 	arrowForm->addRow("Style", m_arrowStyle);
+
+	// A DOUBLED SHAFT, BESIDE THE STYLE RATHER THAN IN IT.
+	//
+	// A doubled line is a mark in its own right - a natural transformation is
+	// written with one - and it has nothing to do with the hooks and barbs
+	// the menu above offers. Put in that menu it would have needed an entry
+	// for every combination of the two. An equals is drawn doubled whatever
+	// this says, because that is what an equals IS.
+	m_doubleLine = new ToggleSwitch(m_arrowBox);
+	m_doubleLine->setToolTip("Draw the line itself as two lines side by side, whatever else the arrow "
+	                         "is drawn as. An equals is drawn this way in any case.");
+	connect(m_doubleLine, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating)
+			return;
+		if (Arrow* arrow = soleArrow())
+			arrow->setDoubledLineRecorded(on);
+	});
+	arrowForm->addRow("Double line", m_doubleLine);
 
 	// THE SHAPE OF THE LINE. Adding a bend needs a point to put it at, and the
 	// panel has none - that one stays on the right-click menu of the line
@@ -621,11 +652,21 @@ void PropertiesDock::refresh()
 		const QString built = builtInOfSelection();
 		const bool sharedColour = !built.isEmpty();
 		m_setDefaultLook->setEnabled(!sharedColour);
+		// The canvas asks about THIS diagram; anything else asks in general.
+		// Said on the button itself, because the two sit in the same place
+		// and file into different ones.
+		const bool aboutThisDiagram = m_scene != nullptr && m_scene->ambientCategory() == nodes.first();
+		m_setDefaultLook->setText(aboutThisDiagram ? QStringLiteral("Set diagram default")
+		                                           : QStringLiteral("Set default"));
 		m_setDefaultLook->setToolTip(sharedColour
 			? QString("%1's colour is %1's, wherever it is drawn: it is already the default, and "
 			          "changing it above changes every %1 in every open diagram.").arg(built)
-			: QString("Start the next %1 placed in these colours - fill, border and the "
-			          "colour its name is written in. What is already drawn is left alone.").arg(soleArrow() != nullptr ? QStringLiteral("arrow")
+			: aboutThisDiagram
+			? QStringLiteral("Start everything placed in THIS diagram in these colours. Saved with "
+			                 "the diagram, so it opens this way wherever it is opened.")
+			: QString("Start the next %1 placed in these colours - fill, border and the colour its "
+			          "name is written in - in every diagram from now on. What is already drawn is "
+			          "left alone.").arg(soleArrow() != nullptr ? QStringLiteral("arrow")
 			                                                    : QStringLiteral("node")));
 		const QString whose = sharedColour
 			? QString("Every %1 is drawn in this colour, here and in every other diagram: it "
@@ -658,6 +699,15 @@ void PropertiesDock::refresh()
 		m_epic->setChecked(soleA->isEpic());
 		if (const int index = m_arrowStyle->findData(int(soleA->style())); index >= 0)
 			m_arrowStyle->setCurrentIndex(index);
+		m_doubleLine->setChecked(soleA->doubledLine());
+		// an equals is two lines whatever the switch says, so the switch has
+		// nothing to answer for and says why it cannot be turned off
+		const bool equals = soleA->style() == Arrow::Style::Equals;
+		m_doubleLine->setEnabled(!equals);
+		m_doubleLine->setToolTip(equals
+			? QStringLiteral("An equals is two lines: that is what it is drawn as.")
+			: QStringLiteral("Draw the line itself as two lines side by side, whatever else the "
+			                 "arrow is drawn as. An equals is drawn this way in any case."));
 		// nothing to straighten on a line that is already straight
 		m_straighten->setEnabled(!soleA->bends().isEmpty());
 	}
@@ -857,9 +907,10 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 	// The paper is the canvas's, so the chip is only on the canvas's page.
 	const bool isCanvas = category->isAmbient() && m_scene != nullptr;
 	m_background->setVisible(isCanvas);
+	m_setDefaultPaper->setVisible(isCanvas);
 	if (auto* row = m_categoryBox->layout(); row != nullptr)
 		if (auto* form = qobject_cast<QFormLayout*>(row))
-			if (QWidget* label = form->labelForField(m_background); label != nullptr)
+			if (QWidget* label = form->labelForField(m_background->parentWidget()); label != nullptr)
 				label->setVisible(isCanvas);
 	if (isCanvas)
 		m_background->setStyleSheet(colourSwatch(m_scene->background()));
@@ -1150,18 +1201,42 @@ void PropertiesDock::applyDefaultLook()
 	if (nodes.isEmpty())
 		return;
 
-	// The colours as they stand on the first one selected - the two the chips
-	// beside this button are wearing. An invalid colour is a chosen "none",
-	// and is stored as one.
+	// The colours as they stand on the first one selected - the three the
+	// chips beside this button are wearing. An invalid colour is a chosen
+	// "none", and is stored as one.
 	Node* first = nodes.first();
 	const QColor fill = first->fill().style() == Qt::NoBrush ? QColor() : first->fill().color();
 	const QColor border = first->border().style() == Qt::NoPen ? QColor() : first->border().color();
+	const QColor text = first->labelColour();
 	const bool arrow = dynamic_cast<Arrow*>(first) != nullptr;
+
+	// WHICH DEFAULT, of the two there are.
+	//
+	// The canvas is this diagram: pressing it asks about THIS diagram, so
+	// what is filed is the diagram's own default and it is saved in the file
+	// with it. Any other node is a thing in general, and what is filed is
+	// the setting - where every new diagram starts from.
+	if (m_scene != nullptr && m_scene->ambientCategory() == first)
+	{
+		m_scene->setDefaultLook(false, fill, border);
+		m_scene->setDefaultText(false, text);
+		refresh();
+		return;
+	}
+
 	AppSettings::instance().setDefaultLook(arrow, fill, border);
 	// and the colour its name is written in, taken the same way: what the
 	// chip beside this button is wearing, an invalid one meaning "nothing
 	// chosen - the ink names are written in"
-	AppSettings::instance().setDefaultText(arrow, first->labelColour());
+	AppSettings::instance().setDefaultText(arrow, text);
+	refresh();
+}
+
+void PropertiesDock::applyDefaultPaper()
+{
+	if (m_updating || m_scene == nullptr)
+		return;
+	AppSettings::instance().setDefaultBackground(m_scene->background());
 	refresh();
 }
 

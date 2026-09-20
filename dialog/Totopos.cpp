@@ -37,6 +37,7 @@
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QDir>
+#include <QCloseEvent>
 
 namespace
 {
@@ -114,6 +115,20 @@ Totopos::Totopos(QWidget *parent)
     buildMenus();
 
     AppSettings::instance().apply();   // the grid, the tutor: from the stored settings
+
+    // AND THE WINDOW AS IT WAS LEFT. After the docks are built, because what
+    // is restored is WHERE EACH OF THEM SAT, and a dock that does not exist
+    // yet cannot be put back. Nothing saved (a first run) leaves the window
+    // wherever the system puts it, which is the right answer for a first run.
+    {
+        AppSettings& settings = AppSettings::instance();
+        const QByteArray geometry = settings.windowGeometry();
+        if (!geometry.isEmpty())
+            restoreGeometry(geometry);
+        const QByteArray arrangement = settings.windowState();
+        if (!arrangement.isEmpty())
+            restoreState(arrangement);
+    }
 
     // an ordinary message may cover an error for a moment; when it times out
     // the error comes back, because it is still true
@@ -924,7 +939,10 @@ bool Totopos::openInto(Document* document, const QString& path)
 
 void Totopos::openDiagram()
 {
-    const QString path = QFileDialog::getOpenFileName(this, "Open diagram", QString(), SceneFile::filter());
+    // starting where the last diagram was kept, rather than wherever the
+    // program happens to have been started from
+    const QString path = QFileDialog::getOpenFileName(this, "Open diagram",
+        AppSettings::instance().lastFolder(), SceneFile::filter());
     if (path.isEmpty())
         return;
     // an untouched Untitled tab is the place for it; otherwise a new one
@@ -933,6 +951,7 @@ void Totopos::openDiagram()
         document = newDocument();
     if (!openInto(document, path))
         return;
+    AppSettings::instance().setLastFolder(QFileInfo(path).absolutePath());
     const int steps = document->scene->history()->structural().size();
     statusBar()->showMessage(QString("Opened %1 - %2 step%3 of history.")
         .arg(QFileInfo(path).fileName()).arg(steps).arg(steps == 1 ? "" : "s"), 5000);
@@ -976,12 +995,18 @@ bool Totopos::saveDiagramAs()
         : SceneFile::baseNameOf(document->path);
     const QString suggested = QFileInfo(document->path).absolutePath() + "/" + SceneFile::fileNameFor(base, kind);
 
-    QString path = QFileDialog::getSaveFileName(this, "Save diagram",
-        document->path.isEmpty() ? SceneFile::fileNameFor(base, kind) : suggested, SceneFile::filter());
+    // An untitled diagram is offered the folder the last one was kept in, so
+    // a session's work lands together instead of wherever the program was
+    // started from.
+    const QString startIn = document->path.isEmpty()
+        ? QDir(AppSettings::instance().lastFolder()).filePath(SceneFile::fileNameFor(base, kind))
+        : suggested;
+    QString path = QFileDialog::getSaveFileName(this, "Save diagram", startIn, SceneFile::filter());
     if (path.isEmpty())
         return false;
     if (QFileInfo(path).suffix().isEmpty())
         path += "." + SceneFile::extension();
+    AppSettings::instance().setLastFolder(QFileInfo(path).absolutePath());
 
     // the name chosen has the last word on what this is
     if (const int named = SceneFile::kindFromFileName(path);
@@ -1002,6 +1027,15 @@ void Totopos::openSettings()
 {
     SettingsDialog dialog(this);
     dialog.exec();
+}
+
+void Totopos::closeEvent(QCloseEvent* event)
+{
+    // Saved before anything else answers the close, so it is written even if
+    // something below asks a question and the window ends up staying: the
+    // arrangement as it stands is the arrangement to come back to.
+    AppSettings::instance().rememberWindow(saveGeometry(), saveState());
+    QMainWindow::closeEvent(event);
 }
 
 Totopos::~Totopos()

@@ -68,33 +68,44 @@ bool ArrowTutor::onPick(TutorSession& session, Node* node)
 
 Node* ArrowTutor::onPlace(TutorSession& session, const QPointF& scenePos)
 {
+	Q_UNUSED(session);   // nothing to refuse any more: it goes down where it was put
 	if (m_from.isNull())
 		return nullptr;   // nothing to run an arrow from yet
 
-	// It goes in the category the arrow STARTS in - the two ends of an arrow
-	// belong to one category, so there is only one place a new end could go.
-	Category* home = m_from->surroundingCategory();
+	// IT GOES WHERE IT WAS PUT DOWN, IN WHATEVER THE OTHER END IS DRAWN IN.
+	//
+	// Whatever is drawn is drawn IN something, and that something decides what
+	// may be put beside it: an object of a category, an element of something
+	// whose objects are sets. So the holder is asked rather than guessed - the
+	// nearest thing above the domain that can hold children.
+	Object* home = nullptr;
+	for (QGraphicsItem* up = m_from->parentItem(); up != nullptr && home == nullptr; up = up->parentItem())
+		if (auto* holder = dynamic_cast<Object*>(up); holder != nullptr && holder->canHoldNamedChildren())
+			home = holder;
+	if (home == nullptr)
+		home = m_from->surroundingCategory();
 	if (home == nullptr)
 		return nullptr;
-	// INSIDE IT - unless it IS the canvas, which has no outside.
-	//
-	// A drawn category is a box, and an object of it put down beyond its
-	// frame would be sitting outside the thing it is an object of. The
-	// ambient category is not a box: it is the paper, its frame is only the
-	// union of whatever happens to be on it, and every point of the canvas is
-	// already in it. Testing it the same way meant that double-clicking a
-	// hand's breadth from the one object on the canvas was "outside the
-	// category" and refused - so the gesture that draws an arrow to somewhere
-	// new did nothing at all on an almost empty diagram, which is exactly
-	// when it is wanted.
-	if (!home->isAmbient() && !home->mapRectToScene(home->boxRect()).contains(scenePos))
-	{
-		session.say(QString("An arrow joins two objects of one category. Put it down inside %1, "
-		                    "where %2 is.").arg(home->id(), m_from->id()), home);
-		return nullptr;
-	}
 
-	Object* made = home->createCanvasObject(scenePos);
+	// OUTSIDE ITS FRAME IS NOT OUTSIDE IT.
+	//
+	// This used to refuse a point beyond the holder's box, on the grounds
+	// that an object of a category should not sit outside the thing it is an
+	// object of. But a box is not what makes it one: a node is in a category
+	// because it is drawn in it, and the frame is only the union of what is
+	// held - so putting one down out here simply grows the frame to reach it,
+	// which is what happens when an object already inside is dragged out.
+	//
+	// Refusing was the whole of the trouble: the arrow is dragged CLEAR of
+	// the box precisely to leave room for the other end, so the commonest
+	// place to put it down was the one place that did nothing. It goes down
+	// exactly where it was asked for.
+	const QString name = [home] {
+		if (auto* category = dynamic_cast<Category*>(home))
+			return category->nextObjectName();
+		return home->nextElementName();
+	}();
+	Object* made = home->createNamedChild(name, scenePos);
 	if (made == nullptr)
 		return nullptr;
 	m_scene->recordCreation(QString("Placed %1 in %2").arg(made->id(), home->id()), { made });
