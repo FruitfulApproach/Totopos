@@ -1,10 +1,16 @@
 ﻿#include "core/categories/RMod.h"
+#include "core/NodeKind.h"
 #include "art/RModule.h"
 
 RMod::RMod(QGraphicsItem* parent)
 	: Category("R-Mod", parent)
 {
 	setProperties({ "hasProducts", "hasCoproducts", "hasEqualizers", "hasCoequalizers", "hasZeroObject", "hasKernels", "isAdditive", "isAbelian", "isConcrete", "isLocallySmall" });
+}
+
+QString RMod::objectKind() const
+{
+	return NodeKind::module();
 }
 
 Object* RMod::makeObject(const QString& name)

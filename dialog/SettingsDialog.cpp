@@ -1,4 +1,6 @@
 ﻿#include "dialog/SettingsDialog.h"
+
+#include <QColorDialog>
 #include "core/AppSettings.h"
 #include "art/Category.h"
 
@@ -135,6 +137,18 @@ void SettingsDialog::buildPages()
 			"categories neither of which contains the other may share a name freely.");
 	}
 	{
+		Page& p = addPage("Diagram", "Badges", "The little stamps a node wears: what it is put forward as "
+			"- AXIOM, DEFINITION, THEOREM, CONJECTURE - and, in green, that what is drawn under it "
+			"commutes. All four kinds are stamped in one colour: which kind it is is written on the "
+			"badge in words, so a colour for each said the same thing twice.");
+		addColour(p, "Badge colour", AppSettings::BadgeFill,
+			"The ground a badge is stamped in. Dodger blue unless you say otherwise. The frame round a "
+			"proposition is drawn in this too, so the mark and the box it belongs to read as one thing.");
+		addColour(p, "Badge lettering", AppSettings::BadgeText,
+			"The colour the badge is lettered in. White unless you say otherwise; the green commuting "
+			"badge is lettered in this as well.");
+	}
+	{
 		Page& p = addPage("Diagram", "Notation", "How labels are written.");
 		addChoice(p, "Functor applied to a label", AppSettings::FunctorNotation, { "F(h)", "Fh" },
 			"How the image of an object or an arrow under a functor is named: F(h) or Fh.");
@@ -213,6 +227,37 @@ void SettingsDialog::addDouble(Page& page, const QString& label, const char* key
 	page.options.append(Option{ label, key, spin,
 		[spin, key] { spin->setValue(AppSettings::instance().value(key).toDouble()); },
 		[spin, key] { AppSettings::instance().setValue(key, spin->value()); } });
+}
+
+void SettingsDialog::addColour(Page& page, const QString& label, const char* key, const QString& tip)
+{
+	auto* chip = new QPushButton(page.widget);
+	chip->setToolTip(tip);
+	chip->setMaximumWidth(140);
+	chip->setMinimumHeight(24);
+
+	// The colour is held on the button rather than read back out of the
+	// settings as it is edited: Apply is what writes it, and until then the
+	// dialog shows what WOULD be set, not what is.
+	auto wear = [chip](const QColor& colour) {
+		chip->setProperty("colour", colour);
+		chip->setText(colour.isValid() ? colour.name().toUpper() : QStringLiteral("none"));
+		chip->setStyleSheet(colour.isValid()
+			? QString("background-color: %1; color: %2;")
+				.arg(colour.name(), colour.lightnessF() > 0.55 ? "#2A2F3A" : "#FFFFFF")
+			: QString());
+	};
+	QObject::connect(chip, &QPushButton::clicked, chip, [chip, wear, label] {
+		const QColor was = chip->property("colour").value<QColor>();
+		const QColor now = QColorDialog::getColor(was.isValid() ? was : Qt::white, chip, label);
+		if (now.isValid())
+			wear(now);
+	});
+
+	formOf(page.widget)->addRow(label, chip);
+	page.options.append(Option{ label, key, chip,
+		[chip, wear, key] { wear(AppSettings::instance().value(key).value<QColor>()); },
+		[chip, key] { AppSettings::instance().setValue(key, chip->property("colour").value<QColor>()); } });
 }
 
 void SettingsDialog::addChoice(Page& page, const QString& label, const char* key, const QStringList& choices, const QString& tip)

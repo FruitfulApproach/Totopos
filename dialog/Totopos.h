@@ -6,6 +6,9 @@
 #include <QGraphicsScene>
 #include <QList>
 #include <QString>
+#include <QPointer>
+#include <QTabWidget>
+#include <QLabel>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class TotoposClass; };
@@ -20,6 +23,8 @@ class ApplicableRulesDock;
 class EnglishDock;
 class QAction;
 class QCloseEvent;
+class QSplitter;
+class QTabWidget;
 
 // One diagram open in the window: its own canvas, its own scene, its own file
 // and its own history. A piece of one can be carried into another - hold a
@@ -28,6 +33,9 @@ struct Document
 {
 	SketchView* view = nullptr;
 	DiagramScene* scene = nullptr;
+	// the tab group it is shown in: with the window split there is more than
+	// one, and a tab index alone no longer says which tab
+	QTabWidget* group = nullptr;
 	QString path;
 	QString error;      // what this diagram cannot mean; shown in red while it is in front
 
@@ -57,6 +65,12 @@ protected:
     // the way out rather than as the window is dragged about: what is worth
     // remembering is where it was LEFT.
     void closeEvent(QCloseEvent* event) override;
+
+    // WHICH SIDE IS BEING WORKED IN. With the window split, a press anywhere
+    // in a group - its tab bar or the canvas itself - is what says the work
+    // has moved there, and the docks, the menus and the title follow. Qt has
+    // no signal for "this view was clicked", so the presses are watched.
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
     void openSettings();
@@ -91,6 +105,40 @@ private:
 
     void updateTitle();
     void updateTabText(Document* document);
+
+    // ---- SIDE BY SIDE
+    //
+    // The tabs live in one or more groups, and the groups sit in a splitter.
+    // One group is the ordinary case and is exactly what was there before;
+    // a second is what "Split right" makes, so a diagram can be kept in view
+    // while another is worked on - the reason anybody splits a window.
+    //
+    // Everything about a document that used to be found by INDEX (the tab at
+    // position i is m_documents[i]) is found through the document itself
+    // now: it knows which group it is in, and its position is asked of that
+    // group. Two groups and one index are not a pair.
+    QTabWidget* makeGroup();
+    void adoptGroup(QTabWidget* group);
+    QTabWidget* activeGroup() const;
+    void setActiveGroup(QTabWidget* group);
+    Document* documentOf(QWidget* view) const;
+    // put the current diagram in a group of its own beside this one
+    void splitCurrent();
+    // carry a diagram to the other group (making one if there is none)
+    void moveToOtherGroup(Document* document);
+    // and the general form: into that group, at that position (-1: the end).
+    // Dragging a tab across comes through here, and so does the menu entry.
+    void moveDocumentTo(Document* document, QTabWidget* to, int at);
+    // a group with nothing left in it is taken away, unless it is the last
+    void dropIfEmpty(QTabWidget* group);
+    void closeDocument(Document* document);
+    // A FILE THE LIBRARY ASKED FOR, opened once. Already open means already
+    // open: the tab that exists is brought to the front rather than a second
+    // one onto the same file, which would be two diagrams that are both it,
+    // each able to save over the other.
+    void openFromLibrary(const QString& path);
+    // rename the file a tab's diagram is kept in (the tab's own menu)
+    void renameDocument(Document* document);
     void syncEditActions();
     // put View > Classical notation in step with the diagram in front
     void syncNotationAction();
@@ -108,6 +156,9 @@ private:
     Ui::TotoposClass *ui;
 
     QList<Document*> m_documents;
+    QSplitter* m_split = nullptr;
+    QList<QTabWidget*> m_groups;
+    QPointer<QTabWidget> m_activeGroup;
 
     QAction* m_undo = nullptr;
     QAction* m_redo = nullptr;
@@ -127,6 +178,16 @@ private:
 
     PropertiesDock* m_properties = nullptr;
     CommutativeEquationsDock* m_equations = nullptr;
+    // WHAT IS BEING POINTED AT, in the status bar: "X : left R-module".
+    //
+    // A widget of its own rather than showMessage, and for two reasons. The
+    // canvas is a node like any other, so the mouse is over SOMETHING nearly
+    // all the time and a message would be overwritten before it could be
+    // read; and a message that says what the mouse is on would itself be
+    // wiped by the next thing the diagram had to say. Side by side, each
+    // says its own thing and neither loses.
+    QLabel* m_typing = nullptr;
+
     LibraryDock* m_library = nullptr;
     ApplicableRulesDock* m_applicable = nullptr;
     EnglishDock* m_english = nullptr;

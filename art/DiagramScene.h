@@ -15,8 +15,10 @@
 #include "core/rules/Rule.h"
 
 class ClassicalView;
+class SelectionPill;
 class NodeHandles;
 class SceneHistory;
+class Memento;
 class QGraphicsLineItem;
 class QKeyEvent;
 
@@ -54,6 +56,10 @@ public:
 	// note that these nodes were just made (an object placed, an arrow drawn,
 	// a construction built); the change must already have happened
 	void recordCreation(const QString& description, const QList<Node*>& nodes);
+	// the same, for a change that is not simply "these nodes appeared" and so
+	// brings its own memento (the scene takes it over); the nodes are what was
+	// made by it, for the chase and for anything listening
+	void recordStep(Memento* step, const QList<Node*>& made);
 
 	// The chase. Before it starts, whatever is drawn is the setup. Once it is
 	// running, anything ADDED is forced into the hypotheses of the statement -
@@ -260,7 +266,8 @@ public:
 	void noteArrowStyle(Arrow* arrow, Arrow::Style before, Arrow::Style after);
 	// the same for the red X that strikes a node off when the rule is applied
 	void noteDeleteMark(Node* node, bool before, bool after);
-
+	// the claim that what is drawn under a node commutes
+	void noteCommutes(Node* node, bool before, bool after);
 	// ---------------------------------------------------------------- the clipboard
 	//
 	// A piece of a diagram can be carried off and put down again: in this
@@ -282,6 +289,25 @@ public:
 	QList<Node*> duplicateSelection();
 	// a fragment carried in by a drag, put down at that point
 	QList<Node*> dropFragment(const QByteArray& payload, const QPointF& scenePos);
+
+	// CARRYING A PIECE OF A DIAGRAM.
+	//
+	// Pick several things out and a pill appears over them with two sheets of
+	// paper on it; press it and they are copied and CARRIED - held by the
+	// program rather than dragged by the hand, so the journey may cross tabs,
+	// sides of a split window and scrolls. The next press in any diagram puts
+	// them down there; Escape lets go of them.
+	void carrySelection();
+	void addNodeIntoSelected();
+	// GATHER WHAT IS PICKED OUT INTO A PROPOSITION OF ITS OWN.
+	//
+	// A tagged node is a thing in its own right rather than a mark added to
+	// something already drawn: what is selected is taken into a NEW node,
+	// which carries the tag. That node and everything now inside it are one
+	// statement - for all the plain items drawn in it, there exist the dashed
+	// ones, and after the struck-out ones are taken away it still commutes.
+	// the pill follows what is picked out, and hides when fewer than two are
+	void refreshSelectionPill();
 	// is there anything on the clipboard for us?
 	static bool clipboardHasFragment();
 
@@ -411,6 +437,11 @@ signals:
 	void backgroundChanged(const QColor& colour);
 	void commutesChanged(bool commutes);
 	void statementKindChanged(int kind, const QString& name);
+	// SOMETHING IS BEING POINTED AT, and this is what it is: "X : left
+	// R-module". Empty when the mouse has left it again. Said in the status
+	// bar as well as in the tooltip, because a tooltip is over the diagram
+	// and in the way of the very thing it is describing.
+	void typingHovered(const QString& typing);
 	// something the diagram cannot mean; empty when it is put right
 	void error(const QString& text);
 	// what was just drawn / just taken out: a live functor listens to these
@@ -457,6 +488,7 @@ private:
 	Category* m_ambientCategory = nullptr;
 	QPointer<TutorSession> m_session;
 	NodeHandles* m_handle = nullptr;
+	SelectionPill* m_pill = nullptr;
 	QPointer<Node> m_arrowFrom;
 	// The arrow being placed: a real Arrow with no codomain, running to the
 	// cursor. QPointer because it hangs off its domain and goes with it.

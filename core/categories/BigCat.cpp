@@ -1,9 +1,16 @@
 ﻿#include "core/categories/BigCat.h"
 
+#include "core/NodeKind.h"
+
 BigCat::BigCat(QGraphicsItem* parent)
 	: Category("BigCat", parent)
 {
 	setProperties({ "hasProducts", "hasCoproducts", "hasEqualizers", "hasCoequalizers" });
+}
+
+QString BigCat::objectKind() const
+{
+	return NodeKind::category();
 }
 
 Object* BigCat::makeObject(const QString& name)

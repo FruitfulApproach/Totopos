@@ -29,6 +29,17 @@ namespace MementoTag
 		Monic        = 15,
 		Epic         = 16,
 		NodeRetyped  = 17,
+		// 18, 19 and 20 were the proposition BOX and the pieces it could be
+		// read in; 22 was a tag put on a node. Both were attempts at holding
+		// several statements in one file, and a file says ONE thing (see
+		// Node). The numbers are not reused: a tag is what a saved step is
+		// read back BY, and an old file still carries steps that say 18.
+		PropositionMade = 18,
+		Piecewise       = 19,
+		PieceRenamed    = 20,
+		// the claim that what is drawn under a node commutes
+		Commutes        = 21,
+		// 22: a statement tag put on a node, which no longer exists
 	};
 }
 

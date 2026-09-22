@@ -83,6 +83,7 @@ void PropertiesDock::build()
 	connect(m_id, &QLineEdit::editingFinished, this, [this] { applyId(m_id->text()); });
 	nodeForm->addRow("Label", m_id);
 
+
 	// What this node IS. Not a setting on the node: picking another entry
 	// builds the node afresh as that kind and hands everything over - the
 	// name, where it sits, what is drawn inside it, the arrows that end on
@@ -111,6 +112,28 @@ void PropertiesDock::build()
 	m_exists->setToolTip("Draw it dotted and read it as the part that is claimed to EXIST.");
 	connect(m_exists, &QAbstractButton::toggled, this, [this](bool on) { applyExistsSuch(on); });
 	nodeForm->addRow("Exists such", m_exists);
+	// WHETHER WHAT IS DRAWN UNDER THIS NODE COMMUTES.
+	//
+	// A claim about the diagram this node holds, so it is asked of the node -
+	// the canvas, a nested category, a proposition, an object with a diagram
+	// inside it - rather than of categories alone. A node that claims it
+	// wears a green badge saying so, which can be dragged where you want it.
+	m_commutesLabel = new QLabel(m_nodeBox);
+	m_commutes = new ToggleSwitch(m_nodeBox);
+	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
+		refreshCommutesLabel(on);
+		if (m_updating) return;
+		// one node selected is that node; nothing selected is a question
+		// about the whole picture, which is the ambient category
+		const QList<Node*> chosen = selection();
+		if (chosen.size() == 1)
+			chosen.first()->setCommutesRecorded(on);
+		else if (Category* home = pageCategory())
+			home->setCommutes(on);
+	});
+	nodeForm->addRow(m_commutesLabel, m_commutes);
+	refreshCommutesLabel(false);
+
 	m_deleteMark = new ToggleSwitch(m_nodeBox);
 	m_deleteMark->setToolTip("Cross it out in red. Read as a rule, the diagram still has to FIND this - "
 	                         "but where the rule is applied, this is what gets taken out.");
@@ -250,18 +273,11 @@ void PropertiesDock::build()
 	// node holds. It used to sit in the category box and speak for the whole
 	// page, which left a nested category with no way to say that the diagram
 	// drawn inside IT commutes. Each parent now answers for its own.
-	m_commutesLabel = new QLabel(m_categoryBox);
-	m_commutes = new ToggleSwitch(m_categoryBox);
-	connect(m_commutes, &QAbstractButton::toggled, this, [this](bool on) {
-		refreshCommutesLabel(on);
-		if (m_updating) return;
-		// pageCategory, not the selection: with nothing selected the page is
-		// about the ambient category, and the switch has to write there too
-		if (Category* home = pageCategory())
-			home->setCommutes(on);
-	});
-	categoryForm->addRow(m_commutesLabel, m_commutes);
-	refreshCommutesLabel(false);
+	// COMMUTING IS ASKED OF THE NODE, and is asked up in the Node box with
+	// the rest of what a node claims - see build()'s node section. It was
+	// here, which made it a question only a category could be asked; but a
+	// proposition holds a diagram, and so does any object with something
+	// drawn in it, and each of them can claim its paths agree.
 	m_rowsExact = new ToggleSwitch(m_categoryBox);
 	m_rowsExact->setToolTip("Every row of the diagram drawn in here is an exact sequence: at each object "
 	                        "along it, the image of the arrow coming in is the kernel of the arrow going out.");
@@ -278,6 +294,7 @@ void PropertiesDock::build()
 	});
 	categoryForm->addRow("Columns exact", m_columnsExact);
 	layout->addWidget(m_categoryBox);
+
 
 	// ---- what an object has
 	m_objectBox = new QGroupBox("Object", body);
@@ -366,6 +383,17 @@ void PropertiesDock::build()
 			arrow->setDoubledLineRecorded(on);
 	});
 	arrowForm->addRow("Double line", m_doubleLine);
+
+	m_headless = new ToggleSwitch(m_arrowBox);
+	m_headless->setToolTip("Draw the line with no arrowhead. The style (monic, epi, etc.) is kept — "
+	                       "only the head is hidden. Useful for undirected edges or lines of equality.");
+	connect(m_headless, &QAbstractButton::toggled, this, [this](bool on) {
+		if (m_updating)
+			return;
+		if (Arrow* arrow = soleArrow())
+			arrow->setHeadlessRecorded(on);
+	});
+	arrowForm->addRow("No head", m_headless);
 
 	// THE SHAPE OF THE LINE. Adding a bend needs a point to put it at, and the
 	// panel has none - that one stays on the right-click menu of the line
@@ -542,7 +570,12 @@ void PropertiesDock::refresh()
 	{
 		m_header->setText(ambient->contextTitle());
 		m_hint->hide();
-		m_nodeBox->hide();
+		// the canvas answers one question on this page - whether the whole
+		// diagram commutes - and the switch for it lives in the Node box
+		m_nodeBox->show();
+		m_nodeBox->setTitle(QStringLiteral("The whole diagram"));
+		showOnlyCommutingRow(true);
+		refreshCommutes(ambient);
 		m_objectBox->hide();
 		m_arrowBox->hide();
 		m_mappingBox->hide();
@@ -613,11 +646,18 @@ void PropertiesDock::refresh()
 		m_header->setText(QString("%1 items selected").arg(nodes.size()));
 		m_id->setEnabled(false);
 		m_id->setText(QString());
+		{
+			// several at once: what they are each put forward as is a question
+			// per node, and the box has one answer
+		}
 		m_type->setVisible(false);
 		m_typeHint->setVisible(false);
 	}
 
 	m_nodeBox->show();
+	m_nodeBox->setTitle(QStringLiteral("Node"));
+	showOnlyCommutingRow(false);
+	refreshCommutes(nodes.size() == 1 ? nodes.first() : nullptr);
 	bool allExist = true;
 	for (Node* node : nodes)
 		allExist = allExist && node->existsSuch();
@@ -708,6 +748,9 @@ void PropertiesDock::refresh()
 			? QStringLiteral("An equals is two lines: that is what it is drawn as.")
 			: QStringLiteral("Draw the line itself as two lines side by side, whatever else the "
 			                 "arrow is drawn as. An equals is drawn this way in any case."));
+		m_headless->setChecked(soleA->isHeadless());
+		// equals has no head in any case; the toggle is moot
+		m_headless->setEnabled(soleA->style() != Arrow::Style::Equals);
 		// nothing to straighten on a line that is already straight
 		m_straighten->setEnabled(!soleA->bends().isEmpty());
 	}
@@ -879,6 +922,38 @@ void PropertiesDock::refreshCommutesLabel(bool commutes)
 		m_commutes->setToolTip(tip);
 }
 
+void PropertiesDock::showOnlyCommutingRow(bool only)
+{
+	auto* form = qobject_cast<QFormLayout*>(m_nodeBox->layout());
+	if (form == nullptr)
+		return;
+	form->setRowVisible(m_id, !only);
+	form->setRowVisible(m_type, !only);
+	form->setRowVisible(m_typeHint, !only);
+	form->setRowVisible(m_exists, !only);
+	form->setRowVisible(m_deleteMark, !only);
+	// the colour buttons share one row, which is known by the widget holding
+	// them rather than by any one button
+	if (m_setDefaultLook != nullptr && m_setDefaultLook->parentWidget() != nullptr)
+		form->setRowVisible(m_setDefaultLook->parentWidget(), !only);
+}
+
+void PropertiesDock::refreshCommutes(Node* node)
+{
+	auto* form = qobject_cast<QFormLayout*>(m_nodeBox->layout());
+	// A DIAGRAM IS WHAT COMMUTES. One box on its own has no two paths to
+	// agree, so the question is not put to it at all - the switch appears
+	// where there is something under the node to ask about.
+	const bool askable = node != nullptr && node->holdsDiagram();
+	if (form != nullptr)
+		form->setRowVisible(m_commutes, askable);
+	if (!askable)
+		return;
+	const QSignalBlocker block(m_commutes);
+	m_commutes->setChecked(node->commutes());
+	refreshCommutesLabel(node->commutes());
+}
+
 void PropertiesDock::refreshCategoryBox(Category* category)
 {
 	m_categoryBox->setVisible(category != nullptr);
@@ -977,13 +1052,12 @@ void PropertiesDock::refreshCategoryBox(Category* category)
 	// those two go as well where the category cannot answer them.
 	const bool drawn = category->holdsAnything();
 	const bool exact = drawn && category->exactnessDefined();
-	m_commutes->setChecked(category->commutes());
-	refreshCommutesLabel(category->commutes());
+	// the commuting switch lives in the Node box now, and the canvas's own
+	// answer is filled in there (see refresh)
 	m_rowsExact->setChecked(category->rowsExact());
 	m_columnsExact->setChecked(category->columnsExact());
 	if (auto* form = qobject_cast<QFormLayout*>(m_categoryBox->layout()))
 	{
-		form->setRowVisible(m_commutes, drawn);
 		form->setRowVisible(m_rowsExact, exact);
 		form->setRowVisible(m_columnsExact, exact);
 	}

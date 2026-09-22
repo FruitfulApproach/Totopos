@@ -2,6 +2,7 @@
 #include "art/DiagramScene.h"
 #include "core/AppSettings.h"
 #include "dialog/SettingsDialog.h"
+#include "dialog/RenameSceneDialog.h"
 
 #include <QMenuBar>
 #include <QStatusBar>
@@ -11,6 +12,7 @@
 #include <QFileInfo>
 #include <QTabWidget>
 #include <QTabBar>
+#include "widget/TabDragBar.h"
 #include "core/io/SceneFile.h"
 #include "core/history/SceneHistory.h"
 #include "tutor/SetupTutor.h"
@@ -38,6 +40,8 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QCloseEvent>
+#include <QGridLayout>
+#include <QSplitter>
 
 namespace
 {
@@ -49,7 +53,14 @@ namespace
 
 QString Document::title() const
 {
-    return path.isEmpty() ? QStringLiteral("Untitled") : QFileInfo(path).fileName();
+    // THE NAME, NOT THE FILENAME. What a diagram is called is "snake-lemma";
+    // that it is a conjecture and that it is kept in a .totopos file are two
+    // further things about it, said in the file's name because a file has
+    // nowhere else to say them. A tab reading "snake-lemma.conjecture.totopos"
+    // spends its width on the two that never change. What it IS is shown
+    // beside the diagram and in the window title; the tab is for telling one
+    // diagram from another.
+    return path.isEmpty() ? QStringLiteral("Untitled") : SceneFile::baseNameOf(path);
 }
 
 QString Document::displayPath() const
@@ -82,33 +93,31 @@ Totopos::Totopos(QWidget *parent)
     const QIcon ours = Branding::windowIcon();
     setWindowIcon(ours.isNull() ? Emoji::appIcon() : ours);
 
-    // Several diagrams at once, each its own tab. A piece of one is carried
-    // into another by holding Ctrl and dragging it; hold the drag over a tab
-    // and that tab comes to the front, so the two need never be side by side.
-    ui->tabs->setDocumentMode(true);
-    ui->tabs->setMovable(true);
-    // NO LITTLE CROSSES. Closing a diagram is the one thing on a tab that
-    // cannot be half-done, and a target that small, sitting where you reach
-    // to SWITCH tabs, is asked for by accident more often than on purpose.
-    // It is on the right-click menu instead, where it can say what it closes.
-    ui->tabs->setTabsClosable(false);
-    // A file name is as long as it is; the tab is not. Middle, because the
-    // ends of a name are what tell two files apart - "kernel.definition" and
-    // "kernel.theorem" differ at the end, and eliding the end hides exactly
-    // the part that matters.
-    ui->tabs->setElideMode(Qt::ElideMiddle);
-    ui->tabs->tabBar()->setAcceptDrops(true);
-    ui->tabs->tabBar()->setChangeCurrentOnDrag(true);
-    ui->tabs->tabBar()->setUsesScrollButtons(true);
-    // Bold on the bar rather than per tab: every tab is a diagram and they are
-    // all equally one, so there is nothing for a difference in weight to say.
-    QFont tabFont = ui->tabs->tabBar()->font();
-    tabFont.setBold(true);
-    ui->tabs->tabBar()->setFont(tabFont);
-    ui->tabs->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->tabs->tabBar(), &QWidget::customContextMenuRequested,
-            this, &Totopos::showTabMenu);
-    connect(ui->tabs, &QTabWidget::currentChanged, this, &Totopos::currentTabChanged);
+    // SEVERAL DIAGRAMS AT ONCE, IN ONE GROUP OF TABS OR TWO.
+    //
+    // A piece of one diagram is carried into another by holding Ctrl and
+    // dragging it; hold the drag over a tab and that tab comes to the front,
+    // so the two need never be side by side. They CAN be, though - "Split
+    // right" puts a diagram in a group of its own beside this one, which is
+    // what a split window is for: one diagram to work in and one to look at
+    // while doing it.
+    //
+    // The group built in the .ui file is the first one. The splitter holds
+    // it, and holds the second when there is one.
+    m_split = new QSplitter(Qt::Horizontal, ui->centralWidget);
+    m_split->setChildrenCollapsible(false);
+    if (auto* grid = qobject_cast<QGridLayout*>(ui->centralWidget->layout()))
+    {
+        grid->removeWidget(ui->tabs);
+        grid->addWidget(m_split, 0, 0);
+    }
+    m_split->addWidget(ui->tabs);
+    adoptGroup(ui->tabs);
+    // Straight onto the member, NOT through setActiveGroup: that one tells
+    // the docks to follow the diagram in front, and the docks are built
+    // further down. There is nothing to follow yet either - the first
+    // diagram is made after all of this - so the front is simply noted.
+    m_activeGroup = ui->tabs;
 
     // the docks come first: the View menu is built by FINDING them
     buildDocks();
@@ -129,6 +138,15 @@ Totopos::Totopos(QWidget *parent)
         if (!arrangement.isEmpty())
             restoreState(arrangement);
     }
+
+    // WHAT THE MOUSE IS ON, and what it is: "X : left R-module". Dodger blue,
+    // because it is neither news nor a complaint - it is the diagram
+    // answering a question about itself - and must not be taken for either
+    // the messages beside it or an error.
+    m_typing = new QLabel(this);
+    m_typing->setStyleSheet("color: #1E90FF; font-weight: bold;");
+    m_typing->setToolTip("What the mouse is on, and what it is.");
+    statusBar()->addPermanentWidget(m_typing);
 
     // an ordinary message may cover an error for a moment; when it times out
     // the error comes back, because it is still true
@@ -264,27 +282,40 @@ void Totopos::buildDocks()
             QString("%1 is out of the library.").arg(QFileInfo(path).fileName()), 4000);
     });
 
-    connect(m_library, &LibraryDock::opened, this, [this](const QString& path) {
-        // ALREADY OPEN MEANS ALREADY OPEN. A second tab onto one file is two
-        // diagrams that are both it, each with its own history, each able to
-        // save over the other. Bring the one that exists to the front instead.
-        if (Document* already = documentFor(path))
+    // A NEW DIAGRAM ASKED FOR IN THE LIBRARY. The panel settled the name and
+    // the folder; making one and putting it in a tab is ours. It is written
+    // to disk at once - an empty file is what puts it IN the library, and a
+    // diagram that only appeared there once it was first saved would be a
+    // thing the user made and could not see.
+    connect(m_library, &LibraryDock::createRequested, this, [this](const QString& path) {
+        // THAT NAME MAY ALREADY BE A DIAGRAM. Asked for one that is there
+        // already - open in a tab, or sitting on the disk - the answer is
+        // that diagram, not a second one: the tab that has it comes to the
+        // front, and a file that is there is opened rather than written over.
+        if (documentFor(path) != nullptr || QFileInfo::exists(path))
         {
-            ui->tabs->setCurrentIndex(m_documents.indexOf(already));
-            statusBar()->showMessage(QString("%1 is already open.").arg(SceneFile::baseNameOf(path)), 5000);
+            openFromLibrary(path);
             return;
         }
 
-        Document* document = current();
-        // an untouched Untitled tab is the place for it; otherwise a new one
-        if (document == nullptr || !document->path.isEmpty()
-            || (document->scene != nullptr && document->scene->history()->canUndo()))
-            document = newDocument();
-        if (!openInto(document, path))
+        Document* document = newDocument();   // a tab of its own, and brought to the front
+        document->path = path;
+        QString error;
+        if (!SceneFile::save(document->scene, path, &error))
+        {
+            QMessageBox::warning(this, "New diagram", error);
+            document->path.clear();   // it is not that file: it is not any file
             return;
-        statusBar()->showMessage(
-            QString("Opened %1.  Chase > Teach me this proof walks the steps that made it.")
-                .arg(SceneFile::baseNameOf(path)), 8000);
+        }
+        document->scene->history()->markSaved();
+        updateTabText(document);
+        updateTitle();
+        m_library->rescan();   // it is on the disk now, so the tree can show it
+        statusBar()->showMessage(QString("Made %1.").arg(QFileInfo(path).fileName()), 5000);
+    });
+
+    connect(m_library, &LibraryDock::opened, this, [this](const QString& path) {
+        openFromLibrary(path);
     });
 
     // a click in the library lays that file over the diagram in front as a rule
@@ -329,7 +360,7 @@ void Totopos::buildMenus()
     connect(openAct, &QAction::triggered, this, &Totopos::openDiagram);
     connect(saveAct, &QAction::triggered, this, &Totopos::saveDiagram);
     connect(saveAsAct, &QAction::triggered, this, &Totopos::saveDiagramAs);
-    connect(closeAct, &QAction::triggered, this, [this] { closeTab(ui->tabs->currentIndex()); });
+    connect(closeAct, &QAction::triggered, this, [this] { closeDocument(current()); });
 
     // Edit: the scene's history, and carrying pieces about
     QMenu* edit = ui->menuBar->addMenu("&Edit");
@@ -400,6 +431,31 @@ void Totopos::buildMenus()
         view->addAction(dock->toggleViewAction());
     view->addSeparator();
 
+    // SIDE BY SIDE. The diagram in front goes into a group of its own beside
+    // the rest, so one can be kept in view - the statement being proved, the
+    // definition being used - while another is worked on. Pressed again with
+    // the window already split, it carries the diagram back.
+    QAction* splitRight = view->addAction("Split &right");
+    splitRight->setShortcut(QKeySequence("Ctrl+\\"));
+    splitRight->setStatusTip("Put the diagram in front beside the others, so both can be seen at once.");
+    connect(splitRight, &QAction::triggered, this, [this] { splitCurrent(); });
+
+    QAction* unsplit = view->addAction("&Join the sides");
+    unsplit->setStatusTip("Bring every diagram back into one group of tabs.");
+    connect(unsplit, &QAction::triggered, this, [this] {
+        // Carried one at a time into the first group, which is the one the
+        // window is built around; the empty group then goes of its own accord
+        // (see dropIfEmpty).
+        QTabWidget* home = m_groups.isEmpty() ? nullptr : m_groups.first();
+        if (home == nullptr)
+            return;
+        for (Document* document : m_documents)
+            if (document != nullptr && document->group != home)
+                moveToOtherGroup(document);
+        setActiveGroup(home);
+    });
+    view->addSeparator();
+
     QAction* centre = view->addAction(Emoji::centre() + "  &Centre the diagram");
     centre->setShortcut(QKeySequence("Ctrl+Home"));
     centre->setStatusTip("Bring what is drawn back to the middle of the view.");
@@ -412,6 +468,23 @@ void Totopos::buildMenus()
     fit->setStatusTip("Zoom so the whole diagram is in view.");
     connect(fit, &QAction::triggered, this, [this] {
         if (Document* document = current()) document->view->fitContents();
+    });
+
+    // IN AND OUT, by the step the wheel uses, on the diagram in front. With
+    // the window split "in front" is the side last worked in, which is what
+    // current() answers.
+    QAction* zoomIn = view->addAction("Zoom &in");
+    zoomIn->setShortcuts({ QKeySequence("Ctrl++"), QKeySequence("Ctrl+=") });
+    zoomIn->setStatusTip("Draw everything larger.");
+    connect(zoomIn, &QAction::triggered, this, [this] {
+        if (Document* document = current()) document->view->zoomBy(1.15);
+    });
+
+    QAction* zoomOut = view->addAction("Zoom &out");
+    zoomOut->setShortcuts({ QKeySequence("Ctrl+-"), QKeySequence("Ctrl+_") });
+    zoomOut->setStatusTip("Draw everything smaller.");
+    connect(zoomOut, &QAction::triggered, this, [this] {
+        if (Document* document = current()) document->view->zoomBy(1.0 / 1.15);
     });
 
     QAction* actualSize = view->addAction("&Actual size");
@@ -511,10 +584,219 @@ void Totopos::buildMenus()
 
 // ---------------------------------------------------------------- the documents
 
+void Totopos::adoptGroup(QTabWidget* group)
+{
+    if (group == nullptr || m_groups.contains(group))
+        return;
+    group->setDocumentMode(true);
+    group->setMovable(true);
+    // NO LITTLE CROSSES. Closing a diagram is the one thing on a tab that
+    // cannot be half-done, and a target that small, sitting where you reach
+    // to SWITCH tabs, is asked for by accident more often than on purpose.
+    // It is on the right-click menu instead, where it can say what it closes.
+    group->setTabsClosable(false);
+    // A file name is as long as it is; the tab is not. Middle, because the
+    // ends of a name are what tell two files apart - "kernel.definition" and
+    // "kernel.theorem" differ at the end, and eliding the end hides exactly
+    // the part that matters.
+    group->setElideMode(Qt::ElideMiddle);
+    group->tabBar()->setAcceptDrops(true);
+    group->tabBar()->setChangeCurrentOnDrag(true);
+    group->tabBar()->setUsesScrollButtons(true);
+    // Bold on the bar rather than per tab: every tab is a diagram and they
+    // are all equally one, so there is nothing for a difference in weight to
+    // say.
+    QFont tabFont = group->tabBar()->font();
+    tabFont.setBold(true);
+    group->tabBar()->setFont(tabFont);
+    group->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    // A TAB CAN BE CARRIED TO THE OTHER SIDE. The bar reports where the tab
+    // came from and where it was let go of; what a tab MEANS - a diagram, in
+    // a group - is ours to know, so the move is made here.
+    const auto carried = [this, group](TabDragBar* source, int from, int at) {
+        auto* fromGroup = source == nullptr ? nullptr
+                                            : qobject_cast<QTabWidget*>(source->parentWidget());
+        if (fromGroup == nullptr || from < 0 || from >= fromGroup->count())
+            return;
+        moveDocumentTo(documentOf(fromGroup->widget(from)), group, at);
+    };
+    if (auto* bar = qobject_cast<TabDragBar*>(group->tabBar()))
+        connect(bar, &TabDragBar::tabDroppedIn, this, carried);
+    // ...and the same again for a tab let go of on the PAGE rather than on
+    // the bar, which is what anybody aims at: it goes on the end.
+    if (auto* page = qobject_cast<TabGroup*>(group))
+        connect(page, &TabGroup::tabDroppedOnPage, this,
+                [carried](TabDragBar* source, int from) { carried(source, from, -1); });
+
+    connect(group->tabBar(), &QWidget::customContextMenuRequested, this,
+            [this, group](const QPoint& at) { setActiveGroup(group); showTabMenu(at); });
+    connect(group, &QTabWidget::currentChanged, this, [this, group](int index) {
+        // Switching tabs in a group says which diagram that group shows, and
+        // that this group is the one being used - so it comes to the front.
+        // A group whose current tab changed because a tab was moved OUT of it
+        // has not been used and says nothing, which is what the count guards.
+        if (group->count() == 0)
+            return;
+        setActiveGroup(group);
+        if (group == m_activeGroup)
+            currentTabChanged(index);
+    });
+    m_groups << group;
+}
+
+QTabWidget* Totopos::makeGroup()
+{
+    auto* group = new TabGroup(m_split);
+    adoptGroup(group);
+    m_split->addWidget(group);
+    // an even share: a diagram kept for reference is looked at as much as the
+    // one being worked in
+    const int each = qMax(1, m_split->width() / qMax(1, m_split->count()));
+    QList<int> sizes;
+    for (int at = 0; at < m_split->count(); ++at)
+        sizes << each;
+    m_split->setSizes(sizes);
+    return group;
+}
+
+QTabWidget* Totopos::activeGroup() const
+{
+    if (!m_activeGroup.isNull() && m_groups.contains(m_activeGroup))
+        return m_activeGroup;
+    return m_groups.isEmpty() ? ui->tabs : m_groups.first();
+}
+
+void Totopos::setActiveGroup(QTabWidget* group)
+{
+    if (group == nullptr || !m_groups.contains(group) || m_activeGroup == group)
+        return;
+    m_activeGroup = group;
+    bindCurrent();   // the docks, the menus and the title follow the front
+    updateTitle();
+}
+
+Document* Totopos::documentOf(QWidget* view) const
+{
+    for (Document* document : m_documents)
+        if (document != nullptr && document->view == view)
+            return document;
+    return nullptr;
+}
+
+void Totopos::splitCurrent()
+{
+    moveToOtherGroup(current());
+}
+
+void Totopos::moveToOtherGroup(Document* document)
+{
+    if (document == nullptr || document->view == nullptr)
+        return;
+    QTabWidget* from = document->group;
+    QTabWidget* to = nullptr;
+    for (QTabWidget* group : m_groups)
+        if (group != from)
+        {
+            to = group;
+            break;
+        }
+    if (to == nullptr)
+    {
+        // THE ONLY DIAGRAM CANNOT BE PUT BESIDE ITSELF. Splitting here would
+        // leave one empty group and one diagram, which is the same window
+        // with a gap in it.
+        if (from != nullptr && from->count() < 2)
+        {
+            statusBar()->showMessage("Open another diagram to put one beside it.", 4000);
+            return;
+        }
+        to = makeGroup();
+    }
+
+    moveDocumentTo(document, to, -1);
+}
+
+void Totopos::moveDocumentTo(Document* document, QTabWidget* to, int at)
+{
+    if (document == nullptr || document->view == nullptr || to == nullptr
+     || !m_groups.contains(to))
+        return;
+
+    QTabWidget* from = document->group;
+    if (from == to)
+    {
+        // dragged out and brought back to its own bar: a reorder, which is
+        // the one thing the bar could already do for itself
+        const int was = from->indexOf(document->view);
+        if (at >= 0 && at != was)
+            from->tabBar()->moveTab(was, at);
+        setActiveGroup(to);
+        return;
+    }
+
+    if (from != nullptr)
+        from->removeTab(from->indexOf(document->view));
+    const QString text = document->title() + document->saveStar();
+    const int index = at >= 0 && at <= to->count()
+        ? to->insertTab(at, document->view, text)
+        : to->addTab(document->view, text);
+    to->setTabToolTip(index, document->displayPath() + document->saveStar());
+    document->group = to;
+    to->setCurrentIndex(index);
+    dropIfEmpty(from);
+    setActiveGroup(to);
+    bindCurrent();
+}
+
+void Totopos::dropIfEmpty(QTabWidget* group)
+{
+    if (group == nullptr || group->count() > 0 || m_groups.size() < 2)
+        return;
+    // The group built in the .ui file is kept whatever happens to it: it is
+    // the window's own canvas area and the rest of the program reaches it by
+    // name. An empty SECOND group is just a gap, and goes.
+    if (group == ui->tabs)
+        return;
+    m_groups.removeAll(group);
+    if (m_activeGroup == group)
+        m_activeGroup = m_groups.isEmpty() ? nullptr : m_groups.first();
+    group->deleteLater();
+}
+
+void Totopos::closeDocument(Document* document)
+{
+    if (document == nullptr)
+        return;
+    QTabWidget* group = document->group;
+    // the last diagram is not closed but emptied: a window with no canvas in
+    // it has nothing to offer
+    if (m_documents.size() == 1)
+    {
+        document->scene->clearDiagram();
+        document->path.clear();
+        document->error.clear();
+        updateTabText(document);
+        updateTitle();
+        statusBar()->showMessage("New diagram.", 3000);
+        return;
+    }
+    m_documents.removeAll(document);
+    if (group != nullptr)
+        group->removeTab(group->indexOf(document->view));
+    delete document->view;   // the scene is its child, and goes with it
+    delete document;
+    dropIfEmpty(group);
+    bindCurrent();
+}
+
 Document* Totopos::current() const
 {
-    const int index = ui->tabs->currentIndex();
-    return index >= 0 && index < m_documents.size() ? m_documents.at(index) : nullptr;
+    // THE DIAGRAM IN FRONT IS THE ONE IN THE GROUP IN FRONT. With the window
+    // split there are two current tabs at all times and only one of them is
+    // being worked on; which is settled by what was last clicked in.
+    QTabWidget* group = activeGroup();
+    return group == nullptr ? nullptr : documentOf(group->currentWidget());
 }
 
 Document* Totopos::documentFor(const QString& path) const
@@ -546,10 +828,41 @@ DiagramScene* Totopos::currentScene() const
     return document != nullptr ? document->scene : nullptr;
 }
 
+void Totopos::openFromLibrary(const QString& path)
+{
+    // ALREADY OPEN MEANS ALREADY OPEN. A second tab onto one file is two
+    // diagrams that are both it, each with its own history, each able to save
+    // over the other. Bring the one that exists to the front instead.
+    if (Document* already = documentFor(path))
+    {
+        if (already->group != nullptr)
+        {
+            already->group->setCurrentIndex(already->group->indexOf(already->view));
+            setActiveGroup(already->group);
+        }
+        statusBar()->showMessage(QString("%1 is already open.").arg(SceneFile::baseNameOf(path)), 5000);
+        return;
+    }
+
+    Document* document = current();
+    // an untouched Untitled tab is the place for it; otherwise a new one
+    if (document == nullptr || !document->path.isEmpty()
+        || (document->scene != nullptr && document->scene->history()->canUndo()))
+        document = newDocument();
+    if (!openInto(document, path))
+        return;
+    statusBar()->showMessage(
+        QString("Opened %1.  Chase > Teach me this proof walks the steps that made it.")
+            .arg(SceneFile::baseNameOf(path)), 8000);
+}
+
 Document* Totopos::newDocument()
 {
     auto* document = new Document();
-    document->view = new SketchView(ui->tabs);
+    QTabWidget* group = activeGroup();
+    document->view = new SketchView(group);
+    // a press in this canvas brings its group to the front (see eventFilter)
+    document->view->viewport()->installEventFilter(this);
     document->scene = new DiagramScene(document->view);
     document->view->setScene(document->scene);
     document->view->centerOn(0, 0);   // the middle of the fixed scene rect
@@ -560,9 +873,14 @@ Document* Totopos::newDocument()
     wire(document);
 
     // the tab list and the widget stack are indexed alike: insert into both
-    const int index = ui->tabs->addTab(document->view, document->title());
-    m_documents.insert(index, document);
-    ui->tabs->setCurrentIndex(index);
+    // The list is the diagrams that are OPEN, in no particular order: where
+    // each one is shown is its group's business, and asking a group is how
+    // its tab is found (see updateTabText). The two used to be one list
+    // indexed alike, which two groups of tabs cannot be.
+    const int index = group->addTab(document->view, document->title());
+    document->group = group;
+    m_documents << document;
+    group->setCurrentIndex(index);
     bindCurrent();
     return document;
 }
@@ -579,6 +897,13 @@ void Totopos::wire(Document* document)
             return;
         statusBar()->setStyleSheet(QString());
         statusBar()->showMessage(text, 6000);
+    });
+
+    // what the mouse is on goes to the typing label at the foot of the
+    // window, and is rubbed out when it leaves
+    connect(scene, &DiagramScene::typingHovered, this, [this, document](const QString& typing) {
+        if (m_typing != nullptr && isInFront(document))
+            m_typing->setText(typing);
     });
 
     // and what it cannot mean goes there in red, and stays until it is put right
@@ -628,11 +953,15 @@ void Totopos::wire(Document* document)
     // and a piece being carried OFF: a scene is not a widget, so the view carries it
     connect(scene, &DiagramScene::fragmentDragRequested, view, &SketchView::carryFragment);
 
-    // ...and is settled by the first thing drawn in it
-    auto settleCategory = [view, scene] {
-        Category* ambient = scene->ambientCategory();
-        view->setCategoryLocked(ambient != nullptr && ambient->holdsAnything());
-    };
+    // ...AND IS NO LONGER SETTLED BY THE FIRST THING DRAWN IN IT.
+    //
+    // The dropdown used to lock the moment anything was on the canvas, on the
+    // ground that what is drawn in one category means something else in
+    // another. True - and the answer is to remake what is drawn, which is
+    // what the swap now does (see DiagramScene::setAmbientCategory). Locked,
+    // the one way to put right a canvas that is not the category it says it
+    // is was to start again and redraw the diagram.
+    auto settleCategory = [view] { view->setCategoryLocked(false); };
     if (scene->history() != nullptr)
         connect(scene->history(), &SceneHistory::changed, view, settleCategory);
     // Every way a node can arrive or leave, not only the ones that make a step
@@ -644,8 +973,13 @@ void Totopos::wire(Document* document)
     // switch the scene REFUSES (the category is settled) answers with the
     // category it still is, and the combo goes back to showing that
     connect(scene, &DiagramScene::ambientCategoryChanged, view, [view, settleCategory](Category* ambient) {
+        // WHAT IT IS, not what it is called. A canvas can be renamed and a
+        // file keeps the two apart, so a Grp called "BigCat" is a thing to
+        // meet - and a dropdown reading it off the NAME said BigCat, which
+        // made choosing BigCat look like a no-op on a canvas that was making
+        // groups (see Category::categoryKind).
         if (ambient != nullptr)
-            view->setCategory(ambient->id());
+            view->setCategory(ambient->categoryKind());
         settleCategory();
     });
     settleCategory();
@@ -707,6 +1041,13 @@ void Totopos::wire(Document* document)
 
 void Totopos::bindCurrent()
 {
+    // NOTHING TO BIND UNTIL THERE IS SOMETHING TO BIND TO. The docks are
+    // built after the tabs, and a group coming to the front - which is what
+    // brings us here - can happen while the window is still being put
+    // together.
+    if (m_properties == nullptr)
+        return;
+
     Document* document = current();
     DiagramScene* scene = document != nullptr ? document->scene : nullptr;
 
@@ -793,10 +1134,13 @@ void Totopos::syncNotationAction()
 
 void Totopos::showTabMenu(const QPoint& at)
 {
-    const int index = ui->tabs->tabBar()->tabAt(at);
-    if (index < 0 || index >= m_documents.size())
+    QTabWidget* group = activeGroup();
+    if (group == nullptr)
         return;
-    Document* document = m_documents.at(index);
+    const int index = group->tabBar()->tabAt(at);
+    Document* document = index < 0 ? nullptr : documentOf(group->widget(index));
+    if (document == nullptr)
+        return;
 
     QMenu menu(this);
     QAction* copy = menu.addAction(QStringLiteral("Copy path"));
@@ -809,15 +1153,102 @@ void Totopos::showTabMenu(const QPoint& at)
         statusBar()->showMessage(QString("Copied: %1").arg(shown), 5000);
     });
 
-    menu.addSeparator();
-    QAction* close = menu.addAction(QString("Close %1").arg(document->title()));
-    connect(close, &QAction::triggered, this, [this, index] {
-        // queued: the menu is still closing, and this takes the tab it
-        // belongs to out from under it
-        QMetaObject::invokeMethod(this, [this, index] { closeTab(index); }, Qt::QueuedConnection);
+    // RENAMING IT IS RENAMING THE FILE, and it is asked the same way it is
+    // asked in the library panel: the name and what the diagram is put
+    // forward as, which together make the filename. A diagram with nowhere to
+    // save itself has no name to change, so it is offered Save As instead -
+    // the same gesture, at the moment it first needs a name.
+    QAction* rename = menu.addAction(document->path.isEmpty()
+        ? QStringLiteral("Save as...")
+        : QString("Rename %1...").arg(document->title()));
+    rename->setToolTip(document->path.isEmpty()
+        ? "This diagram has not been saved, so it has no name to change yet."
+        : "Rename the file this diagram is kept in. What it is put forward as - a theorem, a "
+          "conjecture - is asked alongside, because the filename says both.");
+    connect(rename, &QAction::triggered, this, [this, document] {
+        QMetaObject::invokeMethod(this, [this, document] { renameDocument(document); },
+                                  Qt::QueuedConnection);
     });
 
-    menu.exec(ui->tabs->tabBar()->mapToGlobal(at));
+    // SIDE BY SIDE. A diagram is often wanted in view while another is
+    // worked on - the statement being proved, the definition being used - and
+    // that is what a split window is for. The entry says which way it will
+    // go: out to a group of its own, or back into the one group there is.
+    const bool split = m_groups.size() > 1;
+    QAction* aside = menu.addAction(split
+        ? QString("Move %1 to the other side").arg(document->title())
+        : QString("Split right: %1 beside the rest").arg(document->title()));
+    aside->setToolTip(split
+        ? "Carry this diagram across to the other group of tabs."
+        : "Put this diagram in a group of its own beside the others, so the two can be seen "
+          "at once. Closing its last tab puts the window back together.");
+    aside->setEnabled(split || m_documents.size() > 1);
+    connect(aside, &QAction::triggered, this, [this, document] {
+        QMetaObject::invokeMethod(this, [this, document] { moveToOtherGroup(document); },
+                                  Qt::QueuedConnection);
+    });
+
+    menu.addSeparator();
+    QAction* close = menu.addAction(QString("Close %1").arg(document->title()));
+    connect(close, &QAction::triggered, this, [this, document] {
+        // queued: the menu is still closing, and this takes the tab it
+        // belongs to out from under it
+        QMetaObject::invokeMethod(this, [this, document] { closeDocument(document); },
+                                  Qt::QueuedConnection);
+    });
+
+    menu.exec(group->tabBar()->mapToGlobal(at));
+}
+
+void Totopos::renameDocument(Document* document)
+{
+    if (document == nullptr || !m_documents.contains(document))
+        return;   // closed while the menu was still up
+    if (document->path.isEmpty())
+    {
+        // nothing on disk to rename: naming it for the first time IS saving it
+        if (isInFront(document))
+            saveDiagramAs();
+        return;
+    }
+
+    const QString before = document->path;
+    RenameSceneDialog dialog(before, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const QString after = dialog.newPath();
+    if (QFileInfo(after).absoluteFilePath() == QFileInfo(before).absoluteFilePath())
+        return;   // the same name: nothing to do and nothing to say
+    if (QFileInfo::exists(after))
+    {
+        QMessageBox::warning(this, QStringLiteral("Rename"),
+            QString("There is already something called %1 there.").arg(dialog.fileName()));
+        return;
+    }
+    if (!QFile::rename(before, after))
+    {
+        QMessageBox::warning(this, QStringLiteral("Rename"),
+            QString("%1 could not be renamed to %2. Something else may have it open.")
+                .arg(QFileInfo(before).fileName(), dialog.fileName()));
+        return;
+    }
+
+    // THE NAME HAS THE LAST WORD ON WHAT THIS IS, exactly as it does when a
+    // diagram is saved under a new name: renaming it to .theorem.totopos is
+    // how a conjecture becomes a theorem.
+    document->path = after;
+    if (document->scene != nullptr)
+    {
+        const int named = SceneFile::kindFromFileName(after);
+        if (named != DiagramScene::Unstated)
+            document->scene->setStatementKind(DiagramScene::StatementKind(named));
+    }
+    updateTabText(document);
+    if (isInFront(document))
+        updateTitle();
+    if (m_library != nullptr)
+        m_library->rescan();   // it is under a different name on the disk now
+    statusBar()->showMessage(QString("Renamed to %1.").arg(dialog.fileName()), 5000);
 }
 
 void Totopos::currentTabChanged(int index)
@@ -828,26 +1259,13 @@ void Totopos::currentTabChanged(int index)
 
 void Totopos::closeTab(int index)
 {
-    if (index < 0 || index >= m_documents.size())
+    // An index is only ever an index INTO A GROUP - this is what the tab
+    // widget's own signals hand over, and they hand it over about the group
+    // they belong to.
+    QTabWidget* group = activeGroup();
+    if (group == nullptr || index < 0 || index >= group->count())
         return;
-    Document* document = m_documents.at(index);
-    // the last tab is not closed but emptied: a window with no canvas in it
-    // has nothing to offer
-    if (m_documents.size() == 1)
-    {
-        document->scene->clearDiagram();
-        document->path.clear();
-        document->error.clear();
-        updateTabText(document);
-        updateTitle();
-        statusBar()->showMessage("New diagram.", 3000);
-        return;
-    }
-    m_documents.removeAt(index);
-    ui->tabs->removeTab(index);
-    delete document->view;   // the scene is its child, and goes with it
-    delete document;
-    bindCurrent();
+    closeDocument(documentOf(group->widget(index)));
 }
 
 // ---------------------------------------------------------------- the window
@@ -901,15 +1319,17 @@ void Totopos::updateTitle()
 
 void Totopos::updateTabText(Document* document)
 {
-    const int index = m_documents.indexOf(document);
+    if (document == nullptr || document->group == nullptr)
+        return;
+    const int index = document->group->indexOf(document->view);
     if (index < 0)
         return;
     // The NAME on the tab and the PATH under the pointer. A tab is a few
     // centimetres wide and a library path is not, so the tab says which file
     // and the tooltip says which one of several files of that name - the
     // library has a "composition is defined" in more than one folder.
-    ui->tabs->setTabText(index, document->title() + document->saveStar());
-    ui->tabs->setTabToolTip(index, document->displayPath() + document->saveStar());
+    document->group->setTabText(index, document->title() + document->saveStar());
+    document->group->setTabToolTip(index, document->displayPath() + document->saveStar());
 }
 
 void Totopos::newDiagram()
@@ -931,7 +1351,7 @@ bool Totopos::openInto(Document* document, const QString& path)
     // came in with it
     document->scene->history()->markSaved();
     if (document->scene->ambientCategory() != nullptr)
-        document->view->setCategory(document->scene->ambientCategory()->id());
+        document->view->setCategory(document->scene->ambientCategory()->categoryKind());
     updateTabText(document);
     updateTitle();
     return true;
@@ -1027,6 +1447,19 @@ void Totopos::openSettings()
 {
     SettingsDialog dialog(this);
     dialog.exec();
+}
+
+bool Totopos::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::MouseButtonPress)
+        for (Document* document : m_documents)
+            if (document != nullptr && document->view != nullptr
+             && watched == document->view->viewport())
+            {
+                setActiveGroup(document->group);
+                break;
+            }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void Totopos::closeEvent(QCloseEvent* event)

@@ -10,6 +10,7 @@
 
 #include <QStyleOptionGraphicsItem>
 #include <QPainterPath>
+#include <QFontMetricsF>
 #include "core/AppSettings.h"
 #include "art/GraphicsHelpers.h"
 #include <QDebug>
@@ -27,7 +28,7 @@ Object::Object(const QString& id, QGraphicsItem *parent)
 	// the members rather than through setFill/setBorder, so this does NOT count
 	// as a style chosen by hand - an object with nothing in it is still just
 	// its label unless the setting says otherwise (see paint).
-	setDefaultLook(QBrush(Palette::faded(Palette::thing(), 105)), QPen(Palette::cobalt(), 1.6));
+	setDefaultLook(QBrush(Palette::faded(Palette::thing(), 105)), QPen(Palette::cobalt(), 1.0));
 
 	// AND WHAT WAS ASKED FOR, which wins over the look above.
 	//
@@ -118,23 +119,22 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 		brush = QBrush(Palette::faded(Palette::pointedAt(), 70));
 	}
 
-	// PICKED OUT. The fill comes forward either way, so the object reads as
-	// chosen without anything being drawn over it. The border says so in
-	// whichever way it is already drawn: an object asserted to exist has a
-	// dotted border of its own and merely THICKENS, because what the diagram
-	// claims must not be lost to what is only selected. An ordinary object
-	// has no such border, so it gets a thin dashed ring instead.
+	// PICKED OUT. Selection is shown by a bolder border and a less transparent
+	// fill — no separate dashed ring, because what the diagram claims must not
+	// be obscured by a decoration drawn over it.
 	const bool selected = (option->state & QStyle::State_Selected) != 0;
 	if (selected)
 	{
 		if (brush.style() != Qt::NoBrush)
 		{
 			QColor c = brush.color();
-			c.setAlpha(qMin(255, c.alpha() + 70));
+			c.setAlpha(qMin(255, c.alpha() + 100));
 			brush = QBrush(c);
 		}
-		if (existsSuch() && pen.style() != Qt::NoPen)
-			pen.setWidthF(pen.widthF() + 1.6 * scale);
+		if (pen.style() != Qt::NoPen)
+			pen.setWidthF(pen.widthF() + 2.0 * scale);
+		else
+			pen = QPen(Palette::picked(), 2.0 * scale);
 	}
 
 	painter->setBrush(brush);
@@ -142,13 +142,6 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 	// the BOX, not boundingRect(): that one also covers the label, which may
 	// have been dragged clear of the frame (see Node::boxRect)
 	painter->drawRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
-
-	if (selected && !existsSuch())
-	{
-		painter->setBrush(Qt::NoBrush);
-		painter->setPen(QPen(Palette::picked(), 1.0 * scale, Qt::DashLine));
-		painter->drawRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
-	}
 
 	// Struck off: this one goes when the rule is applied. Drawn last, over
 	// everything else, because it is not one of the object's looks - it is a
@@ -163,6 +156,11 @@ void Object::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QW
 		painter->drawLine(at + QPointF(-reach, -reach), at + QPointF(reach, reach));
 		painter->drawLine(at + QPointF(-reach, reach), at + QPointF(reach, -reach));
 	}
+
+	// WHETHER WHAT IS DRAWN UNDER THIS COMMUTES, stamped on the bottom line
+	// of the box. Last of all, so nothing the object draws lands on top of
+	// it - and Node's, not ours, because an arrow wears the same badge.
+	paintCommutesBadge(painter);
 }
 
 
@@ -279,6 +277,10 @@ QPainterPath Object::shape() const
 {
 	QPainterPath path;
 	path.addRoundedRect(boxRect(), drawnCornerRadius(), drawnCornerRadius());
+	// the badge is drawn outside the box, so without this the press that
+	// would carry it never reaches us at all
+	if (commutes())
+		path.addRect(commutesBadgeRect());
 	return path;
 }
 
@@ -294,6 +296,13 @@ void Object::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	if (event->button() == Qt::LeftButton)
 	{
+		// THE BADGE IS PICKED UP ON ITS OWN, not the node under it: it is
+		// a label, and every other label here can be put where it is wanted.
+		if (beginBadgeDrag(event->pos()))
+		{
+			event->accept();
+			return;
+		}
 		if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
 		{
 			// Taken here so this object becomes the one the mouse is on and
@@ -311,4 +320,24 @@ void Object::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		}
 	}
 	Node::mousePressEvent(event);
+}
+
+void Object::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
+{
+	if (dragBadge(event->pos()))
+	{
+		event->accept();
+		return;
+	}
+	Node::mouseMoveEvent(event);
+}
+
+void Object::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+	if (endBadgeDrag())
+	{
+		event->accept();
+		return;
+	}
+	Node::mouseReleaseEvent(event);
 }

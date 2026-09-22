@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>TotoposClass</class>
  <widget class="QMainWindow" name="TotoposClass">
@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout">
     <item row="0" column="0">
-     <widget class="QTabWidget" name="tabs"/>
+     <widget class="TabGroup" name="tabs"/>
     </item>
    </layout>
   </widget>
@@ -42,6 +42,11 @@
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <customwidgets>
+  <customwidget>
+   <class>TabGroup</class>
+   <extends>QTabWidget</extends>
+   <header>widget/TabDragBar.h</header>
+  </customwidget>
   <customwidget>
    <class>SketchView</class>
    <extends>QGraphicsView</extends>

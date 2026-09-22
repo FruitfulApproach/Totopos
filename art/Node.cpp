@@ -2,14 +2,17 @@
 #include "core/Palette.h"
 #include "art/Category.h"
 #include "art/Arrow.h"
+#include "art/AtomicElement.h"
 
 #include <QGraphicsSceneContextMenuEvent>
+#include <QGraphicsSceneHoverEvent>
 #include <QMenu>
 #include <QWidgetAction>
 #include <QToolButton>
 #include <QGridLayout>
 #include <QColorDialog>
 #include <QStyleOptionGraphicsItem>
+#include <QFontMetricsF>
 #include <QGraphicsScene>
 #include <QApplication>
 #include "art/DiagramScene.h"
@@ -123,6 +126,8 @@ Node::Node(const QString& id, QGraphicsItem *parent)
 	, m_key(QStringLiteral("n%1").arg(++s_nextKey))
 {
 	setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);   // itemChange sees moves
+	// pointed at, anything drawn says what it is (see typing())
+	setAcceptHoverEvents(true);
 	m_cornerRadius = AppSettings::instance().nodeCornerRadius();
 	setId(id);
 }
@@ -196,6 +201,13 @@ void Node::setId(const QString& id) {
 		prepareGeometryChange();
 		ancestorsPrepareGeometryChange();
 		m_idText = new NodeLabel(id, this);
+		// ABOVE EVERYTHING THIS NODE HOLDS. A name is a name of the thing,
+		// not part of the picture drawn in it, and a category's own label sat
+		// UNDER that picture: objects are placed at z 1, arrows at 2, and the
+		// label was left at 0, where anything later drawn over it - a
+		// proposition's box, say - hid it for good, with no way to bring it
+		// back.
+		m_idText->setZValue(3);
 		applyLabelColour();   // born in whatever colour this node writes in
 		placeLabel();
 		ancestorsUpdate();
@@ -282,6 +294,157 @@ void Node::recordLabelColourChange(const QColor& before)
 		this, before, m_labelColour));
 }
 
+// ----------------------------------------------------------------- the badge
+
+QString Node::commutesBadgeText()
+{
+	return QStringLiteral("COMMUTES");
+}
+
+QFont Node::badgeFont() const
+{
+	// the label's family, so a badge is set in the same type as the rest of
+	// the diagram, but at the badge's own size whatever the label was given.
+	// SMALL: a badge is a stamp put on the diagram, not part of it.
+	QFont stamp = label() != nullptr ? label()->font() : QFont();
+	stamp.setPointSizeF(qMax(5.0, 5.5 * depthScale()));
+	stamp.setBold(true);
+	return stamp;
+}
+
+QRectF Node::commutesBadgeRect() const
+{
+	if (!commutes())
+		return QRectF();
+
+	const qreal scale = depthScale();
+	const qreal air = 3.0 * scale;
+	const QFontMetricsF metrics(badgeFont());
+	const QRectF box = badgeAnchorRect();
+
+	// ON THE BOTTOM LINE, not above it and not under it: the badge is centred
+	// across the edge of the box, so it belongs to the box it marks rather
+	// than floating near it.
+	const qreal height = metrics.height() + air;
+	const qreal width = metrics.horizontalAdvance(commutesBadgeText()) + 2 * air;
+	return QRectF(box.left(), box.bottom() - height / 2.0, width, height)
+	       .translated(commutesBadgeOffset());
+}
+
+void Node::paintCommutesBadge(QPainter* painter)
+{
+	if (!commutes())
+		return;
+
+	// EVERYTHING UNDER HERE AGREES. Green, because it is the claim that the
+	// thing is in order - and because it is the one claim a node makes about
+	// itself. The lettering is a setting (Tools > Settings > Diagram).
+	const qreal scale = depthScale();
+	painter->save();
+	painter->setFont(badgeFont());
+	painter->setPen(Qt::NoPen);
+	painter->setBrush(Palette::commuting());
+	painter->drawRoundedRect(commutesBadgeRect(), 3 * scale, 3 * scale);
+	painter->setPen(AppSettings::instance().badgeText());
+	painter->drawText(commutesBadgeRect(), Qt::AlignCenter, commutesBadgeText());
+	painter->restore();
+}
+
+bool Node::beginBadgeDrag(const QPointF& where)
+{
+	if (!commutes() || !commutesBadgeRect().contains(where))
+		return false;
+	m_draggingBadge = true;
+	m_badgeGrab = where - commutesBadgeOffset();
+	setCursor(Qt::ClosedHandCursor);
+	return true;
+}
+
+bool Node::dragBadge(const QPointF& where)
+{
+	if (!m_draggingBadge)
+		return false;
+	setCommutesBadgeOffset(where - m_badgeGrab);
+	return true;
+}
+
+bool Node::endBadgeDrag()
+{
+	if (!m_draggingBadge)
+		return false;
+	m_draggingBadge = false;
+	unsetCursor();
+	return true;
+}
+
+QString Node::typeName() const
+{
+	// WHERE IT IS DRAWN SETTLES WHAT IT IS. An object of R-Mod is a left
+	// R-module, an object of BigCat is a category, an arrow of Set is a
+	// function: the word belongs to the category, not to the class of the
+	// item, which is why this asks the category it is drawn in rather than
+	// asking itself.
+	Category* home = surroundingCategory();
+
+	if (dynamic_cast<const Arrow*>(this) != nullptr)
+		return home != nullptr ? home->morphismName() : QStringLiteral("arrow");
+
+	// An element is not an object of the category: it is a member of the
+	// object it is drawn in, and saying WHICH object is the whole of what is
+	// worth saying about it.
+	if (dynamic_cast<const AtomicElement*>(this) != nullptr)
+	{
+		auto* of = dynamic_cast<Node*>(parentItem());
+		return of == nullptr || of->id().isEmpty()
+			? QStringLiteral("element")
+			: QString("element of %1").arg(of->id());
+	}
+
+	// A SUBCATEGORY IS NOT AN OBJECT OF WHAT IT IS DRAWN IN. A subcategory of
+	// R-Mod drawn inside R-Mod would otherwise be typed a left R-module,
+	// which it is not: it is a part of that category, not a member of it.
+	if (auto* self = dynamic_cast<const Category*>(this);
+	    self != nullptr && self->isSubcategory() && home != nullptr)
+		return QString("subcategory of %1").arg(home->id());
+
+	// THE CANVAS IS DRAWN IN NOTHING, and is a category all the same - it is
+	// an object of the category of categories one universe up, which is never
+	// drawn (see Rule::universeSubject). So it answers for itself.
+	if (home == nullptr)
+		return dynamic_cast<const Category*>(this) != nullptr
+			? QStringLiteral("category") : QStringLiteral("object");
+
+	return home->objectTypeName();
+}
+
+QString Node::typing() const
+{
+	const QString name = id();
+	return name.isEmpty() ? typeName() : QString("%1 : %2").arg(name, typeName());
+}
+
+void Node::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+{
+	// Worked out now rather than kept up to date: a name is edited, a node is
+	// dragged from one category into another and is a different thing there,
+	// and a tooltip written when the node was made would be wrong by the time
+	// anybody read it.
+	const QString said = typing();
+	setToolTip(said);
+	// and in the status bar at the same moment, because the tooltip appears
+	// over the diagram - on top of the very thing it is describing
+	if (auto* diagram = diagramOf(this))
+		emit diagram->typingHovered(said);
+	QGraphicsObject::hoverEnterEvent(event);
+}
+
+void Node::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+	if (auto* diagram = diagramOf(this))
+		emit diagram->typingHovered(QString());
+	QGraphicsObject::hoverLeaveEvent(event);
+}
+
 bool Node::holdsAnything() const
 {
 	return containedCount() > 0;
@@ -305,6 +468,48 @@ void Node::setHighlight(bool on)
 void Node::setCommutesInComponent(bool commutes)
 {
 	m_componentCommutes = commutes;
+}
+
+void Node::setCommutes(bool commutes)
+{
+	if (m_commutes == commutes)
+		return;
+	prepareGeometryChange();   // the badge stands off the frame
+	ancestorsPrepareGeometryChange();
+	m_commutes = commutes;
+	update();
+	ancestorsUpdate();
+}
+
+void Node::setCommutesRecorded(bool commutes)
+{
+	if (this->commutes() == commutes)
+		return;
+	const bool before = this->commutes();
+	setCommutes(commutes);
+	if (auto* diagram = diagramOf(this))
+		diagram->noteCommutes(this, before, commutes);
+}
+
+void Node::setCommutesBadgeOffset(const QPointF& offset)
+{
+	if (m_commutesBadgeOffset == offset)
+		return;
+	prepareGeometryChange();
+	ancestorsPrepareGeometryChange();
+	m_commutesBadgeOffset = offset;
+	update();
+	ancestorsUpdate();
+}
+
+bool Node::holdsDiagram() const
+{
+	// a diagram is things with arrows among them: one box on its own has no
+	// paths to agree, so there is nothing for it to claim
+	for (QGraphicsItem* child : childItems())
+		if (auto* arrow = dynamic_cast<Arrow*>(child); arrow != nullptr && arrow->isVisible())
+			return true;
+	return false;
 }
 
 void Node::setError(bool error)

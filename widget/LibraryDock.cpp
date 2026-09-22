@@ -212,6 +212,15 @@ void LibraryDock::showContextMenu(const QPoint& at)
 		connect(rename, &QAction::triggered, this, [this, path] { renameFile(path); });
 	}
 
+	// A NEW DIAGRAM, HERE. Beside "New folder", because they are the same
+	// kind of thing: the two ways of adding to a library.
+	QAction* diagram = menu.addAction(QString("%1  New diagram in %2...")
+		.arg(Emoji::newFile(), info.isDir() ? info.fileName() : QFileInfo(here).fileName()));
+	diagram->setToolTip("Make an empty diagram here and open it. It is on the disk from the moment "
+	                    "it is made, so it is in the library straight away rather than when it is "
+	                    "first saved.");
+	connect(diagram, &QAction::triggered, this, [this, here] { createDiagram(here); });
+
 	QAction* folder = menu.addAction(QString("New folder in %1...")
 		.arg(info.isDir() ? info.fileName() : QFileInfo(here).fileName()));
 	folder->setToolTip("Make a folder here. A library is sorted by folder - a category, a chapter, "
@@ -296,6 +305,66 @@ void LibraryDock::createFolder(const QString& inDir)
 			return;
 		}
 		rescan();
+		m_where->setText(QString("Made %1.").arg(Library::relativePath(target)));
+		return;
+	}
+}
+
+void LibraryDock::createDiagram(const QString& inDir)
+{
+	if (inDir.isEmpty())
+		return;
+	for (;;)
+	{
+		bool said = false;
+		const QString name = QInputDialog::getText(this, QStringLiteral("New diagram"),
+			QString("A new diagram in %1:").arg(Library::relativePath(inDir)),
+			QLineEdit::Normal, QString(), &said).trimmed();
+		if (!said)
+			return;
+		// The same rules a folder is held to: what a file may be called is
+		// what the file system will take, and that does not differ by kind.
+		if (const QString wrong = whatIsWrongWithFolderName(name); !wrong.isEmpty())
+		{
+			QMessageBox::warning(this, QStringLiteral("New diagram"),
+				wrong.startsWith(QStringLiteral("A folder"))
+					? QString(wrong).replace(QStringLiteral("A folder"), QStringLiteral("A diagram"))
+					: wrong);
+			continue;   // back to the box with what they typed still in mind
+		}
+
+		// The kind is left UNSTATED: what a diagram is put forward as - a
+		// theorem, a lemma - is something it becomes once there is something
+		// in it to claim, and the name it is saved under says so then.
+		QString fileName = name;
+		if (QFileInfo(fileName).suffix().compare(SceneFile::extension(), Qt::CaseInsensitive) != 0)
+			fileName += QStringLiteral(".") + SceneFile::extension();
+		const QString target = QDir(inDir).absoluteFilePath(fileName);
+
+		// THAT NAME IS ALREADY A DIAGRAM. Not an error to be refused: asking
+		// for a diagram that is there already is asking for THAT diagram, so
+		// it is opened - and if it is open already, the window brings the tab
+		// that has it to the front rather than making a second one onto the
+		// same file. A folder of the same name is a different matter: it
+		// cannot be opened as a diagram and there is nothing to do but say so.
+		if (QFileInfo(target).isDir())
+		{
+			QMessageBox::warning(this, QStringLiteral("New diagram"),
+				QString("There is already a folder called %1 there.").arg(fileName));
+			continue;
+		}
+		if (QFileInfo::exists(target))
+		{
+			emit opened(target);
+			m_where->setText(QString("%1 is already there: opened it.")
+				.arg(Library::relativePath(target)));
+			return;
+		}
+
+		// The WINDOW makes it: it knows how to build a diagram and how to put
+		// one in a tab, and a diagram made here would have to be both before
+		// it could be written. The file appears when the window saves it.
+		emit createRequested(target);
 		m_where->setText(QString("Made %1.").arg(Library::relativePath(target)));
 		return;
 	}

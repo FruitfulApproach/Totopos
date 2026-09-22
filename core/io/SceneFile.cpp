@@ -14,11 +14,12 @@
 #include "core/history/SceneHistory.h"
 #include "core/history/Mementos.h"
 #include "core/props/MapsElements.h"
+#include "widget/SketchView.h"
 
 namespace
 {
 	const char kMagic[4] = { 'D', 'D', 'G', 'M' };
-	const quint16 kVersion = 25;   // 25: a doubled line, asked for on its own   // 24: which of the diagram's own defaults it has actually set   // 23: the diagram's own default colours   // 22: the colour each name is written in   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
+	const quint16 kVersion = 32;   // 32: headless flag on arrows (suppress head without changing style)   // 31: one statement per file, said in the header alone - no node or arrow carries a kind of its own   // 29: any node may claim its diagram commutes, and wears a badge saying so   // 28: a statement read piece by piece, and what its pieces are called   // 27: any node may be a proposition   // 26: how the diagram was being looked at   // 25: a doubled line, asked for on its own   // 24: which of the diagram's own defaults it has actually set   // 23: the diagram's own default colours   // 22: the colour each name is written in   // 21: the colour of the paper   // 20: R-modules as a kind of their own, and the ring each is over   // 19: where things were put in the classical view, and which notation was in front   // 18: the two lines of work joined - what each node IS (which built-in a category is, elements, what the diagram in it claims) alongside node identity and arrow style   // 17: each node's own identity   // 16: what kind of arrow it is   // 15: struck off in red, a label dragged clear, and what a proof proves   // 13: which pieces are exact. 14: what it is, written on the outside   // 2: Exists such, hypotheses, commuting. 3: rounding, image links, mapping settings. 4: bends
 
 	// THE TWO MEANINGS OF VERSION 15.
 	//
@@ -39,6 +40,8 @@ namespace
 
 	QString kindOf(Node* node)
 	{
+		// before Object, which they are: the most particular kind wins, and an
+		// older build that does not know the word makes a plain object of it
 		if (dynamic_cast<Functor*>(node) != nullptr)       return QStringLiteral("Functor");
 		if (dynamic_cast<Arrow*>(node) != nullptr)         return QStringLiteral("Arrow");
 		if (dynamic_cast<AtomicElement*>(node) != nullptr) return QStringLiteral("Element");
@@ -102,6 +105,15 @@ namespace
 		// version 22: the colour the NAME is written in. Invalid means nobody
 		// said, and it is written in the ink names are written in.
 		out << node->labelColour();
+		// Versions 27 to 30 wrote what each node was put forward as, and
+		// then a whole list of them with the titles that went beside them.
+		// Nothing writes one now: a file is ONE statement and says so in its
+		// header (see the scene section below, and Node).
+		// version 29: the claim that what is drawn UNDER this node commutes,
+		// and where the green badge saying so has been dragged to. A
+		// category wrote this in its own section before; it belongs to every
+		// node, because a diagram is what any node may hold.
+		out << node->commutes() << node->commutesBadgeOffset();
 
 		if (auto* category = dynamic_cast<Category*>(node))
 		{
@@ -144,6 +156,8 @@ namespace
 			// version 25: a doubled shaft, which is a mark of its own and not
 			// one of the styles above
 			out << quint8(arrow->doubledLine() ? 1 : 0);
+			// version 32: headless flag (suppress arrowhead without changing style)
+			out << quint8(arrow->isHeadless() ? 1 : 0);
 		}
 
 		QList<Node*> children;
@@ -198,6 +212,23 @@ namespace
 		}
 	}
 
+	// EVERYTHING A NODE IS PUT FORWARD AS (version 30), read in one piece
+	// because a node and an arrow are built at different moments and must
+	// come back wearing the same tags.
+	struct SavedTags
+	{
+		QList<qint32> kinds;
+		QStringList notes;
+		QList<QPointF> badgeAt;
+		QList<QPointF> noteAt;
+	};
+
+	void readTags(QDataStream& in, SavedTags& tags)
+	{
+		in >> tags.kinds >> tags.notes >> tags.badgeAt >> tags.noteAt;
+	}
+
+
 	struct PendingArrow
 	{
 		Node* parent = nullptr;
@@ -222,6 +253,7 @@ namespace
 		QList<QPointF> bends;
 		quint8 style = 0;   // Arrow::Style::Plain
 		quint8 doubled = 0;   // a doubled shaft, asked for beside the style
+		quint8 headless = 0; // suppress arrowhead without changing the style
 		QString key;
 		QColor labelColour;   // invalid: written in the ink names are written in
 		QString pattern;
@@ -273,6 +305,24 @@ namespace
 		QColor labelColour;
 		if (version >= 22)
 			in >> labelColour;
+		// versions 27 to 30: what this node was put forward as. Read past
+		// and dropped - one statement per file, and the file says it in its
+		// own header.
+		qint32 statementKind = 0;
+		if (version >= 27 && version < 31)
+			in >> statementKind;
+		Q_UNUSED(statementKind);
+		bool nodeCommutes = false;
+		QPointF commutesBadge;
+		if (version >= 29)
+			in >> nodeCommutes >> commutesBadge;
+		if (version == 30)
+		{
+			// the one version that held a LIST of them, with a title beside
+			// each: read past, and dropped with the rest
+			SavedTags dropped;
+			readTags(in, dropped);
+		}
 
 		Node* node = nullptr;
 		if (kind == "Arrow" || kind == "Functor")
@@ -317,6 +367,8 @@ namespace
 				in >> arrow.style;
 			if (version >= 25)
 				in >> arrow.doubled;
+			if (version >= 32)
+				in >> arrow.headless;
 			pending << arrow;
 			// an arrow holds nothing but its own label
 			qint32 count = 0;
@@ -370,6 +422,28 @@ namespace
 			category->setStatementName(statementName);
 			node = category;
 		}
+		else if (kind == "Proposition")
+		{
+			// A PROPOSITION USED TO BE A NODE. It was a box drawn round a
+			// piece of diagram, holding it, and saying what it was put
+			// forward as. It is a tag on what was already there now - so an
+			// old file's box comes back as the plain object it always was
+			// underneath, still wearing the claim it used to be (applied
+			// below, from the kind read a few lines above).
+			//
+			// What is drawn inside it stays inside it: it was drawn there,
+			// and moving it out on load would rearrange somebody's page.
+			if (version >= 28 && version < 30)
+			{
+				// the pieces it could be read in, which nothing holds any
+				// more: read past them so the record ends where it should
+				bool piecewise = false;
+				QHash<QString, QString> names;
+				QHash<QString, QPointF> offsets;
+				in >> piecewise >> names >> offsets;
+			}
+			node = new Object(id, parent);
+		}
 		else if (kind == "Element")
 		{
 			node = new AtomicElement(id, parent);
@@ -400,6 +474,8 @@ namespace
 		node->setHypothesis(hypothesis);
 		node->setLabelOffset(labelOffset);
 		node->setLabelColour(labelColour);
+		node->setCommutes(nodeCommutes);
+		node->setCommutesBadgeOffset(commutesBadge);
 		node->setCommutesInComponent(componentCommutes);
 		node->setRowsExactInComponent(componentRows);
 		node->setColumnsExactInComponent(componentColumns);
@@ -632,6 +708,23 @@ bool SceneFile::save(DiagramScene* scene, const QString& path, QString* error)
 		writeOwn(scene->ownFill(true));
 		writeOwn(scene->ownBorder(true));
 		writeOwn(scene->ownText(true));
+
+		// version 26: HOW IT WAS BEING LOOKED AT - the zoom asked for and
+		// where the view was centred. Not the diagram itself, but part of
+		// working on one: coming back to a proof and having to find your
+		// place again, at a size you have to set again, is the program
+		// forgetting something you arranged. The zoom written is the one
+		// ASKED for, never a smaller one a narrow pane forced (see
+		// SketchView::keepInView), or a diagram saved in a split window would
+		// open small ever after.
+		qreal zoom = 1.0;
+		QPointF centre;
+		if (auto* view = qobject_cast<SketchView*>(scene->views().value(0)))
+		{
+			zoom = view->chosenZoom();
+			centre = view->mapToScene(view->viewport()->rect().center());
+		}
+		out << zoom << centre;
 	}
 
 	QSaveFile file(path);
@@ -741,6 +834,21 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 	QString ambientKey;
 	if (version >= 17)
 		data >> ambientKey;
+	// ...and the colour its name is written in, which writeNode likewise
+	// writes for EVERY node. This reader spells out by hand what writeNode
+	// writes in a loop, so every field added there has to be added here too -
+	// and this one was not, which put every field after it one QColor early
+	// and made a file written since unreadable. That is what "the file does
+	// not add up" was reporting, and it was right.
+	QColor ambientLabelColour;
+	if (version >= 22)
+		data >> ambientLabelColour;
+	// ...and its tag, likewise written for every node. (The canvas answers
+	// for the file, so this is the same value the scene's own statement kind
+	// carries; it is read here because the stream has it here.)
+	qint32 ambientStatement = 0;
+	if (version >= 27)
+		data >> ambientStatement;
 	QStringList props;
 	qint32 nextObject = 0, nextArrow = 0;
 	data >> props >> nextObject >> nextArrow;
@@ -788,6 +896,7 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 	if (fill.isValid()) ambient->setFill(QBrush(fill));
 	if (border.isValid()) ambient->setBorder(QPen(border, width));
 	ambient->setLabelOffset(ambientLabelOffset);
+	ambient->setLabelColour(ambientLabelColour);
 
 	QList<PendingArrow> pending;
 	QList<PendingDerived> derived;
@@ -841,6 +950,7 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		arrow->setBends(p.bends);
 		arrow->setStyle(static_cast<Arrow::Style>(p.style));
 		arrow->setDoubledLine(p.doubled != 0);
+		arrow->setHeadless(p.headless != 0);
 		arrow->setKey(p.key);
 		arrow->setLabelOffset(p.labelOffset);
 		arrow->setLabelColour(p.labelColour);
@@ -865,6 +975,12 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 			maps->setLive(p.live != 0);
 			maps->setMirrorsGeometry(p.reflect != 0);
 		}
+
+		// and it belongs where both its ends are. A file written before
+		// propositions could hold arrows has them saved beside the box
+		// rather than in it, and an arrow left outside leaves its name
+		// behind when the box is dragged.
+		arrow->homeToCommonAncestor();
 	}
 
 	// now that every object and every arrow is there, the labels built out of
@@ -947,6 +1063,19 @@ static bool loadOneWay(DiagramScene* scene, const QString& path, QString* error,
 		data >> paper;
 		if (data.status() == QDataStream::Ok)
 			scene->setBackground(paper);
+	}
+
+	if (version >= 26)
+	{
+		qreal zoom = 1.0;
+		QPointF centre;
+		data >> zoom >> centre;
+		if (data.status() == QDataStream::Ok)
+			if (auto* view = qobject_cast<SketchView*>(scene->views().value(0)))
+			{
+				view->setChosenZoom(zoom);
+				view->centerOn(centre);
+			}
 	}
 
 	if (version >= 24)
@@ -1211,16 +1340,21 @@ QList<Node*> SceneFile::pasteFragment(const QByteArray& payload, Category* into,
 	if (in.status() != QDataStream::Ok || records.size() != count)
 		return made;
 
-	// A name means one thing in a diagram, so anything already spoken for
-	// takes a prime, as many as it needs.
-	auto freshen = [into](const QString& wanted) {
-		if (wanted.isEmpty() || !into->nameInUse(wanted))
-			return wanted;
-		QString name = wanted;
-		for (int guard = 0; guard < 26 && into->nameInUse(name); ++guard)
-			name += QChar(0x2032);
-		return name;
-	};
+	// A COPY IS CALLED WHAT IT IS A COPY OF.
+	//
+	// This used to add a prime to any name already spoken for, on the
+	// reasoning that a name means one thing in a diagram. That is true of a
+	// name somebody CHOSE, and is what the name check is for - but a copy is
+	// not a new thing that happens to clash, it is the same X put down twice,
+	// and X' is not what anybody asked for. Renaming it on the way in also
+	// broke the commonest use of copying: laying the same shape out twice to
+	// compare them, or carrying a piece into another diagram where it is
+	// meant to be the very same objects.
+	//
+	// So a copy keeps its names. Where that really is two things of one name,
+	// the diagram says so itself (AppSettings::NameCheck), which is a better
+	// answer than a silent rename: it is shown, and it can be put right by
+	// renaming whichever of the two was meant to be different.
 
 	QList<Node*> built;
 	for (int i = 0; i < records.size(); ++i)
@@ -1242,7 +1376,31 @@ QList<Node*> SceneFile::pasteFragment(const QByteArray& payload, Category* into,
 		// a top-level node is placed where the fragment was put down; a child
 		// keeps the place it had inside its parent
 		const QPointF scenePos = r.parent < 0 ? atScenePos + r.pos : home->mapToScene(r.pos);
-		Object* object = home->createObject(freshen(r.id), scenePos);
+
+		// A CATEGORY MUST BE PASTED AS A CATEGORY.
+		//
+		// home->createObject calls home->makeObject, which returns whatever kind
+		// that category creates (a plain Object for a plain Category, a Category
+		// for BigCat, etc.). When C is a Category nested inside a plain Category P,
+		// P->makeObject gives a plain Object — so C's children find a plain Object
+		// where they expect a Category and are silently dropped.
+		//
+		// The kind in the fragment is the ground truth: if it says Category, build
+		// one directly, bypassing makeObject's type decision.
+		Object* object = nullptr;
+		if (r.kind == QLatin1String("Category"))
+		{
+			auto* cat = new Category(r.id, home);
+			cat->setPos(home->mapFromScene(scenePos));
+			cat->setZValue(1);
+			cat->refreshDepthAppearance();
+			cat->refreshFrame();
+			object = cat;
+		}
+		else
+		{
+			object = home->createObject(r.id, scenePos);
+		}
 		if (object == nullptr)
 			continue;
 		object->setZValue(r.z);
@@ -1282,7 +1440,7 @@ QList<Node*> SceneFile::pasteFragment(const QByteArray& payload, Category* into,
 				++*dropped;
 			continue;
 		}
-		Arrow* arrow = home->createArrow(freshen(r.id), from, to);
+		Arrow* arrow = home->createArrow(r.id, from, to);
 		if (arrow == nullptr)
 			continue;
 		arrow->setZValue(r.z);

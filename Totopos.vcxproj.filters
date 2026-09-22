@@ -92,6 +92,12 @@
     <ClCompile Include="core\Branding.cpp">
       <Filter>core</Filter>
     </ClCompile>
+    <ClCompile Include="core\Carry.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="art\SelectionPill.cpp">
+      <Filter>art</Filter>
+    </ClCompile>
     <ClCompile Include="core\NodeKind.cpp">
       <Filter>core</Filter>
     </ClCompile>
@@ -234,6 +240,9 @@
       <Filter>widget</Filter>
     </ClCompile>
     <ClCompile Include="widget\SketchView.cpp">
+      <Filter>widget</Filter>
+    </ClCompile>
+    <ClCompile Include="widget\TabDragBar.cpp">
       <Filter>widget</Filter>
     </ClCompile>
     <ClCompile Include="widget\ToggleSwitch.cpp">
@@ -393,6 +402,15 @@
     </QtMoc>
     <QtMoc Include="widget\SketchView.h">
       <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="widget\TabDragBar.h">
+      <Filter>widget</Filter>
+    </QtMoc>
+    <QtMoc Include="core\Carry.h">
+      <Filter>core</Filter>
+    </QtMoc>
+    <QtMoc Include="art\SelectionPill.h">
+      <Filter>art</Filter>
     </QtMoc>
     <QtMoc Include="widget\ToggleSwitch.h">
       <Filter>widget</Filter>

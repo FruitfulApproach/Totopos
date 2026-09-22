@@ -33,6 +33,7 @@
 #include "widget/ToggleSwitch.h"
 #include "art/Node.h"
 #include "core/io/SceneFile.h"
+#include "widget/TabDragBar.h"
 #include "core/english/Translation.h"
 #include <QDrag>
 #include <QMimeData>
@@ -128,8 +129,9 @@ void SketchView::setCategoryLocked(bool locked)
 	m_category->setToolTip(locked
 		? QStringLiteral("Settled once the diagram has something in it. Start a new "
 		                 "diagram to work in another category.")
-		: QStringLiteral("The category everything here is drawn in. Changeable while the diagram "
-		                 "is empty."));
+		: QStringLiteral("The category everything here is drawn in. Changing it remakes what is "
+		                 "drawn as what it has to be here - objects of Grp become objects of "
+		                 "whatever you pick - and Undo takes it back."));
 }
 
 void SketchView::buildOverlay()
@@ -398,7 +400,65 @@ void SketchView::defineCustomCategory()
 void SketchView::resizeEvent(QResizeEvent* event)
 {
 	QGraphicsView::resizeEvent(event);
+	keepInView();
 	placeOverlay();
+}
+
+namespace
+{
+	// How small the view will go on its own to keep a diagram whole. Below
+	// this nothing can be read anyway, and a diagram far bigger than the pane
+	// is better shown cut off and scrollable than as a smudge.
+	const qreal kLeastAutoZoom = 0.2;
+}
+
+void SketchView::keepInView()
+{
+	// WHAT IS DRAWN STAYS IN VIEW WHEN THE ROOM FOR IT CHANGES.
+	//
+	// With the window split, a pane's width is whatever the splitter says
+	// from one moment to the next, and a diagram that fitted a moment ago is
+	// cut off. So the zoom follows the room: never larger than what was
+	// asked for, and no smaller than it takes to hold the whole diagram -
+	// down to a floor, past which shrinking further shows nothing anybody
+	// could read.
+	// Not while it is already doing it: scaling can bring the scrollbars in
+	// or out, and that is another resize.
+	if (m_keepingInView)
+		return;
+
+	const QRectF drawn = contentsRect();
+	if (drawn.isEmpty() || viewport() == nullptr)
+		return;
+
+	// MEASURED AGAINST THE ROOM THERE WOULD BE WITH NO SCROLLBARS.
+	//
+	// viewport()->rect() is what is left AFTER they are drawn, and they come
+	// and go with the very thing being decided here - so measuring against it
+	// is a loop: contents overflow, a scrollbar appears, the room shrinks, the
+	// view scales down, the contents now fit, the scrollbar goes, the room
+	// grows, the view scales back up. Editing a label is enough to set it
+	// going, because the editor shows the raw source and the node is wider
+	// while it is open.
+	//
+	// maximumViewportSize() is the room with no scrollbars at all. It does not
+	// change when they appear, so the answer is the same either way and the
+	// loop has nothing to feed on.
+	const QRectF room = QRectF(QPointF(0, 0), QSizeF(maximumViewportSize())).adjusted(0, 0, -1, -1);
+	if (room.width() <= 1 || room.height() <= 1)
+		return;
+	const QRectF wanted = drawn.adjusted(-40, -40, 40, 40);   // a little air around it
+	const qreal fits = qMin(room.width() / wanted.width(), room.height() / wanted.height());
+
+	const qreal target = qBound(kLeastAutoZoom, qMin(m_chosenZoom, fits), m_chosenZoom);
+	if (qFuzzyCompare(target, m_zoom))
+		return;
+	// straight to the transform: this is not a new choice, it is the choice
+	// already made, shown at the size there is room for
+	m_keepingInView = true;
+	scale(target / m_zoom, target / m_zoom);
+	m_zoom = target;
+	m_keepingInView = false;
 }
 
 void SketchView::setZoom(qreal factor)
@@ -409,6 +469,16 @@ void SketchView::setZoom(qreal factor)
 	// scale RELATIVE to the current transform so the anchor (cursor) holds still
 	scale(factor / m_zoom, factor / m_zoom);
 	m_zoom = factor;
+}
+
+void SketchView::setChosenZoom(qreal factor)
+{
+	// ASKED FOR, and so remembered: the wheel, the menu and the file all come
+	// through here. keepInView may then show it smaller, but what was asked
+	// for is what comes back when there is room again.
+	m_chosenZoom = qBound(0.1, factor, 8.0);
+	setZoom(m_chosenZoom);
+	keepInView();
 }
 
 namespace
@@ -511,7 +581,7 @@ void SketchView::wheelEvent(QWheelEvent* event)
 		QGraphicsView::wheelEvent(event);
 		return;
 	}
-	setZoom(m_zoom * qPow(1.15, notches));
+	setChosenZoom(m_zoom * qPow(1.15, notches));
 	event->accept();
 }
 
@@ -553,6 +623,7 @@ void SketchView::fitContents()
 		factor = clamped;
 	}
 	m_zoom = factor;
+	m_chosenZoom = factor;   // fitting IS the choice: it is what to come back to
 }
 
 void SketchView::refreshCommutesLabel(bool commutes)
@@ -696,10 +767,26 @@ namespace
 	{
 		return data != nullptr && data->hasFormat(SceneFile::fragmentMimeType());
 	}
+
+	// A TAB being carried across the window, rather than a piece of a
+	// diagram. The canvas is not what it is for, but the canvas is what the
+	// cursor is over - the page is the whole side of the window and the bar
+	// above it is a few millimetres - so it is taken here and handed to the
+	// group this view is shown in.
+	bool carriesATab(const QMimeData* data)
+	{
+		return data != nullptr && data->hasFormat(TabDragBar::mimeType());
+	}
 }
 
 void SketchView::dragEnterEvent(QDragEnterEvent* event)
 {
+	if (carriesATab(event->mimeData()))
+	{
+		event->setDropAction(Qt::MoveAction);
+		event->accept();
+		return;
+	}
 	if (carriesAFragment(event->mimeData()) && scene() != nullptr)
 	{
 		event->setDropAction(Qt::CopyAction);
@@ -711,6 +798,12 @@ void SketchView::dragEnterEvent(QDragEnterEvent* event)
 
 void SketchView::dragMoveEvent(QDragMoveEvent* event)
 {
+	if (carriesATab(event->mimeData()))
+	{
+		event->setDropAction(Qt::MoveAction);
+		event->accept();
+		return;
+	}
 	if (carriesAFragment(event->mimeData()) && scene() != nullptr)
 	{
 		event->setDropAction(Qt::CopyAction);
@@ -732,6 +825,22 @@ void SketchView::dragLeaveEvent(QDragLeaveEvent* event)
 
 void SketchView::dropEvent(QDropEvent* event)
 {
+	if (carriesATab(event->mimeData()))
+	{
+		auto* source = qobject_cast<TabDragBar*>(event->source());
+		TabGroup* here = TabGroup::holding(this);
+		const int from = event->mimeData()->data(TabDragBar::mimeType()).toInt();
+		if (source != nullptr && here != nullptr)
+		{
+			event->setDropAction(Qt::MoveAction);
+			event->accept();
+			here->takeCarriedTab(source, from);
+			return;
+		}
+		event->ignore();
+		return;
+	}
+
 	auto* diagram = qobject_cast<DiagramScene*>(scene());
 	if (!carriesAFragment(event->mimeData()) || diagram == nullptr)
 	{

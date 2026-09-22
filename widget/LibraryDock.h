@@ -43,6 +43,12 @@ signals:
 	// has one of them open follows by path: anything beginning with `before`
 	// now begins with `after`.
 	void folderRenamed(const QString& before, const QString& after);
+	// A NEW, EMPTY DIAGRAM, asked for in a folder of the library. The panel
+	// settles what it is to be CALLED and where it goes; making the diagram
+	// itself belongs to the window, which is what knows how to build one and
+	// how to put it in a tab - so the path is handed over and the window
+	// does the rest.
+	void createRequested(const QString& path);
 	// a file the user picked, by clicking it: lay it over the diagram as a rule
 	void chosen(const QString& path);
 	void applyAllRequested();
@@ -58,6 +64,8 @@ private slots:
 	void removeFile(const QString& path);
 	// make a folder inside that one, asking what to call it
 	void createFolder(const QString& inDir);
+	// ask for a name and hand the path out to be made (see createRequested)
+	void createDiagram(const QString& inDir);
 	// rename a folder of the library; everything in it goes with it
 	void renameFolder(const QString& dir);
 

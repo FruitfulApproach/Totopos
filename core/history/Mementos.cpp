@@ -79,6 +79,18 @@ void ArrowDoubled::redo()
 		arrow->setDoubledLine(m_after);
 }
 
+void ArrowHeadless::undo()
+{
+	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))
+		arrow->setHeadless(m_before);
+}
+
+void ArrowHeadless::redo()
+{
+	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))
+		arrow->setHeadless(m_after);
+}
+
 void ArrowBent::undo()
 {
 	if (auto* arrow = dynamic_cast<Arrow*>(m_arrow.data()))
@@ -243,6 +255,27 @@ QByteArray NodesCreated::payload() const
 		}
 		out << kind << id << path;
 	}
+	return bytes;
+}
+
+void CommutesChanged::undo()
+{
+	if (!m_node.isNull())
+		m_node->setCommutes(m_before);
+}
+
+void CommutesChanged::redo()
+{
+	if (!m_node.isNull())
+		m_node->setCommutes(m_after);
+}
+
+QByteArray CommutesChanged::payload() const
+{
+	QByteArray bytes;
+	QDataStream out(&bytes, QIODevice::WriteOnly);
+	out.setVersion(QDataStream::Qt_6_0);
+	out << (m_node.isNull() ? QString() : m_node->id()) << m_before << m_after;
 	return bytes;
 }
 

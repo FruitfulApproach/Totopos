@@ -246,6 +246,28 @@ private:
 	// is that node one of ours?
 	bool isOurImage(const Node* node) const;
 
+	// Recursively sync one level: objects of sourceCat → imgCat, then recurse
+	// into nested categories. Fills `imageMap` (source→image) for arrow pass.
+	// Also appends to `live` the keys of every source that still exists.
+	void syncObjectsRecursive(Node* sourceCat, Object* imgCat, const QString& name,
+	                          QMap<Node*, Node*>& imageMap, QStringList& live);
+	// Recursively sync arrows of sourceCat → imgCat, using imageMap for endpoints.
+	void syncArrowsRecursive(Node* sourceCat, Object* imgCat, const QString& name,
+	                         const QMap<Node*, Node*>& imageMap, QStringList& live);
+	// Remove any of our images inside imgCat (and recursively inside nested
+	// image categories) whose source key is not in `live`.
+	void removeStaleRecursive(Object* imgCat, const QStringList& live);
+	// One-shot recursive helpers for mapDiagram() (static so they take self explicitly)
+	static void mapObjectsRecursive(MapsElements* self, Node* sourceCat, Object* imgCat,
+	                                const QString& name, bool contravariant,
+	                                QMap<Node*, Node*>& imageMap, QList<Node*>& made, int& drawn);
+	static void mapArrowsRecursive(MapsElements* self, Node* sourceCat, Object* imgCat,
+	                                const QString& name, bool contravariant,
+	                                const QMap<Node*, Node*>& imageMap, QList<Node*>& made, int& drawn);
+	// Create or find the image of source inside imgCat; creates Category when source is Category.
+	static Object* makeOrFindImage(MapsElements* self, Object* imgCat, const QString& name,
+	                               Node* source, bool live, bool mirror);
+
 	bool m_mirror = true;   // geometry travels between the two sides, both ways
 	bool m_live = true;     // the image is drawn, on show, and kept up to date
 	bool m_contravariant = false;

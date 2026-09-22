@@ -34,6 +34,8 @@ const char* AppSettings::ArrowBorder = "arrow/border";
 const char* AppSettings::NodeText = "node/text";
 const char* AppSettings::ArrowText = "arrow/text";
 const char* AppSettings::Background = "diagram/background";
+const char* AppSettings::BadgeFill = "badge/fill";
+const char* AppSettings::BadgeText = "badge/text";
 const char* AppSettings::WindowGeometry = "window/geometry";
 const char* AppSettings::WindowState = "window/state";
 const char* AppSettings::LastFolder = "window/lastFolder";
@@ -104,10 +106,10 @@ QVariant AppSettings::defaultValue(const char* key)
 	if (k == WarnOnLibraryRemove) return true;
 	if (k == Collision) return true;
 	if (k == CollisionEpsilon) return 1.0;
-	if (k == ArrowLineWidth) return 2.0;
-	if (k == ArrowHeadLength) return 15.0;
-	if (k == ArrowHeadWidth) return 7.0;
-	if (k == ArrowHeadLineWidth) return 2.0;
+	if (k == ArrowLineWidth) return 1.2;
+	if (k == ArrowHeadLength) return 13.0;
+	if (k == ArrowHeadWidth) return 6.0;
+	if (k == ArrowHeadLineWidth) return 1.2;
 	if (k == ArrowHitWidth) return 20.0;
 	if (k == LabelPointSize) return 11.0;
 	if (k == ComposeWithRing) return true;
@@ -120,6 +122,11 @@ QVariant AppSettings::defaultValue(const char* key)
 	 || k == NodeText || k == ArrowText)
 		return QColor();
 	if (k == Background) return Palette::paper();
+	// DODGER BLUE, and white letters on it. Not one of the accents: a badge
+	// is not a state the node is in, it is a stamp put on it, and it wants a
+	// colour of its own that nothing else in the diagram uses.
+	if (k == BadgeFill) return QColor(0x1E, 0x90, 0xFF);
+	if (k == BadgeText) return QColor(0xFF, 0xFF, 0xFF);
 	// Empty: nothing to restore, so the window opens where the system puts it
 	// and the file dialog starts wherever it would have started anyway.
 	if (k == WindowGeometry || k == WindowState) return QByteArray();

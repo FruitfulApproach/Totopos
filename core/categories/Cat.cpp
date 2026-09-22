@@ -1,9 +1,15 @@
 ﻿#include "core/categories/Cat.h"
+#include "core/NodeKind.h"
 
 Cat::Cat(QGraphicsItem* parent)
 	: Category("Cat", parent)
 {
 	setProperties({ "hasProducts", "hasCoproducts", "hasEqualizers", "hasCoequalizers", "isLocallySmall" });
+}
+
+QString Cat::objectKind() const
+{
+	return NodeKind::category();
 }
 
 Object* Cat::makeObject(const QString& name)

@@ -1,4 +1,5 @@
 ﻿#include "art/Category.h"
+#include "core/NodeKind.h"
 #include "core/Palette.h"
 #include "art/Arrow.h"
 #include "core/props/MapsElements.h"
@@ -21,7 +22,7 @@ Category::Category(const QString& name, QGraphicsItem* parent)
 	const QColor wantedFill = StartsAs::fill(this, false);
 	const QColor wantedBorder = StartsAs::border(this, false);
 	setFill(QBrush(wantedFill.isValid() ? wantedFill : Palette::faded(Palette::field(), 70)));
-	setBorder(QPen(wantedBorder.isValid() ? wantedBorder : Palette::faded(Palette::cobalt(), 170), 2));
+	setBorder(QPen(wantedBorder.isValid() ? wantedBorder : Palette::faded(Palette::cobalt(), 170), 1.2));
 }
 
 Category::~Category()
@@ -107,7 +108,7 @@ bool Category::commutes() const
 	// page are never two answers to one question
 	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()); diagram != nullptr && diagram->ambientCategory() == this)
 		return diagram->commutes();
-	return m_commutes;
+	return Node::commutes();
 }
 
 void Category::setCommutes(bool commutes)
@@ -117,9 +118,9 @@ void Category::setCommutes(bool commutes)
 		diagram->setCommutes(commutes);
 		return;
 	}
-	if (m_commutes == commutes)
+	if (Node::commutes() == commutes)
 		return;
-	m_commutes = commutes;
+	Node::setCommutes(commutes);
 	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
 	{
 		emit diagram->statementChanged(diagram->statementText());
@@ -131,9 +132,14 @@ void Category::setCommutes(bool commutes)
 
 int Category::statementKind() const
 {
+	// THE CANVAS SPEAKS FOR THE FILE. Everything drawn is drawn in it, so
+	// what IT is put forward as is what the file as a whole is - which is
+	// also what its name on disk says. Every other node answers for itself.
 	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()); diagram != nullptr && diagram->ambientCategory() == this)
 		return int(diagram->statementKind());
-	return m_statementKind;
+	// Nothing else is put forward as anything: one statement per file, and
+	// this is not the file (see Node, "WHAT THE PICTURE IS PUT FORWARD AS").
+	return int(DiagramScene::Unstated);
 }
 
 void Category::setStatementKind(int kind)
@@ -143,11 +149,9 @@ void Category::setStatementKind(int kind)
 		diagram->setStatementKind(DiagramScene::StatementKind(kind));
 		return;
 	}
-	if (m_statementKind == kind)
-		return;
-	m_statementKind = kind;
-	if (auto* diagram = dynamic_cast<DiagramScene*>(scene()))
-		emit diagram->statementChanged(diagram->statementText());
+	// and nowhere else: a category drawn inside another is not a file, and a
+	// file says one thing (see Node).
+	Q_UNUSED(kind);
 }
 
 QString Category::statementName() const
@@ -485,6 +489,12 @@ bool Category::objectsAreSets() const
 	return has(IsConcrete::Key());
 }
 
+QString Category::objectKind() const
+{
+	// a plain object, which holds nothing - see makeObject just below
+	return NodeKind::object();
+}
+
 Object* Category::makeObject(const QString& name)
 {
 	// A PLAIN object, which holds nothing. An object used to be a category in
@@ -508,6 +518,9 @@ Arrow* Category::createArrow(const QString& name, Node* from, Node* to)
 	arrow->setZValue(2);
 	arrow->refreshDepthAppearance();
 	arrow->refreshFrame();
+	// and it goes where both its ends are, which is this category unless
+	// something has been drawn round them (see Arrow::homeToCommonAncestor)
+	arrow->homeToCommonAncestor();
 	return arrow;
 }
 

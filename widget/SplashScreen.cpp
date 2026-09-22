@@ -43,12 +43,20 @@ namespace
 	// starts at the edge.
 	const qreal kScrimFadesBy = 0.75;   // gone by three quarters of the way down
 
-	// the rows, measured up from the bottom edge rather than down from the
-	// logo: the artwork now owns the whole card, so there is no bottom of it
-	// to hang them from
-	const int kSayingBaseline = kHeight - kMargin + 10;
-	const int kVersionTop = kSayingBaseline - 54;
-	const int kNameTop = kVersionTop - 46;
+	// THE ARTWORK SAYS THE NAME, so nothing else does.
+	//
+	// The logo has "Totopos" written across it. Drawing Version::name() as
+	// well put the word on the card twice, one over the other in two
+	// different faces, and the version and the status line landed on the
+	// script as well. What is left to say is the version and what the program
+	// is doing, and each is given somewhere of its own to sit.
+	//
+	// The version goes in the TOP CORNER, where the wash is deepest and there
+	// is nothing drawn under it. The status line keeps the bottom, which is
+	// where a line that keeps changing is looked for.
+	const int kVersionTop = kMargin - 14;
+	const int kSayingTop = kHeight - 44;
+	const int kRuleAbove = kSayingTop - 8;
 
 	// How long the splash stays up at the least. Long enough to read the name
 	// and the version and to notice the line underneath; short enough that
@@ -139,29 +147,21 @@ QPixmap SplashScreen::plate()
 	painter.setPen(QPen(kEdge, 2));
 	painter.drawPath(rounded);
 
-	// the name, large and light: a wide tracking would be better still, but
-	// letter spacing is a font property and this one is whatever is installed
-	QFont title = painter.font();
-	title.setPointSizeF(30);
-	title.setWeight(QFont::Light);
-	painter.setFont(title);
-	painter.setPen(kOnArt);
-	painter.drawText(QRect(0, kNameTop, kWidth, 46), Qt::AlignHCenter | Qt::AlignVCenter,
-	                 Version::name());
-
-	// the version, small and quiet, directly under the name
+	// the version, small and quiet, in the top corner over the deepest part
+	// of the wash
 	QFont version = painter.font();
 	version.setPointSizeF(9.5);
 	version.setWeight(QFont::Normal);
 	painter.setFont(version);
 	painter.setPen(kQuiet);
-	painter.drawText(QRect(0, kVersionTop, kWidth, 20), Qt::AlignHCenter | Qt::AlignVCenter,
+	painter.drawText(QRect(kMargin, kVersionTop, kWidth - 2 * kMargin, 20),
+	                 Qt::AlignRight | Qt::AlignVCenter,
 	                 QStringLiteral("version %1").arg(Version::number()));
 
-	// a hairline above the subtext, so the line that keeps changing is visibly
-	// a different kind of thing from the two that do not
-	painter.setPen(QPen(QColor(255, 255, 255, 46), 1));
-	painter.drawLine(kMargin + 40, kSayingBaseline - 30, kWidth - kMargin - 40, kSayingBaseline - 30);
+	// a hairline above the subtext, so the line that keeps changing is
+	// visibly a different kind of thing from the artwork it sits on
+	painter.setPen(QPen(QColor(255, 255, 255, 90), 1));
+	painter.drawLine(kMargin + 40, kRuleAbove, kWidth - kMargin - 40, kRuleAbove);
 
 	painter.end();
 	return pixmap;
@@ -204,7 +204,9 @@ void SplashScreen::drawContents(QPainter* painter)
 	subtext.setPointSizeF(9.5);
 	subtext.setItalic(true);
 	painter->setFont(subtext);
-	painter->setPen(kQuiet);
+	// white, not the quiet grey: the foot of the card is the bright end of
+	// the wash and a grey line would be lost in it
+	painter->setPen(kOnArt);
 
 	// THE DOTS ARE PART OF THE SENTENCE, not part of the message.
 	//
@@ -214,6 +216,6 @@ void SplashScreen::drawContents(QPainter* painter)
 	const QString line = m_saying.endsWith(QLatin1Char('.'))
 		? m_saying
 		: m_saying + QStringLiteral("...");
-	painter->drawText(QRect(kMargin, kSayingBaseline - 22, kWidth - 2 * kMargin, 24),
+	painter->drawText(QRect(kMargin, kSayingTop, kWidth - 2 * kMargin, 24),
 	                  Qt::AlignHCenter | Qt::AlignVCenter, line);
 }

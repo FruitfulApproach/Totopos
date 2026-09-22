@@ -15,6 +15,8 @@ public:
 public:
 	QString objectName() const override { return QStringLiteral("category"); }
 	QString morphismName() const override { return QStringLiteral("functor"); }
+	// an object of Cat is a category (see makeObject)
+	QString objectKind() const override;
 
 protected:
 	Object* makeObject(const QString& name) override;

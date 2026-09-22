@@ -2,6 +2,9 @@
 
 #include "art/Node.h"
 
+#include <QFont>
+#include <QPointF>
+
 class AtomicElement;
 
 class Object  : public Node
@@ -17,8 +20,10 @@ public:
 	// The box round what this object holds, with a little air (see
 	// Node::boxRect) - and squared off when the object is a single letter.
 	QRectF boxRect() const override;
-	// the box together with the label, which may have been dragged outside it
-	QRectF boundingRect() const override { return boxRect() | childFrame(); }
+	// the box, the label (which may have been dragged outside it), and the
+	// badge that stands on the bottom line
+	QRectF boundingRect() const override
+	{ return boxRect() | childFrame() | commutesBadgeRect(); }
 
 	// What can be clicked. An object with nothing inside it paints NOTHING -
 	// no fill, no border, just its label - but it is still the object, so its
@@ -70,8 +75,11 @@ protected:
 	// belong to. Category overrides this again and puts one inside itself.
 	void populateActions(QMenu& menu) override;
 
-	// the press that carries this object about
+	// the press that carries this object about - or, on the badge, the one
+	// that carries the badge alone (see Node::beginBadgeDrag)
 	void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+	void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
+	void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
 	// where to START looking for a free element name, not a tally of how

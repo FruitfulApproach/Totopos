@@ -725,6 +725,44 @@ int Arrow::bendAt(const QPointF& pos, qreal radius) const
 	return -1;
 }
 
+namespace
+{
+	// everything an item is drawn in, innermost first
+	QList<QGraphicsItem*> ancestryOf(QGraphicsItem* item)
+	{
+		QList<QGraphicsItem*> up;
+		for (QGraphicsItem* at = item; at != nullptr; at = at->parentItem())
+			up << at;
+		return up;
+	}
+}
+
+void Arrow::homeToCommonAncestor()
+{
+	Node* from = domain();
+	Node* to = codomain();
+	if (from == nullptr || to == nullptr)
+		return;
+
+	// the innermost thing both ends are drawn in - not either end itself: an
+	// arrow drawn from a box to something inside it belongs outside that box
+	const QList<QGraphicsItem*> theirs = ancestryOf(to->parentItem());
+	QGraphicsItem* home = nullptr;
+	for (QGraphicsItem* up = from->parentItem(); up != nullptr && home == nullptr; up = up->parentItem())
+		if (theirs.contains(up))
+			home = up;
+	if (home == nullptr || home == parentItem())
+		return;
+
+	// the line is worked out from the two ends, so nothing about where it is
+	// drawn changes: only which node carries it, and its label with it
+	const QPointF was = scenePos();
+	setParentItem(home);
+	setPos(home->mapFromScene(was));
+	refreshDepthAppearance();
+	refreshFrame();
+}
+
 QPointF Arrow::labelAnchor() const
 {
 	if (label() == nullptr)
@@ -963,6 +1001,16 @@ QRectF Arrow::boxRect() const
 	return r.adjusted(-margin, -margin, margin, margin);
 }
 
+QRectF Arrow::badgeAnchorRect() const
+{
+	// boxRect() adds a wide margin all round, so that an arrow can be picked
+	// up by reaching near it rather than exactly at it. That margin is no
+	// part of the drawing, and badges lined up on the bottom of it would
+	// float well under the line they belong to.
+	const QPainterPath path = curve();
+	return path.isEmpty() ? QRectF(-2, -2, 4, 4) : path.boundingRect();
+}
+
 Arrow::Marks Arrow::markGeometry(const QPainterPath& path) const
 {
 	Marks marks;
@@ -1125,8 +1173,9 @@ QPainterPath Arrow::figure() const
 QRectF Arrow::boundingRect() const
 {
 	// the line together with the label, which hangs beside it and so is very
-	// nearly always outside boxRect()
-	return boxRect() | childFrame();
+	// nearly always outside boxRect() - and the badge, which stands on the
+	// bottom of the line itself
+	return boxRect() | childFrame() | commutesBadgeRect();
 }
 
 QPainterPath Arrow::shape() const
@@ -1191,6 +1240,16 @@ QPainterPath Arrow::shape() const
 		QPainterPath dot;
 		dot.addEllipse(bend, BendGrabRadius, BendGrabRadius);
 		hit = hit.united(dot);
+	}
+
+	// AND ITS BADGE. It stands on the bottom of the line, and a badge that
+	// cannot be pressed on cannot be carried anywhere. United, for the same
+	// reason the bend handles are.
+	if (commutes())
+	{
+		QPainterPath stamp;
+		stamp.addRect(commutesBadgeRect());
+		hit = hit.united(stamp);
 	}
 	return hit;
 }
@@ -1262,7 +1321,7 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	}
 	const bool selected = (option->state & QStyle::State_Selected) != 0;
 	if (selected)
-		pen.setWidthF(pen.widthF() + 1.5 * scale);
+		pen.setWidthF(pen.widthF() + 2.0 * scale);
 	painter->setPen(pen);
 	painter->setBrush(Qt::NoBrush);
 	const qreal headLengthAhead = marks.headLength;
@@ -1350,7 +1409,7 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 	const qreal secondHeadBack = marks.secondHeadBack;
 
 	QPen headPen(pen.color(),
-	             headLineWidth + (selected ? 1.5 * scale : 0.0),
+	             headLineWidth + (selected ? 2.0 * scale : 0.0),
 	             Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 	painter->setPen(headPen);
 	painter->setBrush(Qt::NoBrush);
@@ -1510,6 +1569,10 @@ void Arrow::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWi
 		for (const QPointF& bend : m_bends)
 			painter->drawEllipse(bend, 4.5, 4.5);
 	}
+
+	// WHETHER WHAT IS DRAWN UNDER IT COMMUTES: the same badge a node wears,
+	// stamped last so nothing on the line lands on top of it.
+	paintCommutesBadge(painter);
 }
 
 // ---------------------------------------------------------------- properties
@@ -1699,6 +1762,29 @@ void Arrow::setDoubledLineRecorded(bool doubled)
 			this, !doubled, doubled));
 }
 
+void Arrow::setHeadless(bool headless)
+{
+	if (m_headless == headless)
+		return;
+	prepareGeometryChange();
+	m_headless = headless;
+	update();
+	ancestorsUpdate();
+}
+
+void Arrow::setHeadlessRecorded(bool headless)
+{
+	if (m_headless == headless)
+		return;
+	const QString name = id().isEmpty() ? QStringLiteral("an arrow") : id();
+	setHeadless(headless);
+	if (auto* diagram = diagramOf(this))
+		diagram->history()->record(new ArrowHeadless(
+			headless ? QString("Removed the head of %1").arg(name)
+			         : QString("Restored the head of %1").arg(name),
+			this, !headless, headless));
+}
+
 void Arrow::setStyleRecorded(Style style)
 {
 	if (m_style == style)
@@ -1742,6 +1828,40 @@ bool Arrow::takesPressAt(const QPointF& itemPos) const
 	return along >= BendFreeEnds && along <= 1.0 - BendFreeEnds;
 }
 
+bool Arrow::pressBelongsToAnEnd(const QPointF& scenePos) const
+{
+	// IS THE PRESS INSIDE ONE OF THE TWO THINGS THIS ARROW JOINS?
+	//
+	// Only the things themselves, and only what is drawn INSIDE them. Not
+	// their names, and not the notes written beside them: a label is a line
+	// of text that hangs wherever it was dragged to, very often right across
+	// a line running past it, and surrendering the press to it meant an
+	// arrow could not be picked out anywhere its neighbour's name happened
+	// to lie. That is most of a short arrow.
+	//
+	// Nor does this cost anything at the ends: shape() has already taken the
+	// two of them out of what the arrow answers to, so a press INSIDE either
+	// box never reaches this arrow in the first place. What is left here is
+	// the case the subtraction cannot see - an end that holds the point in
+	// its shape although the arrow's stroke reaches it too.
+	for (Node* end : { m_domain, m_codomain })
+	{
+		if (end == nullptr)
+			continue;
+		if (end->contains(end->mapFromScene(scenePos)))
+			return true;
+		for (QGraphicsItem* child : end->childItems())
+		{
+			// a node drawn inside it is part of it; its name is not
+			if (!child->isVisible() || dynamic_cast<Node*>(child) == nullptr)
+				continue;
+			if (child->contains(child->mapFromScene(scenePos)))
+				return true;
+		}
+	}
+	return false;
+}
+
 void Arrow::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	if (event->button() != Qt::LeftButton)
@@ -1750,12 +1870,46 @@ void Arrow::mousePressEvent(QGraphicsSceneMouseEvent* event)
 		return;
 	}
 
-	// Near either end this press is not ours: ignored rather than swallowed,
-	// so the scene hands it on to whatever is under it and the node moves as
-	// it was asked to.
-	if (!takesPressAt(event->pos()))
+	// A BADGE IS PICKED UP ON ITS OWN, exactly as it is on a node: it is a
+	// label, and it is carried rather than bending the line under it.
+	if (beginBadgeDrag(event->pos()))
+	{
+		event->accept();
+		return;
+	}
+
+	// NEAR EITHER END, THE PRESS IS GIVEN AWAY ONLY IF THERE IS SOMETHING TO
+	// GIVE IT TO.
+	//
+	// The rule exists because the last stretch of line before an object lies
+	// across the very place you reach for to pick that object up (see
+	// takesPressAt). But it was applied to the whole outer third whatever was
+	// under the cursor, so two thirds of every arrow answered nothing at all:
+	// a press there was ignored, the scene found only the canvas beneath it,
+	// and the arrow could not be picked out. On a short arrow between two
+	// boxes, the middle third that WAS its own is a few pixels long.
+	//
+	// So: if the press is over one of the two things this arrow runs between
+	// - or over anything drawn inside one of them, a label included - it is
+	// theirs, exactly as before. Anywhere else the arrow takes it, and takes
+	// it only to be PICKED OUT: bending still belongs to the middle stretch
+	// and to the points already placed, so nothing is bent by a press meant
+	// to select.
+	const bool mine = takesPressAt(event->pos());
+	if (!mine && pressBelongsToAnEnd(event->scenePos()))
 	{
 		event->ignore();
+		return;
+	}
+	if (!mine)
+	{
+		// Let QGraphicsItem's handler clear the selection of other items.
+		// Do NOT call setSelected(true) here: if we set it before returning,
+		// Qt's scene sees the item already selected and sets mousePressDeselect=true,
+		// which deselects the arrow on mouseRelease. Instead, let Qt's scene set it
+		// after our handler returns (it sees the item not-yet-selected → no deselect).
+		QGraphicsObject::mousePressEvent(event);   // clears others, ignores event
+		event->accept();   // re-accept to prevent rubber-band; scene will select us
 		return;
 	}
 
@@ -1763,16 +1917,18 @@ void Arrow::mousePressEvent(QGraphicsSceneMouseEvent* event)
 	m_dragBend = bendAt(event->pos());
 	m_pressPos = event->pos();
 	m_pressed = true;
-	// we take this press to bend the line, so Qt's own selection handling
-	// never runs: do the part of it the user expects
-	if (scene() != nullptr && !(event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)))
-		scene()->clearSelection();
-	setSelected(true);
+	// Same rationale: let Qt's scene do the setSelected so mousePressDeselect stays false.
+	QGraphicsObject::mousePressEvent(event);
 	event->accept();
 }
 
 void Arrow::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
+	if (dragBadge(event->pos()))
+	{
+		event->accept();
+		return;
+	}
 	if (!m_pressed)
 	{
 		Node::mouseMoveEvent(event);
@@ -1811,6 +1967,12 @@ void Arrow::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 
 void Arrow::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
+	if (endBadgeDrag())
+	{
+		event->accept();
+		return;
+	}
+
 	// Pulled back onto the line it would have taken anyway: the point is not
 	// holding the curve in any shape, so it goes. Otherwise an arrow that
 	// LOOKS straight quietly keeps a control point, and the next drag of an
@@ -1830,7 +1992,16 @@ void Arrow::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 		recordBends(QString("Bent %1").arg(id()), m_bendsAtPress);
 	m_pressed = false;
 	m_dragBend = -1;
-	Node::mouseReleaseEvent(event);
+	// DO NOT pass to QGraphicsObject::mouseReleaseEvent.
+	//
+	// Qt's default release handler performs its own selection bookkeeping
+	// based on state it recorded at press time. Because Arrow::mousePressEvent
+	// called setSelected(true) directly and accepted the event before Qt could
+	// run its own press logic, Qt's internal "was selected before press" flag
+	// is wrong, and the default release uses it to *deselect* the arrow.
+	// Accepting here keeps the selection we already set and stops Qt from
+	// undoing it.
+	event->accept();
 }
 
 void Arrow::hoverEnterEvent(QGraphicsSceneHoverEvent* event)

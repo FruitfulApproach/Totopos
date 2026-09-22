@@ -20,6 +20,21 @@ class Arrow  : public Node
 public:
 	Arrow(const QString& id, Node* domain, Node* codomain, QGraphicsItem *parent=nullptr);
 
+	// AN ARROW BELONGS WHERE BOTH ITS ENDS DO.
+	//
+	// It is made by the category, and so was made a child OF the category -
+	// which is right until something is drawn round part of that category. An
+	// arrow between two objects gathered into a proposition was left outside
+	// it: the LINE followed, because it is worked out from its two ends every
+	// time it is drawn, but the arrow item itself and the label hanging off
+	// it did not, so moving the proposition left the name behind on the
+	// canvas.
+	//
+	// So the arrow is put in the deepest node that holds both its ends. For
+	// the ordinary arrow that is the category it was made in and nothing
+	// happens; for one inside a proposition it is the proposition.
+	void homeToCommonAncestor();
+
 	// The points the line is pulled through. Drag the line and one appears
 	// where it was grabbed. The line runs STRAIGHT from one to the next and
 	// turns the corner at each of them with a rounded bend, so it passes
@@ -75,6 +90,9 @@ public:
 	// (see BendFreeEnds). The scene asks this too, so that what it writes
 	// down as the thing being dragged is the same thing that gets the press.
 	bool takesPressAt(const QPointF& itemPos) const;
+	// Is one of the two things this arrow runs between under that point? Near
+	// the ends, a press there is theirs rather than the line's.
+	bool pressBelongsToAnEnd(const QPointF& scenePos) const;
 	// the clipped start, the bends, and the clipped end
 	QList<QPointF> throughPoints() const;
 	// the frame an end is joined to; an arrow is joined at the middle of its line
@@ -197,6 +215,10 @@ public:
 	void setDoubledLine(bool doubled);
 	void setDoubledLineRecorded(bool doubled);
 
+	bool isHeadless() const { return m_headless; }
+	void setHeadless(bool headless);
+	void setHeadlessRecorded(bool headless);
+
 	Style style() const { return m_style; }
 	void setStyle(Style style);
 	// the same, and put it in the scene's history: what an arrow is claimed to
@@ -211,6 +233,9 @@ public:
 
 	// the line, the head and the bend handles - not the label beside it (see Node::boxRect)
 	QRectF boxRect() const override;
+	// the line itself, with no room made round it for the head and the bend
+	// handles: what the badge is lined up on (see Node::commutesBadgeRect)
+	QRectF badgeAnchorRect() const override;
 
 	// Cancellable on the left / on the right (props/ArrowProps.h): whether this
 	// is asserted, drawn with a split vee tail / a doubled head. Checked often
@@ -250,7 +275,7 @@ public:
 	// lets the third combination exist: an implication (art/Implies.h) is a
 	// double line WITH a head, which is how "implies" is written.
 	virtual bool drawsDoubleLine() const { return m_doubleLine || m_style == Style::Equals; }
-	virtual bool drawsHead() const { return m_style != Style::Equals; }
+	virtual bool drawsHead() const { return !m_headless && m_style != Style::Equals; }
 	// half the space between the two lines, in scene units before the arrow's
 	// depth is taken off it
 	virtual qreal doubleLineGap() const { return 1.8; }
@@ -388,6 +413,7 @@ private:
 	QList<ArrowProp*> m_props;
 	Style m_style = Style::Plain;
 	bool m_doubleLine = false;   // asked for on its own, beside the style
+	bool m_headless = false;     // suppress the arrowhead without changing the style
 
 	// where the label was put, in the arrow's own frame: along the line and
 	// off to the side, as fractions of its length (see rememberLabelPlacement)

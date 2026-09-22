@@ -85,6 +85,13 @@ private:
 	void refreshCategoryBox(Category* category);
 	// the two states of the commuting claim, named and explained
 	void refreshCommutesLabel(bool commutes);
+	// The Node box, cut down to the commuting switch alone: that is the only
+	// question the CANVAS answers on this page, and the rest of the box (its
+	// label, its type, its colours) is about a node drawn in the diagram.
+	void showOnlyCommutingRow(bool only);
+	// fill in the commuting switch for that node, and show it only when
+	// there is a diagram under it to ask about
+	void refreshCommutes(Node* node);
 	// the pieces of the diagram, each with its own claim to commute
 	// the commuting and exactness switches for the node that holds a diagram
 
@@ -110,6 +117,7 @@ private:
 	QPushButton* m_textColour = nullptr;
 	QPushButton* m_setDefaultPaper = nullptr;
 	ToggleSwitch* m_doubleLine = nullptr;
+	ToggleSwitch* m_headless = nullptr;
 	QPushButton* m_setDefaultLook = nullptr;
 
 	// Everything a CATEGORY is asked about: which one it is, whether the

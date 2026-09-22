@@ -144,12 +144,14 @@ public:
 	// the claim that it fails to commute: it is the absence of a claim. The
 	// ambient category is the whole canvas, and keeps this on the scene
 	// instead, so that the panel over the canvas and this page never disagree.
-	bool commutes() const;
-	void setCommutes(bool commutes);
+	bool commutes() const override;
+	void setCommutes(bool commutes) override;
 
 	// What the diagram drawn in here is put forward AS, and what it is
-	// called. The same routing as commuting: the ambient category answers
-	// for the scene.
+	// called. ONE PER FILE: only the ambient category has an answer, and its
+	// answer is the scene's - the file is the statement. Nothing else is put
+	// forward as anything, which is why this is not a question Node is asked
+	// (see the note there).
 	int statementKind() const;
 	void setStatementKind(int kind);
 	QString statementName() const;
@@ -259,6 +261,33 @@ public:
 	// and what an OBJECT of it is called: an R-module, a set, a category
 	virtual QString objectName() const { return QStringLiteral("object"); }
 
+	// THE SAME WORD, SAID IN FULL: what an object of this category IS, for
+	// the typing shown when one is pointed at. R-Mod calls its objects
+	// R-modules in a menu, where the category is named alongside and the side
+	// is plain; on its own, "X : left R-module" is the whole truth and
+	// "X : R-module" leaves out which side the ring acts on.
+	virtual QString objectTypeName() const { return objectName(); }
+
+	// WHAT AN OBJECT OF THIS CATEGORY IS, as a NodeKind id.
+	//
+	// The same answer makeObject() gives, said as something that can be
+	// compared and handed to NodeKind::retype - which is what turns a node
+	// drawn in one category into the kind of thing it has to be in another
+	// (see DiagramScene::setAmbientCategory). Kept beside makeObject in every
+	// subclass, so the two cannot drift apart.
+	virtual QString objectKind() const;
+
+	// WHICH CATEGORY THIS IS, BY CLASS AND NOT BY NAME.
+	//
+	// A canvas can be renamed: a Grp called "BigCat" is still a Grp, and its
+	// objects are still groups. Anything asking what a category IS has to ask
+	// this and never id(), or renaming one silently changes what the program
+	// thinks is drawn in it. Empty builtInName means a category the user
+	// defined, which is only its name and its ticked structure.
+	QString categoryKind() const
+	{ return builtInName().isEmpty() ? id() : builtInName(); }
+	bool isCategoryKind(const QString& name) const { return categoryKind() == name; }
+
 	// What an arrow drawn WITHOUT a label means here. In an additive category
 	// there is one arrow that needs no name - the zero map - so a blank label
 	// is read as 0 wherever the name is needed, while the label itself stays
@@ -290,8 +319,6 @@ private:
 	bool m_rowsExact = false;
 	bool m_columnsExact = false;
 	bool m_subcategory = false;
-	bool m_commutes = false;
-	int m_statementKind = 0;
 	QString m_statementName;
 	int m_nextIndex = 0;
 	int m_nextArrowIndex = 0;

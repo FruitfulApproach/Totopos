@@ -46,6 +46,10 @@ private:
 	void addBool(Page& page, const QString& label, const char* key, const QString& tip = QString());
 	void addDouble(Page& page, const QString& label, const char* key, double min, double max, double step, const QString& suffix = QString(), const QString& tip = QString());
 	void addChoice(Page& page, const QString& label, const char* key, const QStringList& choices, const QString& tip = QString());
+	// A COLOUR. A button wearing the colour it sets, which opens the colour
+	// dialog - the same chip the Properties page uses, so a colour is picked
+	// the one way everywhere.
+	void addColour(Page& page, const QString& label, const char* key, const QString& tip = QString());
 
 	void loadAll();
 	void storeAll();

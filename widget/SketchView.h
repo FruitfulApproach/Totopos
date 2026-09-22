@@ -49,7 +49,24 @@ public:
 
 	qreal zoom() const { return m_zoom; }
 	void setZoom(qreal factor);
-	void resetZoom() { setZoom(1.0); }
+	void resetZoom() { setChosenZoom(1.0); }
+
+	// THE ZOOM THE USER ASKED FOR, which is not always the zoom in force.
+	//
+	// A pane that has been made small cannot show the diagram at the size it
+	// was being looked at, so the view backs off until the whole of it is in
+	// view again (see keepInView). What was ASKED for is kept here, and
+	// restored as soon as there is room for it - otherwise dragging a
+	// splitter narrow and wide again would leave the diagram tiny, having
+	// silently taken the shrink for a decision.
+	qreal chosenZoom() const { return m_chosenZoom; }
+	void setChosenZoom(qreal factor);
+	// a step in or out, the size the menu and the shortcuts use
+	void zoomBy(qreal times) { setChosenZoom(m_chosenZoom * times); }
+	// Fit the zoom to the room there is: never larger than what was asked
+	// for, never smaller than kLeastAutoZoom. Called when the view is
+	// resized, which is what a split window does constantly.
+	void keepInView();
 
 public slots:
 	void toggleMenu();
@@ -153,4 +170,6 @@ private:
 	bool m_open = false;
 	int m_lastCategoryIndex = 0;
 	qreal m_zoom = 1.0;
+	qreal m_chosenZoom = 1.0;   // what was asked for; m_zoom may be smaller to fit
+	bool m_keepingInView = false;   // inside keepInView: a scale of its own must not start another
 };

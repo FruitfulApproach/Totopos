@@ -13,6 +13,7 @@ class Category;   // forward: Category derives (via Object) from Node, so it can
 class DiagramScene;
 
 class QGraphicsSceneContextMenuEvent;
+class QGraphicsSceneHoverEvent;
 class QMenu;
 
 class Node  : public QGraphicsObject
@@ -111,6 +112,66 @@ public:
 	// is what makes a frame show round a node holding nothing.
 	void setDefaultLook(const QBrush& fill, const QPen& border);
 
+	// WHAT THE PICTURE IS PUT FORWARD AS IS THE FILE'S QUESTION, NOT A
+	// NODE'S.
+	//
+	// One theorem, one definition, one axiom per file. A file is a statement
+	// and is named after it ("right identity action.axiom.totopos"); what is
+	// drawn in it is what that statement says. So there is nothing to ask a
+	// node here: the kind lives on the scene (DiagramScene::statementKind),
+	// is set once at the top of the window, and is written in the file's
+	// header rather than on any item in it.
+	//
+	// It was tried the other way - a tag on every node, several at once, a
+	// badge apiece and a note beside each - and a file then held any number
+	// of claims with no one thing it was ABOUT. A file that says one thing
+	// can be cited, filed and applied as a rule; a file that says nine
+	// cannot.
+
+	// ------------------------------------------------------------- the badge
+	//
+	// ONE MARK, AND IT IS NOT ABOUT WHAT THIS IS. A node says whether what
+	// is drawn UNDER it commutes, and that claim is worth a stamp: it is the
+	// commonest thing a diagram asserts and was for a long time written
+	// nowhere on the picture.
+	//
+	// ON THE BOTTOM LINE of the box, centred across the edge rather than
+	// hanging under it, so it reads as part of that line rather than as a
+	// second box beneath the first.
+	static QString commutesBadgeText();
+	// WHAT THE BADGE IS ALIGNED TO. The box, for anything drawn as a box; an
+	// arrow gives its LINE instead, because an arrow's box is the wide margin
+	// it is picked up by and a badge hung off the bottom of that would sit
+	// well clear of the arrow it belongs to.
+	virtual QRectF badgeAnchorRect() const { return boxRect(); }
+	// in this node's own coordinates, wherever it has been dragged to; empty
+	// when this node makes no such claim
+	QRectF commutesBadgeRect() const;
+	// the type a badge is stamped in
+	QFont badgeFont() const;
+	// stamp it; called at the END of whatever a node draws, so nothing the
+	// node paints lands on top of it
+	void paintCommutesBadge(QPainter* painter);
+
+	// The badge is a label and is carried about like one. Answer true and the
+	// press was ours: the node itself must not move.
+	bool beginBadgeDrag(const QPointF& where);
+	bool dragBadge(const QPointF& where);
+	bool endBadgeDrag();
+
+	// WHAT THIS IS, IN A WORD, AND WHAT IT IS CALLED: "X : left R-module".
+	//
+	// The typing of a thing is settled by WHERE IT IS DRAWN, not by its
+	// class: an object of R-Mod is a left R-module, an object of BigCat is a
+	// category, an arrow of Set is a function. So the word comes from the
+	// category this is drawn in, and the canvas - drawn in nothing, but a
+	// category all the same - says "category" for itself.
+	//
+	// Shown as a tooltip when this is pointed at, and in the status bar at
+	// the same moment.
+	virtual QString typeName() const;
+	QString typing() const;
+
 	// does this node hold any other node? (its label does not count)
 	bool holdsAnything() const;
 
@@ -134,6 +195,27 @@ public:
 	// to keep it. Every component commutes until told otherwise.
 	bool commutesInComponent() const { return m_componentCommutes; }
 	void setCommutesInComponent(bool commutes);
+
+	// WHETHER WHAT IS DRAWN UNDER THIS NODE IS ASSERTED TO COMMUTE.
+	//
+	// Asked of the NODE, not of the category alone: a proposition holds a
+	// diagram, an object with things drawn in it holds a diagram, and each
+	// of them can claim that any two paths through what it holds agree. It
+	// used to be a question only a category could be asked, which left
+	// everything else with no way to say it.
+	//
+	// Off is not the claim that it fails to commute - it is the absence of a
+	// claim. A node that says it does wears a green badge saying so.
+	virtual bool commutes() const { return m_commutes; }
+	virtual void setCommutes(bool commutes);
+	// the same, filed in the history
+	void setCommutesRecorded(bool commutes);
+	// is there a diagram under here at all to ask about? (something drawn in
+	// it, with at least one arrow among it)
+	bool holdsDiagram() const;
+	// where the green badge has been put, from where it would sit on its own
+	QPointF commutesBadgeOffset() const { return m_commutesBadgeOffset; }
+	void setCommutesBadgeOffset(const QPointF& offset);
 
 	// The same for exactness. A connected component is a diagram; a lone
 	// object is not, which is why these do not belong to an object as such.
@@ -230,7 +312,9 @@ public:
 	// tells the scene the geometry changed, and the scene then asks this item
 	// and its ancestors for their rects). At that moment the subclass does not
 	// exist yet, so a pure virtual here is a crash.
-	QRectF boundingRect() const override { return childFrame(); }
+	// The badge of a tagged node stands above its box, so the rect that Qt
+	// repaints has to reach it (see Object::paint).
+	QRectF boundingRect() const override { return childFrame() | commutesBadgeRect(); }
 
 	// THE BOX, which is not the bounding rect. A node is drawn as a box round
 	// what it holds, and its name sits wherever the name goes - centred for an
@@ -374,6 +458,10 @@ signals:
 	void styleChanged(Node* thisNode);
 
 protected:
+	// pointed at: the typing goes up as a tooltip and into the status bar
+	void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
+
 	void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 	QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
@@ -558,6 +646,8 @@ private:
 	QString m_labelPattern;
 	QList<QPointer<Node>> m_labelSources;
 	bool m_settingDerivedLabel = false;
+	bool m_draggingBadge = false;   // the badge is being carried
+	QPointF m_badgeGrab;            // where in it the mouse took hold
 	// invalid: the name is written in the ink names are written in
 	QColor m_labelColour;
 	QBrush m_fill = Qt::NoBrush;
@@ -568,6 +658,10 @@ private:
 	bool m_inCycle = false;
 	bool m_highlighted = false;
 	bool m_componentCommutes = true;
+	// the claim that what is drawn UNDER this node commutes, and where the
+	// green badge that says so has been dragged to
+	bool m_commutes = false;
+	QPointF m_commutesBadgeOffset;
 	bool m_componentRowsExact = false;
 	bool m_componentColumnsExact = false;
 	bool m_styleChosen = false;

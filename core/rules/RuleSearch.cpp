@@ -119,8 +119,12 @@ void RuleSearchWorker::search(const Pattern& diagram, const QString& libraryRoot
 				found.name = rule.name();
 				found.path = path;
 				found.recognises = rule.isRecogniser();
+				// Pattern::Universe is a root as good as any: it says the
+				// rule was read one universe up, with its C standing for the
+				// canvas. Nothing is drawn there, so there is no node to
+				// resolve it to - and none is needed (see RuleSearch::apply).
 				found.root = match.objects.value(0, -1);
-				if (found.root < 0)
+				if (found.root == -1)
 					continue;
 
 				QStringList arrowsSaid, objectsSaid;
@@ -305,12 +309,17 @@ bool RuleSearch::apply(const ApplicableRule& found)
 	 || rule.premiseArrows().size() != found.arrows.size())
 		return false;   // the file changed under us
 
-	Node* root = nodeAt(found.root);
-	if (root == nullptr)
-		return false;
-
+	// The root binds to nothing when the rule was read one universe up: the
+	// universe is not drawn, and a rule read that way puts nothing in it, so
+	// nothing ever asks what it stands for.
 	RuleMatch match;
-	match.objects.insert(rule.root(), root);
+	if (found.root != Pattern::Universe)
+	{
+		Node* root = nodeAt(found.root);
+		if (root == nullptr)
+			return false;
+		match.objects.insert(rule.root(), root);
+	}
 	for (int i = 0; i < found.objects.size(); ++i)
 	{
 		Node* node = nodeAt(found.objects.at(i));

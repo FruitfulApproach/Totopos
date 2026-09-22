@@ -175,11 +175,29 @@ void Rule::promoteTermsOverExistentials()
 			const QString id = node->id();
 			bool spelt = false;
 			for (const QString& name : claimed)
+			{
+				// THE SAME NAME IS THE SAME VARIABLE, NOT A TERM SPELT OUT OF
+				// ONE.
+				//
+				// What moves over is a label BUILT from something the rule
+				// only claims - xy^{-1} moves because it mentions y. A
+				// premise node whose label IS that name is the very thing the
+				// conclusion is about: draw "for every X there is an
+				// id_X : X -> X" and the conclusion mentions X by name, as it
+				// must, since that is what the identity is on.
+				//
+				// Read as a term, X was promoted out of its own premise and
+				// the rule stopped asking for an X at all - so it no longer
+				// matched a diagram with an X in it, which is the only kind
+				// of diagram it was ever about.
+				if (id == name)
+					continue;
 				if (Node::labelMentions(id, name, everyName))
 				{
 					spelt = true;
 					break;
 				}
+			}
 			// and anything drawn inside something that has moved goes with it
 			if (!spelt)
 				for (Node* gone : m_conclusionObjects)
@@ -204,11 +222,17 @@ void Rule::promoteTermsOverExistentials()
 			bool spelt = endGone;
 			if (!spelt)
 				for (const QString& name : claimed)
+				{
+					// the same name is the same arrow, not a term spelt out
+					// of one: see the note above
+					if (arrow->id() == name)
+						continue;
 					if (Node::labelMentions(arrow->id(), name, everyName))
 					{
 						spelt = true;
 						break;
 					}
+				}
 			if (!spelt)
 				continue;
 			m_premiseArrows.removeAt(i);
@@ -368,6 +392,14 @@ namespace
 				return;
 			}
 			Node* pattern = objects.at(index);
+			// Bound before the walk began (the universe reading binds the
+			// rule's C to the canvas): it is settled, and the walk goes on to
+			// what is drawn inside it.
+			if (current.objects.contains(pattern))
+			{
+				matchObjects(index + 1);
+				return;
+			}
 			Node* patternParent = patternParentOf(pattern);
 			Node* home = current.objects.value(patternParent);
 			if (home == nullptr)
@@ -388,6 +420,52 @@ namespace
 			}
 		}
 	};
+}
+
+Node* Rule::universeSubject() const
+{
+	if (m_root == nullptr)
+		return nullptr;
+
+	// A UNIVERSE, OR A VARIABLE. The implied step up from a canvas is the
+	// category of categories above it, so a rule whose root is one of those -
+	// or is nobody in particular - can be read up there. One drawn in R-Mod
+	// is about R-Mod and stays where it is.
+	const QString named = m_root->id();
+	const bool universe = named == QStringLiteral("BigCat") || named == QStringLiteral("Cat")
+	                   || !Pattern::namesABuiltIn(named);
+	if (!universe)
+		return nullptr;
+
+	// exactly one thing drawn in the root, and it is a category: that is the
+	// C the rule is about
+	Node* subject = nullptr;
+	for (Node* node : m_premiseObjects)
+	{
+		if (node == nullptr || node->parentItem() != m_root)
+			continue;
+		if (subject != nullptr || dynamic_cast<Category*>(node) == nullptr)
+			return nullptr;
+		subject = node;
+	}
+	if (subject == nullptr)
+		return nullptr;
+
+	// nothing else may live in the universe: no arrow to be found there, and
+	// nothing to be drawn or struck out there
+	for (Arrow* arrow : m_premiseArrows)
+		if (arrow != nullptr && arrow->parentItem() == m_root)
+			return nullptr;
+	for (const QList<Node*>* list : { &m_conclusionObjects, &m_deletedObjects })
+		for (Node* node : *list)
+			if (node != nullptr && node->parentItem() == m_root)
+				return nullptr;
+	for (const QList<Arrow*>* list : { &m_conclusionArrows, &m_deletedArrows })
+		for (Arrow* arrow : *list)
+			if (arrow != nullptr && arrow->parentItem() == m_root)
+				return nullptr;
+
+	return subject;
 }
 
 QList<RuleMatch> RuleMatcher::find(const Rule& rule, DiagramScene* diagram, int cap)
@@ -415,30 +493,32 @@ QList<RuleMatch> RuleMatcher::find(const Rule& rule, DiagramScene* diagram, int 
 	// categories, and has no business firing in one that has not been said to
 	// be. Same direction as claimsAgree - the diagram may say more than the
 	// rule asks, never less.
-	Category* pattern = rule.root();
-	const QString named = pattern->id();
 	// By NAME, not by class. A rule for any category is drawn by taking a
 	// fresh scene and calling it C - and a fresh scene starts in BigCat, so
 	// what is on the canvas is a BigCat wearing the name C. Asking the class
 	// would make that rule about BigCat and nothing else, which is the
 	// opposite of what writing C meant.
-	const bool aboutOne = Pattern::namesABuiltIn(named);
-	const QStringList wanted = pattern->properties();
+	Category* pattern = rule.root();
 
-	auto standsFor = [&](Category* candidate) {
-		if (candidate == nullptr)
+	// Asked of the root, and again of the C in the universe reading below:
+	// the question is the same one either way - may this category of the
+	// rule stand for that category of the diagram?
+	auto fits = [](Category* want, Category* candidate) {
+		if (want == nullptr || candidate == nullptr)
 			return false;
-		if (aboutOne)
-			return candidate->id() == named || candidate->builtInName() == named;
+		const QString name = want->id();
+		if (Pattern::namesABuiltIn(name))
+			return candidate->id() == name || candidate->builtInName() == name;
 		// a variable category: any at all, carrying whatever structure was
 		// ticked on it BY HAND. A built-in renamed to a letter carries its
 		// class's structure, which is not a claim anybody made about C.
-		if (pattern->builtInName().isEmpty())
-			for (const QString& key : wanted)
+		if (want->builtInName().isEmpty())
+			for (const QString& key : want->properties())
 				if (!candidate->has(key))
 					return false;
 		return true;
 	};
+	auto standsFor = [&](Category* candidate) { return fits(pattern, candidate); };
 
 	QList<Node*> roots;
 	if (standsFor(diagram->ambientCategory()))
@@ -455,6 +535,26 @@ QList<RuleMatch> RuleMatcher::find(const Rule& rule, DiagramScene* diagram, int 
 		search.current.objects.remove(rule.root());
 		if (search.found.size() >= cap)
 			break;
+	}
+
+	// ONE UNIVERSE UP: the canvas IS the category the rule is about.
+	//
+	// The rule's root stands for the universe the canvas sits in, which is
+	// not drawn and is bound to nothing; its C is bound to the canvas itself,
+	// and the walk goes on inside it as usual. That is how a rule about "any
+	// category C" reaches a diagram drawn straight onto BigCat, without
+	// anybody having to draw BigCat as an object of BigCat (see
+	// Rule::universeSubject).
+	Category* canvas = diagram->ambientCategory();
+	if (Node* subject = rule.universeSubject();
+	    subject != nullptr && search.found.size() < cap
+	 && fits(dynamic_cast<Category*>(subject), canvas))
+	{
+		search.usedObjects.insert(canvas);
+		search.current.objects.insert(subject, canvas);
+		search.matchObjects(0);
+		search.current.objects.remove(subject);
+		search.usedObjects.remove(canvas);
 	}
 	return search.found;
 }

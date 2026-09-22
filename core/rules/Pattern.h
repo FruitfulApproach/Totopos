@@ -83,6 +83,22 @@ public:
 	int objectCount() const { return m_objectCount; }
 	int arrowCount() const { return m_arrowCount; }
 
+	// THE UNIVERSE ABOVE THE CANVAS, as a diagram index.
+	//
+	// A canvas is a category, drawn in nothing - but it sits in a universe
+	// one step up, and is an object of the category of categories there. That
+	// universe is never drawn, so it has no index of its own among the nodes;
+	// this stands for it, and it is what a rule's root is bound to when the
+	// rule is read one universe up (see Rule::universeSubject). Nothing is
+	// ever looked up by it: it says only that the root is the implied
+	// universe rather than anything on the page.
+	static constexpr int Universe = -2;
+
+	// The pattern index of the category such a rule is about - its C - or -1
+	// when this premise cannot be read that way. Set from the rule itself
+	// (see Rule::universeSubject).
+	int universeSubject() const { return m_universeSubject; }
+
 private:
 	void index();
 
@@ -92,6 +108,7 @@ private:
 	QHash<QString, QList<int>> m_categoriesByLabel;
 	int m_objectCount = 0;
 	int m_arrowCount = 0;
+	int m_universeSubject = -1;
 };
 
 // One place a pattern sits inside a diagram, as indices into each.

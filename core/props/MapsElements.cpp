@@ -808,6 +808,215 @@ bool MapsElements::closesALoop() const
 	return false;
 }
 
+// ---------------------------------------------------------------------------
+// Recursive helpers for sync() and mapDiagram()
+// ---------------------------------------------------------------------------
+
+// Create the image of `source` (a non-arrow) inside `imgCat`, or find the
+// existing one. Always returns a Category when the source is a Category,
+// regardless of what imgCat::makeObject would produce.
+Object* MapsElements::makeOrFindImage(MapsElements* self, Object* imgCat,
+                                       const QString& name, Node* source, bool live, bool mirror)
+{
+	Node* img = self->imageOf(imgCat, name, source);
+	if (img == nullptr)
+	{
+		const QPointF scenePos = imgCat->mapToScene(self->imagePlace(source));
+		if (dynamic_cast<Category*>(source) != nullptr)
+		{
+			// A CATEGORY SOURCE MUST PRODUCE A CATEGORY IMAGE.
+			//
+			// imgCat->createNamedChild calls makeObject, which returns a plain
+			// Object for a plain Category. That leaves the image category empty
+			// and unable to hold anything. Creating it directly gives the right type.
+			auto* cat = new Category(applied(name, source->id()), imgCat);
+			cat->setPos(imgCat->mapFromScene(scenePos));
+			cat->setZValue(1);
+			cat->refreshDepthAppearance();
+			cat->refreshFrame();
+			img = cat;
+		}
+		else
+		{
+			img = imgCat->createNamedChild(applied(name, source->id()), scenePos);
+		}
+		self->stamp(img, name, source);
+		img->setVisible(live);
+	}
+	else
+	{
+		const QString wanted = applied(name, source->id());
+		if (img->id() != wanted)
+			img->setId(wanted);
+		if (mirror && img->pos() != self->imagePlace(source))
+			img->setPos(self->imagePlace(source));
+	}
+	return dynamic_cast<Object*>(img);
+}
+
+void MapsElements::syncObjectsRecursive(Node* sourceCat, Object* imgCat,
+                                         const QString& name,
+                                         QMap<Node*, Node*>& imageMap,
+                                         QStringList& live)
+{
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* source = dynamic_cast<Node*>(child);
+		if (source == nullptr || dynamic_cast<Arrow*>(source) != nullptr)
+			continue;
+		if (source->id().isEmpty())
+		{
+			// MID-EDIT IS NOT GONE: keep its image alive until the editor closes
+			if (source->isEditingLabel())
+				live << source->key();
+			continue;
+		}
+		live << source->key();
+		Object* img = makeOrFindImage(this, imgCat, name, source, m_live, m_mirror);
+		if (img == nullptr)
+			continue;
+		imageMap.insert(source, img);
+		connect(source, &Node::moved, this, &MapsElements::onSourceMoved, Qt::UniqueConnection);
+		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
+		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
+		connect(img, &Node::moved, this, &MapsElements::onImageMoved, Qt::UniqueConnection);
+		connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+		connect(img, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
+
+		// RECURSE INTO NESTED CATEGORIES.
+		//
+		// A functor maps the whole diagram, however deeply nested: objects and
+		// arrows inside a subcategory of C must appear inside the image of that
+		// subcategory in F(C). The image was just made a Category above, so it
+		// can hold children; descend into it now.
+		if (auto* srcCat2 = dynamic_cast<Category*>(source))
+			if (auto* dstCat2 = dynamic_cast<Category*>(img))
+				syncObjectsRecursive(srcCat2, dstCat2, name, imageMap, live);
+	}
+}
+
+void MapsElements::syncArrowsRecursive(Node* sourceCat, Object* imgCat,
+                                        const QString& name,
+                                        const QMap<Node*, Node*>& imageMap,
+                                        QStringList& live)
+{
+	// Recurse into nested categories first (objects already exist there)
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* srcNode = dynamic_cast<Node*>(child);
+		if (srcNode == nullptr || dynamic_cast<Arrow*>(srcNode) != nullptr)
+			continue;
+		if (auto* srcCat2 = dynamic_cast<Category*>(srcNode))
+			if (auto* dstCat2 = dynamic_cast<Category*>(imageMap.value(srcCat2)))
+				syncArrowsRecursive(srcCat2, dstCat2, name, imageMap, live);
+	}
+
+	// Then handle the arrows at this level
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* source = dynamic_cast<Arrow*>(child);
+		if (source == nullptr)
+			continue;
+		if (source->id().isEmpty() && source->style() != Arrow::Style::Equals)
+		{
+			if (source->isEditingLabel())
+				live << source->key();
+			continue;
+		}
+		Node* from = imageMap.value(source->domain());
+		Node* to = imageMap.value(source->codomain());
+		if (from == nullptr || to == nullptr)
+			continue;
+		if (m_contravariant)
+			std::swap(from, to);
+		live << source->key();
+		const bool equals = source->style() == Arrow::Style::Equals;
+
+		Node* img = imageOf(imgCat, name, source);
+		if (img == nullptr)
+		{
+			if (equals)
+			{
+				auto* drawn = new Arrow(QString(), from, to, imgCat);
+				drawn->setStyle(Arrow::Style::Equals);
+				drawn->setZValue(2);
+				drawn->refreshDepthAppearance();
+				drawn->refreshFrame();
+				img = drawn;
+				stamp(img, name, source);
+				img->setVisible(m_live);
+			}
+			else
+			{
+				auto* codCat = dynamic_cast<Category*>(imgCat);
+				if (codCat == nullptr)
+					continue;
+				img = codCat->createArrow(applied(name, source->id()), from, to);
+				stamp(img, name, source);
+				img->setVisible(m_live);
+			}
+		}
+		else if (equals)
+		{
+			if (auto* ia = dynamic_cast<Arrow*>(img);
+			    ia != nullptr && ia->style() != Arrow::Style::Equals)
+				ia->setStyle(Arrow::Style::Equals);
+			if (!img->id().isEmpty())
+				img->setId(QString());
+		}
+		else if (img->id() != applied(name, source->id()))
+		{
+			img->setId(applied(name, source->id()));
+		}
+		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
+		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
+		connect(source, &Arrow::bendsChanged, this, &MapsElements::onSourceBends, Qt::UniqueConnection);
+		if (auto* imageArrow = dynamic_cast<Arrow*>(img))
+		{
+			if (imageArrow->domain() != from)
+				imageArrow->setDomain(from);
+			if (imageArrow->codomain() != to)
+				imageArrow->setCodomain(to);
+			connect(imageArrow, &Arrow::bendsChanged, this, &MapsElements::onImageBends, Qt::UniqueConnection);
+			connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
+			connect(imageArrow, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
+			const QList<QPointF> shape = carriedBends(source, imageArrow, isContravariant());
+			if (imageArrow->bends() != shape)
+				imageArrow->setBends(shape);
+		}
+	}
+}
+
+void MapsElements::removeStaleRecursive(Object* imgCat, const QStringList& live)
+{
+	// Recurse into nested image categories first
+	for (QGraphicsItem* child : imgCat->childItems())
+	{
+		auto* node = dynamic_cast<Node*>(child);
+		if (node == nullptr || !isOurImage(node) || dynamic_cast<Arrow*>(node) != nullptr)
+			continue;
+		if (auto* nested = dynamic_cast<Category*>(node))
+			removeStaleRecursive(nested, live);
+	}
+	// Now remove stale items at this level (arrows before objects)
+	QList<Node*> staleObjects, staleArrows;
+	for (QGraphicsItem* child : imgCat->childItems())
+	{
+		auto* node = dynamic_cast<Node*>(child);
+		if (node == nullptr || !isOurImage(node))
+			continue;
+		if (live.contains(node->data(ImageSourceKey).toString()))
+			continue;
+		(dynamic_cast<Arrow*>(node) != nullptr ? staleArrows : staleObjects) << node;
+	}
+	deleteAll(staleArrows);
+	deleteAll(staleObjects);
+	if (!staleArrows.isEmpty() || !staleObjects.isEmpty())
+		imgCat->refreshFrame();
+}
+
+// ---------------------------------------------------------------------------
+
 void MapsElements::sync()
 {
 	Arrow* F = arrow();
@@ -870,175 +1079,11 @@ void MapsElements::sync()
 
 	const QString name = F->id();
 	QStringList live;   // the KEYS of the sources that still exist
+	QMap<Node*, Node*> imageMap;
 
-	// the objects
-	QMap<Node*, Node*> image;
-	for (QGraphicsItem* child : dom->childItems())
-	{
-		auto* source = dynamic_cast<Node*>(child);
-		if (source == nullptr || dynamic_cast<Arrow*>(source) != nullptr)
-			continue;
-		if (source->id().isEmpty())
-		{
-			// MID-EDIT IS NOT GONE.
-			//
-			// Opening the editor selects the whole name, so the first
-			// keystroke empties it for an instant. Read as a source that no
-			// longer has a name, its image counted as stale and was taken
-			// away and drawn again on every keypress - which is both a great
-			// deal of work for nothing and the way items came to be deleted
-			// from inside the keyboard handler. It keeps its image, and its
-			// old name, until the editor closes.
-			if (source->isEditingLabel())
-				live << source->key();
-			continue;
-		}
-		live << source->key();
-		Node* img = imageOf(cod, name, source);
-		if (img == nullptr)
-		{
-			// AT ITS SOURCE'S PLACE, read in the codomain's own frame
-			img = cod->createNamedChild(applied(name, source->id()),
-			                            cod->mapToScene(imagePlace(source)));
-			stamp(img, name, source);
-			img->setVisible(m_live);
-		}
-		else
-		{
-			if (img->id() != applied(name, source->id()))
-				img->setId(applied(name, source->id()));   // the source was relabelled
-			// AND PUT BACK WHERE IT BELONGS. Every sync is the whole answer,
-			// not a correction to the last one: an image that has been left
-			// somewhere else - by a diagram read from a file, by a shove from
-			// a neighbour, by anything at all - is brought to its source's
-			// place here, so the two sides cannot stay apart.
-			if (m_mirror && img->pos() != imagePlace(source))
-				img->setPos(imagePlace(source));
-		}
-		image.insert(source, img);
-		connect(source, &Node::moved, this, &MapsElements::onSourceMoved, Qt::UniqueConnection);
-		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
-		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
-		connect(img, &Node::moved, this, &MapsElements::onImageMoved, Qt::UniqueConnection);
-		connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
-		connect(img, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
-	}
-
-	// the arrows, between the images of their ends
-	for (QGraphicsItem* child : dom->childItems())
-	{
-		auto* source = dynamic_cast<Arrow*>(child);
-		if (source == nullptr)
-			continue;
-		// An EQUALS is nameless for good: it says the two ends are the same
-		// thing and there is nothing else to call it. Everything else with no
-		// name is either being typed into or is not ours to carry across.
-		if (source->id().isEmpty() && source->style() != Arrow::Style::Equals)
-		{
-			if (source->isEditingLabel())
-				live << source->key();   // being typed into: not gone (see above)
-			continue;
-		}
-		Node* from = image.value(source->domain());
-		Node* to = image.value(source->codomain());
-		if (from == nullptr || to == nullptr)
-			continue;   // an end outside C: not ours to map
-		// contravariant: the image of f : X -> Y runs F(Y) -> F(X)
-		if (m_contravariant)
-			std::swap(from, to);
-		live << source->key();
-		// AN EQUALS CROSSES BECAUSE A MAP IS A MAP.
-		//
-		// x = y in M says the two are the same element, and a map sends the
-		// same element to the same value: f(x) = f(y), whatever f is. It is
-		// not something an R-linear map does over and above being a function -
-		// it is what a function IS - so this is handled here, once, at the
-		// level of elements, and every kind of arrow that carries elements
-		// across gets it: an R-module homomorphism because it is a map of
-		// sets in particular.
-		//
-		// It is drawn, never named: an equals has no label (see
-		// Arrow::Style::Equals), so unlike an image morphism there is nothing
-		// to apply the functor's name to, and nothing to rename later.
-		const bool equals = source->style() == Arrow::Style::Equals;
-
-		Node* img = imageOf(cod, name, source);
-		if (img == nullptr)
-		{
-			if (equals)
-			{
-				// Not through Category::createArrow: the two ends are ELEMENTS,
-				// and what holds them is an object (a module), which is not a
-				// category and makes no morphisms. An equals between two of the
-				// things inside it is not a morphism either.
-				auto* drawn = new Arrow(QString(), from, to, cod);
-				drawn->setStyle(Arrow::Style::Equals);
-				drawn->setZValue(2);
-				drawn->refreshDepthAppearance();
-				drawn->refreshFrame();
-				img = drawn;
-				stamp(img, name, source);
-				img->setVisible(m_live);
-			}
-			else
-			{
-				auto* codCat = dynamic_cast<Category*>(cod);
-				if (codCat == nullptr)
-					continue;   // elements of a module have no arrows between them
-				img = codCat->createArrow(applied(name, source->id()), from, to);
-				stamp(img, name, source);
-				img->setVisible(m_live);
-			}
-		}
-		else if (equals)
-		{
-			// it may have been drawn as an ordinary image and then said to be
-			// an equals, or the other way about
-			if (auto* imageArrow = dynamic_cast<Arrow*>(img); imageArrow != nullptr
-			    && imageArrow->style() != Arrow::Style::Equals)
-				imageArrow->setStyle(Arrow::Style::Equals);
-			if (!img->id().isEmpty())
-				img->setId(QString());
-		}
-		else if (img->id() != applied(name, source->id()))
-		{
-			img->setId(applied(name, source->id()));
-		}
-		connect(source, &Node::idChanged, this, &MapsElements::sync, Qt::UniqueConnection);
-		connect(source, &Node::deleted, this, &MapsElements::onSourceDeleted, Qt::UniqueConnection);
-		connect(source, &Arrow::bendsChanged, this, &MapsElements::onSourceBends, Qt::UniqueConnection);
-		if (auto* imageArrow = dynamic_cast<Arrow*>(img))
-		{
-			// the variance may have been switched since it was drawn
-			if (imageArrow->domain() != from)
-				imageArrow->setDomain(from);
-			if (imageArrow->codomain() != to)
-				imageArrow->setCodomain(to);
-			connect(imageArrow, &Arrow::bendsChanged, this, &MapsElements::onImageBends, Qt::UniqueConnection);
-			connect(source, &Node::labelOffsetChanged, this, &MapsElements::onSourceLabelMoved, Qt::UniqueConnection);
-			connect(imageArrow, &Node::labelOffsetChanged, this, &MapsElements::onImageLabelMoved, Qt::UniqueConnection);
-			const QList<QPointF> shape = carriedBends(source, imageArrow, isContravariant());
-			if (imageArrow->bends() != shape)
-				imageArrow->setBends(shape);
-		}
-	}
-
-	// and whatever we drew for something that is no longer there: arrows
-	// first, so nothing is left pointing at an object that has gone
-	QList<Node*> staleObjects, staleArrows;
-	for (QGraphicsItem* child : cod->childItems())
-	{
-		auto* node = dynamic_cast<Node*>(child);
-		if (node == nullptr || !isOurImage(node))
-			continue;
-		if (live.contains(node->data(ImageSourceKey).toString()))
-			continue;
-		(dynamic_cast<Arrow*>(node) != nullptr ? staleArrows : staleObjects) << node;
-	}
-	deleteAll(staleArrows);
-	deleteAll(staleObjects);
-	if (!staleArrows.isEmpty() || !staleObjects.isEmpty())
-		cod->refreshFrame();   // hidden already; the frame no longer holds them
+	syncObjectsRecursive(dom, cod, name, imageMap, live);
+	syncArrowsRecursive(dom, cod, name, imageMap, live);
+	removeStaleRecursive(cod, live);
 
 	if (scene != nullptr)
 		scene->history()->suspend(false);
@@ -1084,6 +1129,91 @@ void MapsElements::setMappingId(const QString& id)
 		F->setData(MappingIdKey, id);
 }
 
+// ---------------------------------------------------------------------------
+// One-shot recursive mapping for mapDiagram()
+// ---------------------------------------------------------------------------
+
+void MapsElements::mapObjectsRecursive(MapsElements* self, Node* sourceCat, Object* imgCat,
+                                        const QString& name, bool contravariant,
+                                        QMap<Node*, Node*>& imageMap, QList<Node*>& made, int& drawn)
+{
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* source = dynamic_cast<Node*>(child);
+		if (source == nullptr || dynamic_cast<Arrow*>(source) != nullptr || source->id().isEmpty())
+			continue;
+		Node* already = self->imageOf(imgCat, name, source);
+		if (already == nullptr)
+		{
+			const QPointF spot = freeSpotIn(imgCat, source->pos());
+			const QPointF scenePos = imgCat->mapToScene(spot);
+			if (dynamic_cast<Category*>(source) != nullptr)
+			{
+				auto* cat = new Category(applied(name, source->id()), imgCat);
+				cat->setPos(imgCat->mapFromScene(scenePos));
+				cat->setZValue(1);
+				cat->refreshDepthAppearance();
+				cat->refreshFrame();
+				already = cat;
+			}
+			else
+			{
+				already = imgCat->createNamedChild(applied(name, source->id()), scenePos);
+			}
+			self->stamp(already, name, source);
+			already->setVisible(true);
+			made << already;
+			++drawn;
+		}
+		imageMap.insert(source, already);
+
+		if (auto* srcCat2 = dynamic_cast<Category*>(source))
+			if (auto* dstCat2 = dynamic_cast<Category*>(already))
+				mapObjectsRecursive(self, srcCat2, dstCat2, name, contravariant, imageMap, made, drawn);
+	}
+}
+
+void MapsElements::mapArrowsRecursive(MapsElements* self, Node* sourceCat, Object* imgCat,
+                                       const QString& name, bool contravariant,
+                                       const QMap<Node*, Node*>& imageMap, QList<Node*>& made, int& drawn)
+{
+	// Recurse into nested categories first
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* srcNode = dynamic_cast<Node*>(child);
+		if (srcNode == nullptr || dynamic_cast<Arrow*>(srcNode) != nullptr)
+			continue;
+		if (auto* srcCat2 = dynamic_cast<Category*>(srcNode))
+			if (auto* dstCat2 = dynamic_cast<Category*>(imageMap.value(srcCat2)))
+				mapArrowsRecursive(self, srcCat2, dstCat2, name, contravariant, imageMap, made, drawn);
+	}
+
+	for (QGraphicsItem* child : sourceCat->childItems())
+	{
+		auto* a = dynamic_cast<Arrow*>(child);
+		if (a == nullptr || a->id().isEmpty())
+			continue;
+		Node* from = imageMap.value(a->domain());
+		Node* to = imageMap.value(a->codomain());
+		if (from == nullptr || to == nullptr)
+			continue;
+		if (contravariant)
+			std::swap(from, to);
+		if (self->imageOf(imgCat, name, a) != nullptr)
+			continue;
+		auto* codCat = dynamic_cast<Category*>(imgCat);
+		if (codCat == nullptr)
+			continue;
+		Node* drawnArrow = codCat->createArrow(MapsElements::applied(name, a->id()), from, to);
+		self->stamp(drawnArrow, name, a);
+		drawnArrow->setVisible(true);
+		made << drawnArrow;
+		++drawn;
+	}
+}
+
+// ---------------------------------------------------------------------------
+
 int MapsElements::mapDiagram()
 {
 	Arrow* F = arrow();
@@ -1093,53 +1223,12 @@ int MapsElements::mapDiagram()
 		return 0;
 
 	const QString name = F->id();
-	QMap<Node*, Node*> image;
+	QMap<Node*, Node*> imageMap;
 	QList<Node*> made;
 	int drawn = 0;
 
-	// The objects first, each at the same offset from its category's origin,
-	// so the image sits in the codomain as the original sits in the domain.
-	for (QGraphicsItem* child : dom->childItems())
-	{
-		auto* object = dynamic_cast<Node*>(child);
-		if (object == nullptr || dynamic_cast<Arrow*>(object) != nullptr || object->id().isEmpty())
-			continue;   // the category's own label is not a node; arrows come next
-		Node* already = imageOf(cod, name, object);
-		if (already == nullptr)
-		{
-			const QPointF spot = freeSpotIn(cod, object->pos());
-			already = cod->createNamedChild(applied(name, object->id()), cod->mapToScene(spot));
-			stamp(already, name, object);
-			already->setVisible(true);   // asked for by hand: shown
-			made << already;
-			++drawn;
-		}
-		image.insert(object, already);
-	}
-
-	// then the arrows, between the images of their ends
-	for (QGraphicsItem* child : dom->childItems())
-	{
-		auto* a = dynamic_cast<Arrow*>(child);
-		if (a == nullptr || a->id().isEmpty())
-			continue;
-		Node* from = image.value(a->domain());
-		Node* to = image.value(a->codomain());
-		if (from == nullptr || to == nullptr)
-			continue;   // an end outside the domain: not ours to map
-		if (m_contravariant)
-			std::swap(from, to);
-		if (imageOf(cod, name, a) != nullptr)
-			continue;   // already drawn
-		auto* codCat = dynamic_cast<Category*>(cod);
-		if (codCat == nullptr)
-			continue;   // elements of a module have no arrows between them
-		Node* drawnArrow = codCat->createArrow(applied(name, a->id()), from, to);
-		stamp(drawnArrow, name, a);
-		drawnArrow->setVisible(true);
-		made << drawnArrow;
-		++drawn;
-	}
+	mapObjectsRecursive(this, dom, cod, name, m_contravariant, imageMap, made, drawn);
+	mapArrowsRecursive(this, dom, cod, name, m_contravariant, imageMap, made, drawn);
 
 	if (auto* scene = dynamic_cast<DiagramScene*>(cod->scene()))
 		scene->recordCreation(QString("Mapped %1 into %2 by %3").arg(dom->id(), cod->id(), name), made);

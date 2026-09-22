@@ -7,6 +7,7 @@
 #include <QTextOption>
 #include <QTextCursor>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsSceneHoverEvent>
 #include <QGraphicsScene>
 #include "art/DiagramScene.h"
 #include "core/Notation.h"
@@ -35,6 +36,7 @@ NodeLabel::NodeLabel(const QString& text, Node* node)
 	// own constructor has run - labelIsMovable() cannot be asked from in here,
 	// where the object is still only a Node.
 	setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+	setAcceptHoverEvents(true);
 }
 
 NodeLabel::~NodeLabel()
@@ -96,6 +98,24 @@ void NodeLabel::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 	m_dragging = false;
 	if (wasDragging && m_node != nullptr && pos() != m_dragFrom)
 		m_node->labelDragFinished(m_dragFrom);
+}
+
+void NodeLabel::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
+{
+	if (m_node == nullptr) { QGraphicsTextItem::hoverEnterEvent(event); return; }
+	const QString said = m_node->typing();
+	setToolTip(said);
+	if (auto* diagram = Node::diagramOf(m_node))
+		emit diagram->typingHovered(said);
+	QGraphicsTextItem::hoverEnterEvent(event);
+}
+
+void NodeLabel::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+	if (m_node != nullptr)
+		if (auto* diagram = Node::diagramOf(m_node))
+			emit diagram->typingHovered(QString());
+	QGraphicsTextItem::hoverLeaveEvent(event);
 }
 
 void NodeLabel::setSource(const QString& text)

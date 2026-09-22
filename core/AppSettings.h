@@ -61,6 +61,14 @@ public:
 	static const char* ArrowText;        // the same for an arrow's name
 	static const char* Background;       // the paper a NEW diagram starts on
 
+	// THE BADGE TAGS: the little stamps a node wears saying what it is put
+	// forward as - AXIOM, DEFINITION, THEOREM, CONJECTURE. All four are one
+	// colour: which KIND it is is written on the badge in words, and four
+	// colours saying the same thing again only made the page noisier. Both
+	// the ground and the lettering are set here.
+	static const char* BadgeFill;        // colour, dodger blue
+	static const char* BadgeText;        // colour, white
+
 	// WHERE THE WINDOW WAS AND HOW IT WAS ARRANGED.
 	//
 	// Not a preference anybody sets in a dialog, but a setting all the same:
@@ -133,6 +141,10 @@ public:
 	// a real colour behind it rather than "nothing chosen": there is no such
 	// thing as a sheet with no colour, so a diagram always has one.
 	QColor defaultBackground() const { return value(Background).value<QColor>(); }
+
+	// what a badge tag is stamped in, and what it is lettered in
+	QColor badgeFill() const { return value(BadgeFill).value<QColor>(); }
+	QColor badgeText() const { return value(BadgeText).value<QColor>(); }
 
 	// the window as it was left, and where files were last kept
 	QByteArray windowGeometry() const { return value(WindowGeometry).toByteArray(); }

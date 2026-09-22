@@ -128,6 +128,8 @@
     <ClCompile Include="core\AppSettings.cpp" />
     <ClCompile Include="core\Emoji.cpp" />
     <ClCompile Include="core\Branding.cpp" />
+    <ClCompile Include="core\Carry.cpp" />
+    <ClCompile Include="art\SelectionPill.cpp" />
     <ClCompile Include="core\NodeKind.cpp" />
     <ClCompile Include="core\Notation.cpp" />
     <ClCompile Include="core\categories\Ab.cpp" />
@@ -177,6 +179,7 @@
     <ClCompile Include="widget\LibraryDock.cpp" />
     <ClCompile Include="widget\PropertiesDock.cpp" />
     <ClCompile Include="widget\SketchView.cpp" />
+    <ClCompile Include="widget\TabDragBar.cpp" />
     <ClCompile Include="widget\ToggleSwitch.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +235,9 @@
     <QtMoc Include="widget\LibraryDock.h" />
     <QtMoc Include="widget\PropertiesDock.h" />
     <QtMoc Include="widget\SketchView.h" />
+    <QtMoc Include="widget\TabDragBar.h" />
+    <QtMoc Include="core\Carry.h" />
+    <QtMoc Include="art\SelectionPill.h" />
     <QtMoc Include="widget\ToggleSwitch.h" />
   </ItemGroup>
   <ItemGroup>

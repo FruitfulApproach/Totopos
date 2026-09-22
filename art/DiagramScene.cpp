@@ -1,7 +1,9 @@
 ﻿#include "art/DiagramScene.h"
+#include <algorithm>
 #include "core/categories/BuiltInCategories.h"
 #include "tutor/TutorSession.h"
 #include "core/AppSettings.h"
+#include "core/NodeKind.h"
 #include "art/NodeHandles.h"
 #include "art/AtomicElement.h"
 #include "tutor/ElementOpTutor.h"
@@ -28,6 +30,8 @@
 #include <QMimeData>
 #include <QDrag>
 #include "core/io/SceneFile.h"
+#include "core/Carry.h"
+#include "art/SelectionPill.h"
 #include "core/english/Translation.h"
 #include "core/view/ClassicalView.h"
 #include <QIODevice>
@@ -63,6 +67,9 @@ DiagramScene::DiagramScene(QObject* parent)
 	// changes what the open diagram goes on to draw.
 	m_background = AppSettings::instance().defaultBackground();
 	setBackgroundBrush(QBrush(m_background));
+
+	// the offer to carry what has been picked out follows the picking
+	connect(this, &QGraphicsScene::selectionChanged, this, [this] { refreshSelectionPill(); });
 
 	// NO BSP INDEX.
 	//
@@ -262,28 +269,19 @@ void DiagramScene::syncClassicalPositions()
 
 void DiagramScene::setAmbientCategory(const QString& name)
 {
-	if (m_ambientCategory != nullptr && m_ambientCategory->id() == name)
-		return;
-
-	// SETTLED ONCE ANYTHING IS DRAWN IN IT - SAID HERE, NOT ONLY IN THE COMBOS.
+	// ALREADY THAT CATEGORY? ASKED BY CLASS, NEVER BY NAME.
 	//
-	// Everything on the canvas is an object or an arrow OF this category and
-	// would mean something else in another, which is why both dropdowns wear
-	// a padlock the moment something is drawn (SketchView::setCategoryLocked,
-	// PropertiesDock::refreshCategoryBox). Those are two widgets that have to
-	// be told; this is the rule. A disabled combo is a courtesy, not a
-	// guarantee - it is refreshed from signals that do not fire for every way
-	// a node can appear - and the swap it guards is the most destructive
-	// thing in the program: it reparents every node in the diagram and then
-	// destroys the canvas they were drawn on.
-	if (m_ambientCategory != nullptr && m_ambientCategory->holdsAnything())
-	{
-		emit message(QString("%1 already holds something, so what it is has settled: what is drawn "
-		                     "in it would mean something else in %2. Start a new diagram to draw in %2.")
-			.arg(m_ambientCategory->id(), name));
-		emit ambientCategoryChanged(m_ambientCategory);   // put the dropdowns back
+	// A canvas can be renamed, and a file remembers the name and the class
+	// separately (SceneFile makes the canvas from its built-in name and then
+	// puts the saved name on it). So a Grp called "BigCat" is a real thing to
+	// meet, and it is still a Grp: what is placed in it is a group, and its
+	// objects have elements. Comparing the NAME here made choosing BigCat on
+	// such a canvas a no-op - the dropdown already said BigCat - and the
+	// program went on making groups on a canvas everybody could see was
+	// called BigCat. Comparing the class is the whole fix: the switch goes
+	// through, the canvas is rebuilt as a BigCat, and the two agree again.
+	if (m_ambientCategory != nullptr && m_ambientCategory->isCategoryKind(name))
 		return;
-	}
 
 	// EVERYTHING POINTING INTO THE OLD CANVAS LETS GO FIRST.
 	//
@@ -353,8 +351,48 @@ void DiagramScene::setAmbientCategory(const QString& name)
 	// Only now can it tell that it IS the canvas, and draw itself as one:
 	// its name in bold at the origin, and no frame round the whole picture.
 	fresh->becameAmbient();
+
+	// AND WHAT WAS DRAWN BECOMES WHAT IT NOW HAS TO BE.
+	//
+	// A node is not a neutral box: an object of Grp is a group, an object of
+	// R-Mod is a module that knows its zero, an object of BigCat is a
+	// category that other things can be drawn inside. Carried over as they
+	// stood, they went on being the old kind on the new canvas - groups
+	// sitting in BigCat, offering to take elements - which is the same
+	// confusion as a Grp called BigCat, one level down.
+	//
+	// So each of them is rebuilt as the kind the new category makes. What is
+	// not about the kind comes across (name, place, contents, the arrows that
+	// end on it - see NodeKind::transplant); what cannot survive the change
+	// does not, and that is the price of saying the canvas is something else.
+	// Every rebuild is a step in the history, so Undo takes the lot back.
+	const QString wanted = fresh->objectKind();
+	QList<Node*> carried;
+	for (QGraphicsItem* child : fresh->childItems())
+		if (auto* node = dynamic_cast<Node*>(child);
+		    node != nullptr && dynamic_cast<Arrow*>(node) == nullptr)
+			carried << node;
+	// ALREADY RIGHT IS LEFT ALONE, and "right" is not always "the same kind".
+	// A category of categories takes ANY category as an object: an R-Mod
+	// drawn in BigCat is a perfectly good object of BigCat, and rebuilding it
+	// as a plain category would throw away what it is made of for no reason.
+	auto alreadyRight = [&wanted](Node* node) {
+		const QString is = NodeKind::of(node);
+		return is == wanted
+		    || (wanted == NodeKind::category() && NodeKind::isCategoryKind(is));
+	};
+	int changed = 0;
+	for (Node* node : carried)
+		if (!alreadyRight(node) && NodeKind::retype(node, wanted) != node)
+			++changed;
+
 	emit ambientCategoryChanged(fresh);
 	emit statementChanged(statementText());
+	if (changed > 0)
+		emit message(QString("%1 is now %2, and %3 thing%4 in it %5 remade as %6.")
+			.arg(fresh->id(), name)
+			.arg(changed).arg(changed == 1 ? "" : "s",
+			     changed == 1 ? "was" : "were", fresh->objectName() + (changed == 1 ? "" : "s")));
 }
 
 Category* DiagramScene::categoryAt(QGraphicsItem* item) const
@@ -470,6 +508,35 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 
 		Node* from = label != nullptr ? dynamic_cast<Node*>(label->parentItem())
 		                              : nodeAt(event->scenePos());
+
+		// AN ARROW ON TOP OF A NODE MUST NOT SWALLOW THE DOUBLE-CLICK.
+		//
+		// A functor between G and H may have a bounding rect that covers
+		// the interior of H, so hitItem returns the functor even when the
+		// cursor is squarely on X inside H. We want to start an arrow from
+		// X, not from the functor, so if the hit resolves to an Arrow we
+		// scan all items at the point for the first non-Arrow node.
+		if (dynamic_cast<Arrow*>(from) != nullptr)
+		{
+			const QList<QGraphicsItem*> under = items(event->scenePos(),
+				Qt::IntersectsItemShape, Qt::DescendingOrder);
+			for (QGraphicsItem* item : under)
+			{
+				if (item == m_handle || item == m_pill) continue;
+				if (!m_pending.isNull() && (item == m_pending.data() || m_pending->isAncestorOf(item))) continue;
+				if (item->acceptedMouseButtons() == Qt::NoButton) continue;
+				if (dynamic_cast<Arrow*>(item) != nullptr) continue;
+				Node* candidate = dynamic_cast<Node*>(item);
+				if (candidate == nullptr)
+					candidate = dynamic_cast<Node*>(item->parentItem());
+				if (candidate != nullptr)
+				{
+					from = candidate;
+					break;
+				}
+			}
+		}
+
 		if (from != nullptr && from != m_ambientCategory && from->canStartArrow())
 		{
 			beginArrow(from);
@@ -522,7 +589,27 @@ void DiagramScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 	}
 	else
 	{
-		into = categoryAt(hitItem(event->scenePos()));
+		// Find the category to place into. If the topmost hit is an Arrow
+		// (e.g. a functor whose bounding rect covers a nested category's
+		// interior), look through the items at the point for the first
+		// non-Arrow — otherwise objects would land in the ambient category
+		// even when the cursor is visually inside a nested one.
+		QGraphicsItem* hit = hitItem(event->scenePos());
+		if (dynamic_cast<Arrow*>(hit) != nullptr)
+		{
+			const QList<QGraphicsItem*> under = items(event->scenePos(),
+				Qt::IntersectsItemShape, Qt::DescendingOrder);
+			for (QGraphicsItem* item : under)
+			{
+				if (item == m_handle || item == m_pill) continue;
+				if (!m_pending.isNull() && (item == m_pending.data() || m_pending->isAncestorOf(item))) continue;
+				if (item->acceptedMouseButtons() == Qt::NoButton) continue;
+				if (dynamic_cast<Arrow*>(item) != nullptr) continue;
+				hit = item;
+				break;
+			}
+		}
+		into = categoryAt(hit);
 	}
 	if (into == nullptr)
 	{
@@ -558,8 +645,8 @@ QGraphicsItem* DiagramScene::hitItem(const QPointF& scenePos) const
 	const QList<QGraphicsItem*> under = items(scenePos, Qt::IntersectsItemShape, Qt::DescendingOrder);
 	for (QGraphicsItem* item : under)
 	{
-		if (item == m_handle)
-			continue;
+		if (item == m_handle || item == m_pill)
+			continue;   // ours, and over the diagram: never the thing meant
 		// The arrow being placed RUNS TO THE CURSOR, so it is always directly
 		// under it - and so is its label. Were it not skipped here, every
 		// click meant for the object underneath would land on it instead and
@@ -594,8 +681,14 @@ Node* DiagramScene::nodeForPress(const QPointF& scenePos) const
 			node = dynamic_cast<Node*>(up);
 		if (node == nullptr)
 			continue;
+		// An arrow that does not want this press is passed over - but it only
+		// does not want it when the press belongs to one of the things it
+		// runs between (see Arrow::mousePressEvent). Anywhere else along the
+		// line it is the arrow's, and the handle bar and the record of what
+		// is being dragged must be about the arrow.
 		if (auto* arrow = dynamic_cast<Arrow*>(node);
-		    arrow != nullptr && !arrow->takesPressAt(arrow->mapFromScene(scenePos)))
+		    arrow != nullptr && !arrow->takesPressAt(arrow->mapFromScene(scenePos))
+		 && arrow->pressBelongsToAnEnd(scenePos))
 			continue;
 		return node;
 	}
@@ -638,6 +731,16 @@ void DiagramScene::recordCreation(const QString& description, const QList<Node*>
 {
 	if (m_history == nullptr || nodes.isEmpty())
 		return;
+	recordStep(new NodesCreated(description, nodes), nodes);
+}
+
+void DiagramScene::recordStep(Memento* step, const QList<Node*>& nodes)
+{
+	if (m_history == nullptr || step == nullptr)
+	{
+		delete step;
+		return;
+	}
 
 	// While the chase is on, anything drawn is an assumption of the statement
 	// being chased: it goes into the hypotheses, and it says so.
@@ -658,7 +761,7 @@ void DiagramScene::recordCreation(const QString& description, const QList<Node*>
 			emit message(QString("Into the hypotheses: %1").arg(named.join(", ")));
 	}
 
-	m_history->record(new NodesCreated(description, nodes));
+	m_history->record(step);
 	emit nodesAdded(nodes);
 	emit statementChanged(statementText());
 	checkDiagram();
@@ -1062,6 +1165,19 @@ void DiagramScene::noteExistsSuch(Node* node, bool before, bool after)
 	// the history's own signal refreshes the statement
 }
 
+void DiagramScene::noteCommutes(Node* node, bool before, bool after)
+{
+	if (node == nullptr || m_history == nullptr)
+		return;
+	const QString what = node->id().isEmpty() ? QStringLiteral("this") : node->id();
+	m_history->record(new CommutesChanged(
+		after ? QString("The diagram in %1 commutes").arg(what)
+		      : QString("%1 no longer claims its diagram commutes").arg(what),
+		node, before, after));
+	emit statementChanged(statementText());
+	checkDiagram();
+}
+
 void DiagramScene::noteDeleteMark(Node* node, bool before, bool after)
 {
 	if (node == nullptr || m_history == nullptr)
@@ -1456,6 +1572,31 @@ namespace
 void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 	m_lastScenePos = event->scenePos();
+
+	// SOMETHING IS BEING CARRIED: this press is where it goes.
+	//
+	// Answered before anything else - before a selection, a move or a bend -
+	// because while a fragment is in hand that is the only thing a press can
+	// mean. Where it lands is where the cursor is, and WHAT it lands in is
+	// whatever category is under that point, so a press inside a box puts it
+	// in that box.
+	if (Carry::instance().isCarrying())
+	{
+		if (event->button() == Qt::LeftButton)
+        {
+			const QByteArray parcel = Carry::instance().payload();
+			Carry::instance().drop();
+			dropFragment(parcel, event->scenePos());
+		}
+		else
+		{
+			Carry::instance().drop();   // any other button: never mind
+			emit message("Put down.");
+		}
+		event->accept();
+		return;
+	}
+
 	pickingAdds(event);
 
 	// SHIFT AND CLICK TAKES A THING IN OR OUT OF THE SELECTION, and does
@@ -1732,6 +1873,14 @@ void DiagramScene::keyPressEvent(QKeyEvent* event)
 			return;
 		}
 	}
+	if (event->key() == Qt::Key_Escape && Carry::instance().isCarrying())
+	{
+		Carry::instance().drop();
+		emit message("Not carrying anything now.");
+		event->accept();
+		return;
+	}
+
 	if (event->key() == Qt::Key_Escape && arrowPending())
 	{
 		cancelArrow();
@@ -2560,6 +2709,88 @@ QList<Node*> DiagramScene::dropFragment(const QByteArray& payload, const QPointF
 			.arg(made.size()).arg(made.size() == 1 ? "" : "s", into->id())
 			.arg(dropped).arg(dropped == 1 ? " was" : "s were"));
 	return made;
+}
+
+void DiagramScene::refreshSelectionPill()
+{
+    const QList<Node*> chosen = selectedNodes();
+    // ANYTHING PICKED OUT CAN BE SAID SOMETHING ABOUT, so the bar appears for
+    // one as readily as for a dozen: a single object drawn with a dashed
+    // arrow off it is a perfectly good axiom, and the whole point of the book
+    // is that a statement is made OF what is picked out.
+    if (chosen.isEmpty())
+    {
+        if (m_pill != nullptr)
+            m_pill->setVisible(false);
+        return;
+    }
+
+    if (m_pill == nullptr)
+    {
+        m_pill = new SelectionPill();
+        addItem(m_pill);
+        connect(m_pill, &SelectionPill::copyAsked, this, [this] { carrySelection(); });
+        connect(m_pill, &SelectionPill::addNodeAsked, this, [this] { addNodeIntoSelected(); });
+    }
+
+    // Add-node button only makes sense when the selection has no arrows:
+    // an arrow cannot hold children, so there is nowhere to put the new node.
+    const bool hasNoArrows = std::none_of(chosen.begin(), chosen.end(),
+        [](Node* n) { return dynamic_cast<Arrow*>(n) != nullptr; });
+    m_pill->setShowAddNode(hasNoArrows);
+
+    QRectF bounds;
+    for (Node* node : chosen)
+        bounds |= node->sceneBoundingRect();
+    m_pill->hoverOver(bounds);
+    m_pill->setVisible(true);
+}
+
+void DiagramScene::addNodeIntoSelected()
+{
+    // Place a new object inside each selected non-arrow node. When exactly
+    // one category is selected it goes inside it; when several are selected
+    // each gets its own new child. Arrows are ignored (the button is hidden
+    // for them, but guard here in case the selection changed under us).
+    const QList<Node*> chosen = selectedNodes();
+    int added = 0;
+    for (Node* node : chosen)
+    {
+        if (dynamic_cast<Arrow*>(node) != nullptr)
+            continue;
+        auto* into = dynamic_cast<Object*>(node);
+        if (into == nullptr || !into->canHoldNamedChildren())
+            continue;
+        auto* cat = dynamic_cast<Category*>(into);
+        const QString name = cat != nullptr ? cat->nextObjectName() : into->nextElementName();
+        // place near the centre of the node
+        const QPointF at = into->mapToScene(into->boundingRect().center());
+        into->createNamedChild(name, at);
+        ++added;
+    }
+    if (added == 0)
+        emit message("The selected item cannot hold children. "
+                     "Select a category or object that can.");
+}
+
+void DiagramScene::carrySelection()
+{
+    const QList<Node*> chosen = selectedNodes();
+    if (chosen.isEmpty())
+        return;
+    const QByteArray parcel = SceneFile::copyFragment(chosen);
+    if (parcel.isEmpty())
+    {
+        emit message("There is nothing in that to carry.");
+        return;
+    }
+    const QString what = chosen.size() == 1
+        ? QString("%1").arg(chosen.first()->id().isEmpty() ? QStringLiteral("one thing")
+                                                           : chosen.first()->id())
+        : QString("%1 things").arg(chosen.size());
+    Carry::instance().pick(parcel, what);
+    emit message(QString("Carrying %1. Click where they should go - in this diagram or another. "
+                         "Escape puts them down.").arg(what));
 }
 
 QList<Node*> DiagramScene::duplicateSelection()

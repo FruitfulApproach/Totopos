@@ -41,6 +41,7 @@ namespace Palette
 	inline QColor picked()       { return QColor(0x7C, 0x3A, 0xED); }   // selected by hand
 	inline QColor offered()      { return QColor(0xF5, 0x9E, 0x0B); }   // a handle held out to be pressed
 	inline QColor held()         { return QColor(0xB4, 0x53, 0x09); }   // locked, and saying so
+	inline QColor commuting()    { return QColor(0x22, 0xC5, 0x5E); }   // every path under here agrees
 
 	// The same colour at a given alpha, for the washes. Written this way so a
 	// call site says WHICH colour and HOW FAINT separately, rather than

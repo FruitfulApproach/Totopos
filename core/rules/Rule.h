@@ -57,6 +57,35 @@ public:
 	// Everything else in a rule is a variable, free to stand for anything.
 	static bool isConstant(const QString& label);
 
+	// THE CATEGORY THIS RULE IS ABOUT, ONE UNIVERSE DOWN - or nullptr.
+	//
+	// "Identity intro" is drawn as BigCat holding a category C holding an
+	// object X, and it concludes that X has an identity. Used on a diagram
+	// whose CANVAS is the category in question - objects drawn straight onto
+	// BigCat - it found nothing, because the diagram has no category drawn
+	// inside it for C to be.
+	//
+	// It should have. A canvas is a category, and although it is drawn in
+	// nothing it is not nowhere: it sits in a universe one step up, and is an
+	// object of the category of categories THERE. Not of itself - BigCat is
+	// not an object of BigCat, and nobody should have to draw it as one to
+	// get an identity arrow.
+	//
+	// So a rule of this shape has a second reading: its root is that implied
+	// universe, and C is the canvas the rule is being used on. This returns
+	// the C - the one category drawn directly in the rule's root - when the
+	// rule can be read that way at all:
+	//
+	//   - the root holds exactly one thing, and that thing is a category;
+	//   - no premise ARROW is drawn directly in the root (in the universe
+	//     reading there is nothing drawn there for it to run between);
+	//   - nothing the rule concludes or deletes is drawn directly in the
+	//     root, because nothing may be made or unmade in a universe that is
+	//     not drawn;
+	//   - the root is a category of categories (BigCat, Cat) or a variable.
+	//     A rule drawn in R-Mod is about R-Mod, not about a universe.
+	Node* universeSubject() const;
+
 private:
 	void extract();
 	// A term spelt out of something the rule only CLAIMS is part of what is

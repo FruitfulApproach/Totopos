@@ -96,6 +96,21 @@ private:
 	bool m_after = false;
 };
 
+class ArrowHeadless : public PureGraphical
+{
+public:
+	ArrowHeadless(const QString& description, Node* arrow, bool before, bool after)
+		: PureGraphical(description), m_arrow(arrow), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+
+private:
+	QPointer<Node> m_arrow;
+	bool m_before = false;
+	bool m_after = false;
+};
+
 // The points an arrow is pulled through. Where a line is drawn says nothing
 // about what it means.
 class ArrowBent : public PureGraphical
@@ -229,6 +244,26 @@ public:
 	void undo() override { attachAll(); }
 	void redo() override { detachAll(); }
 	quint16 typeTag() const override { return MementoTag::NodesRemoved; }
+};
+
+// WHETHER WHAT IS DRAWN UNDER A NODE IS ASSERTED TO COMMUTE. Not a look: a
+// diagram that commutes says that any two paths through it agree, which is
+// most of what a diagram is ever for.
+class CommutesChanged : public Memento
+{
+public:
+	CommutesChanged(const QString& description, Node* node, bool before, bool after)
+		: Memento(description), m_node(node), m_before(before), m_after(after) {}
+
+	void undo() override;
+	void redo() override;
+	quint16 typeTag() const override { return MementoTag::Commutes; }
+	QByteArray payload() const override;
+
+private:
+	QPointer<Node> m_node;
+	bool m_before;
+	bool m_after;
 };
 
 // Whether a part of the diagram is given or claimed to exist. Not graphical:

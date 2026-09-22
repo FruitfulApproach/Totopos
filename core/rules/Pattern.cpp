@@ -171,6 +171,10 @@ Pattern Pattern::fromRulePremise(const Rule& rule)
 
 	pattern.m_objectCount = int(objects.size());
 	pattern.m_arrowCount = int(arrows.size());
+	// and whether this rule can also be read one universe up, with its C
+	// standing for the canvas it is used on rather than for a category drawn
+	// inside it (see Rule::universeSubject)
+	pattern.m_universeSubject = indexOf.value(rule.universeSubject(), -1);
 	pattern.index();
 	return pattern;
 }
@@ -275,6 +279,14 @@ namespace
 				return;
 			}
 			const int patternIndex = objectOrder.at(index);
+			// Bound before the walk began (the universe reading binds the
+			// rule's C to the canvas): settled, so the walk goes on to what
+			// is drawn inside it.
+			if (current.objects.contains(patternIndex))
+			{
+				matchObjects(index + 1);
+				return;
+			}
 			const int home = current.objects.value(pattern.at(patternIndex).parent, -1);
 			if (home < 0)
 				return;   // its parent was not placed: cannot be
@@ -330,6 +342,33 @@ QList<PatternMatch> PatternMatcher::find(const Pattern& pattern, const Pattern& 
 		search.current.objects.remove(0);
 		if (search.found.size() >= cap)
 			break;
+	}
+
+	// ONE UNIVERSE UP: THE CANVAS IS THE CATEGORY THE RULE IS ABOUT.
+	//
+	// "For any category C, every object of C has an identity" is drawn as
+	// BigCat holding C holding X. Used on a diagram whose objects are drawn
+	// straight onto the canvas, there is no C drawn for it to find - and yet
+	// the canvas is exactly the category meant. It is a category drawn in
+	// nothing, which is to say it is an object of the category of categories
+	// ONE UNIVERSE UP; so the rule's root stands for that universe, which is
+	// bound to nothing because nothing draws it, and C stands for the canvas.
+	//
+	// This is not BigCat being an object of BigCat. The root is not the
+	// canvas: it is the step above it, and nothing is ever made there - which
+	// is why Rule::universeSubject refuses the reading for any rule that
+	// draws, deletes or joins anything at that level.
+	const int subject = pattern.universeSubject();
+	if (subject > 0 && search.found.size() < cap
+	 && diagram.at(0).isCategory && search.labelsAgree(subject, 0))
+	{
+		search.current.objects.insert(0, Pattern::Universe);
+		search.current.objects.insert(subject, 0);
+		search.usedObjects.insert(0);
+		search.matchObjects(0);
+		search.usedObjects.remove(0);
+		search.current.objects.remove(subject);
+		search.current.objects.remove(0);
 	}
 	return search.found;
 }
